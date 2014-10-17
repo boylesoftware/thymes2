@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  - Web-fragment deployment descriptor.
+  -
+  - author: Lev Himmelfarb
+ -->
+
+<web-fragment xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-fragment_3_1.xsd"
+	version="3.1">
+
+	<!--
+	  - Default configuration for the core.
+	 -->
+
+	<context-param>
+		<description>
+			Application manifest file path.
+		</description>
+		<param-name>x2.app.manifest</param-name>
+		<param-value>/META-INF/MANIFEST.MF</param-value>
+	</context-param>
+
+	<context-param>
+		<description>
+			Number of threads used to process endpoint requests.
+		</description>
+		<param-name>x2.threads.EndpointCallProcessors</param-name>
+		<param-value>2</param-value>
+	</context-param>
+
+	<context-param>
+		<description>
+			Number of threads used for long-running background jobs.
+		</description>
+		<param-name>x2.threads.JobRunners</param-name>
+		<param-value>1</param-value>
+	</context-param>
+
+	<context-param>
+		<description>
+			Number of threads used to execute asynchronous side tasks.
+		</description>
+		<param-name>x2.threads.SideTaskProcessors</param-name>
+		<param-value>1</param-value>
+	</context-param>
+
+	<context-param>
+		<description>
+			Maximum allowed HTTP request entity size in bytes.
+		</description>
+		<param-name>x2.maxRequestSize</param-name>
+		<param-value>2048</param-value>
+	</context-param>
+
+	<context-param>
+		<description>
+			Timeout in milliseconds for processing regular endpoint calls. Value
+			of zero or less indicates no timeout.
+		</description>
+		<param-name>x2.regularCallTimeout</param-name>
+		<param-value>10000</param-value>
+	</context-param>
+
+	<context-param>
+		<description>
+			Timeout in milliseconds for processing "long job" endpoint calls.
+			Value of zero or less indicates no timeout.
+		</description>
+		<param-name>x2.longJobCallTimeout</param-name>
+		<param-value>60000</param-value>
+	</context-param>
+
+	<context-param>
+		<description>
+			Regular expression for allowed CORS request origins. Special value
+			of "*" is used for the CORS wildcard.
+		</description>
+		<param-name>x2.allowedOriginsPattern</param-name>
+		<param-value>*</param-value>
+	</context-param>
+
+	<context-param>
+		<description>
+			Number of milliseconds a newly issued authentication token is valid.
+		</description>
+		<param-name>x2.auth.tokenTTL</param-name>
+		<param-value>1800000</param-value>
+	</context-param>
+
+	<context-param>
+		<description>
+			Number of milliseconds after which to expire results of actor lookup
+			in the actor authentication service. If 0, caching of actor lookup
+			results is disabled.
+		</description>
+		<param-name>x2.auth.cache.discardAfter</param-name>
+		<param-value>60000</param-value>
+	</context-param>
+
+	<context-param>
+		<description>
+			Number of milliseconds after which to request refresh of cached
+			actor lookup results. As opposed to the discard timeout, refreshing
+			is performed asynchronously in the background, which the currently
+			cached result is still returned.
+		</description>
+		<param-name>x2.auth.cache.refreshAfter</param-name>
+		<param-value>5000</param-value>
+	</context-param>
+
+	<context-param>
+		<description>
+			Maximum size of the actor lookup results cache.
+		</description>
+		<param-name>x2.auth.cache.maxSize</param-name>
+		<param-value>256</param-value>
+	</context-param>
+
+
+	<!--
+	  - Default resources serializer.
+	 -->
+
+	<context-param>
+		<description>
+			Class name of the resource serialization service provider used by
+			the application.
+		</description>
+		<param-name>x2.service.serialization.provider</param-name>
+		<param-value>com.boylesoftware.x2.services.serialization.impl.json.JsonResourceSerializationServiceProvider</param-value>
+	</context-param>
+
+
+	<!--
+	  - Default persistent resource versioning service.
+	 -->
+
+	<context-param>
+		<description>
+			Class name of the persistent resource versioning service provider
+			used by the application.
+		</description>
+		<param-name>x2.service.versioning.provider</param-name>
+		<param-value>com.boylesoftware.x2.services.versioning.impl.memory.MemoryPersistentResourceVersioningServiceProvider</param-value>
+	</context-param>
+
+
+	<!--
+	  - Dummy stubs for other essential services.
+	 -->
+
+	<context-param>
+		<description>
+			Class name of the persistence service provider used by the
+			application.
+		</description>
+		<param-name>x2.service.persistence.provider</param-name>
+		<param-value>org.bsworks.x2.services.persistence.impl.dummy.DummyPersistenceServiceProvider</param-value>
+	</context-param>
+
+	<context-param>
+		<description>
+			Class name of the actor authentication service provider used by the
+			application.
+		</description>
+		<param-name>x2.service.auth.provider</param-name>
+		<param-value>org.bsworks.x2.services.auth.impl.dummy.DummyActorAuthenticationServiceProvider</param-value>
+	</context-param>
+
+	<context-param>
+		<description>
+			Class name of the application internal monitor service provider used
+			by the application.
+		</description>
+		<param-name>x2.service.monitor.provider</param-name>
+		<param-value>org.bsworks.x2.services.monitor.impl.dummy.DummyMonitorServiceProvider</param-value>
+	</context-param>
+
+
+	<!--
+	  - Empty placeholders for the application configuration.
+	 -->
+
+	<context-param>
+		<description>
+			Whitespace-separated list of additional application service
+			providers each with an optional service instance id following a
+			colon after the provider class name.
+		</description>
+		<param-name>x2.app.serviceProviders</param-name>
+		<param-value></param-value>
+	</context-param>
+
+	<context-param>
+		<description>
+			Whitespace-separated list of Java packages that contain application
+			persistent resources.
+		</description>
+		<param-name>x2.app.persistentResources.packages</param-name>
+		<param-value></param-value>
+	</context-param>
+
+	<context-param>
+		<description>
+			Regular expression pattern for JAR file names to scan for persistent
+			application resources. If empty, only classes in /WEB-INF/classes
+			are scanned.
+		</description>
+		<param-name>x2.app.persistentResources.jarsPattern</param-name>
+		<param-value></param-value>
+	</context-param>
+
+	<context-param>
+		<description>
+			Service endpoint definitions.
+		</description>
+		<param-name>x2.app.endpoints</param-name>
+		<param-value></param-value>
+	</context-param>
+
+</web-fragment>

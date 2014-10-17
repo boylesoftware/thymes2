@@ -1,0 +1,594 @@
+package org.bsworks.x2.services.persistence.impl.jdbc;
+
+import java.sql.Connection;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.bsworks.x2.Actor;
+import org.bsworks.x2.resource.FilterSpec;
+import org.bsworks.x2.resource.OrderSpec;
+import org.bsworks.x2.resource.PersistentResourceHandler;
+import org.bsworks.x2.resource.PropertiesFetchSpec;
+import org.bsworks.x2.resource.RangeResult;
+import org.bsworks.x2.resource.RangeSpec;
+import org.bsworks.x2.resource.RefsFetchResult;
+import org.bsworks.x2.resource.RefsFetchSpec;
+import org.bsworks.x2.resource.ResourceReadSessionCache;
+import org.bsworks.x2.resource.Resources;
+import org.bsworks.x2.services.persistence.LockType;
+import org.bsworks.x2.services.persistence.PersistentResourceFetch;
+import org.bsworks.x2.util.sql.dialect.SQLDialect;
+
+
+/**
+ * Persistent resource fetch implementation.
+ *
+ * @param <R> Persistent resource type.
+ *
+ * @author Lev Himmelfarb
+ */
+class PersistentResourceFetchImpl<R>
+	implements PersistentResourceFetch<R> {
+
+	/**
+	 * Main query with an optional count query.
+	 */
+	private final class MainQuery {
+
+		/**
+		 * Statements to execute before the query.
+		 */
+		final List<PersistenceUpdateImpl> preStatements;
+
+		/**
+		 * Statements to execute after the query.
+		 */
+		final List<PersistenceUpdateImpl> postStatements;
+
+		/**
+		 * Query for selecting the data.
+		 */
+		final ResourcePersistenceQueryImpl<R> dataQuery;
+
+		/**
+		 * Query for selecting the records count, or {@code null}.
+		 */
+		final SimpleValuePersistenceQueryImpl<Long> countQuery;
+
+
+		/**
+		 * Create new queries couple.
+		 *
+		 * @param preStatements Statements to execute before the query, may be
+		 * {@code null}.
+		 * @param postStatements Statements to execute after the query, may be
+		 * {@code null}.
+		 * @param dataQuery Query for selecting the data.
+		 * @param countQuery Query for selecting the records count, or
+		 * {@code null}.
+		 */
+		MainQuery(final List<PersistenceUpdateImpl> preStatements,
+				final List<PersistenceUpdateImpl> postStatements,
+				final ResourcePersistenceQueryImpl<R> dataQuery,
+				final SimpleValuePersistenceQueryImpl<Long> countQuery) {
+
+			this.preStatements = preStatements;
+			this.postStatements = postStatements;
+			this.dataQuery = dataQuery;
+			this.countQuery = countQuery;
+		}
+	}
+
+
+	/**
+	 * Application resources manager.
+	 */
+	private final Resources resources;
+
+	/**
+	 * SQL dialect.
+	 */
+	private final SQLDialect dialect;
+
+	/**
+	 * Query parameter value handlers factory.
+	 */
+	private final ParameterValuesFactoryImpl paramsFactory;
+
+	/**
+	 * Database connection.
+	 */
+	private final Connection con;
+
+	/**
+	 * Persistent resource handler.
+	 */
+	private final PersistentResourceHandler<R> prsrcHandler;
+
+	/**
+	 * Data consumer.
+	 */
+	private final Actor actor;
+
+	/**
+	 * Properties fetch specification.
+	 */
+	private PropertiesFetchSpec<R> propsFetch;
+
+	/**
+	 * Filter.
+	 */
+	private FilterSpec<R> filter;
+
+	/**
+	 * Order.
+	 */
+	private OrderSpec<R> order;
+
+	/**
+	 * Range.
+	 */
+	private RangeSpec range;
+
+	/**
+	 * Range result.
+	 */
+	private RangeResult rangeResult;
+
+	/**
+	 * References fetch.
+	 */
+	private RefsFetchSpec<R> refsFetch;
+
+	/**
+	 * References fetch result.
+	 */
+	private RefsFetchResult refsFetchResult;
+
+	/**
+	 Lock type for the result, or {@code null} if none requested.
+	 */
+	private LockType lockType;
+
+	/**
+	 * Name of the temporary table used to anchor multi-query fetches.
+	 */
+	private final String anchorTableName;
+
+
+	/**
+	 * Create new fetch.
+	 *
+	 * @param resources Application resources manager.
+	 * @param dialect SQL dialect.
+	 * @param paramsFactory Query parameter value handlers factory.
+	 * @param con Database connection.
+	 * @param prsrcClass Persistent resource class.
+	 * @param actor The fetch data consumer.
+	 */
+	PersistentResourceFetchImpl(final Resources resources,
+			final SQLDialect dialect,
+			final ParameterValuesFactoryImpl paramsFactory,
+			final Connection con, final Class<R> prsrcClass,
+			final Actor actor) {
+
+		this.resources = resources;
+		this.dialect = dialect;
+		this.paramsFactory = paramsFactory;
+		this.con = con;
+		this.prsrcHandler = resources.getPersistentResourceHandler(prsrcClass);
+		this.actor = actor;
+
+		this.anchorTableName =
+			"q_" + this.prsrcHandler.getPersistentCollectionName();
+	}
+
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public PersistentResourceFetch<R> setPropertiesFetch(
+			final PropertiesFetchSpec<R> propsFetch) {
+
+		this.propsFetch = propsFetch;
+
+		return this;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public PersistentResourceFetch<R> setFilter(final FilterSpec<R> filter) {
+
+		this.filter = filter;
+
+		return this;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public PersistentResourceFetch<R> setOrder(final OrderSpec<R> order) {
+
+		this.order = order;
+
+		return this;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public PersistentResourceFetch<R> setRange(final RangeSpec range,
+			final RangeResult rangeResult) {
+
+		if ((range == null) && (rangeResult != null))
+			throw new IllegalArgumentException("Range result object must be"
+					+ " specified together with a range specification.");
+
+		this.range = range;
+		this.rangeResult = rangeResult;
+
+		return this;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public PersistentResourceFetch<R> setRefsFetch(
+			final RefsFetchSpec<R> refsFetch,
+			final RefsFetchResult refsResult) {
+
+		if (((refsFetch == null) && (refsResult != null))
+				|| ((refsFetch != null) && (refsResult == null)))
+			throw new IllegalArgumentException("References fetch must be"
+					+ " specified together with referneces fetch result"
+					+ " object.");
+
+		this.refsFetch = refsFetch;
+		this.refsFetchResult = refsResult;
+
+		return this;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public PersistentResourceFetch<R> lockResult(final LockType lockType) {
+
+		this.lockType = lockType;
+
+		return this;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public List<R> getResultList() {
+
+		// build the query
+		final QueryBuilder qb = this.buildQuery();
+
+		// setup references fetch result
+		final Map<String, Object> refsFetchResultMap =
+			this.getRefsFetchResultMap();
+
+		// get the main query
+		final MainQuery mainQuery = this.getMainQuery(qb);
+
+		// execute pre-statements
+		if (mainQuery.preStatements != null)
+			for (final PersistenceUpdateImpl stmt : mainQuery.preStatements)
+				stmt.execute();
+		try {
+
+			// get the records count if requested
+			if (mainQuery.countQuery != null)
+				this.rangeResult.setTotalCount(
+						mainQuery.countQuery.getFirstResult(null).longValue());
+
+			// execute the main query
+			final List<R> mainResult =
+				mainQuery.dataQuery.getResultList(refsFetchResultMap);
+
+			// check if nothing
+			if (mainResult.isEmpty())
+				return mainResult;
+
+			// execute branch queries
+			for (final QueryBranch branch : qb.getBranches()) {
+				mainQuery.dataQuery.setQueryText(
+						branch.getQueryBuilder().buildAnchoredSelectQuery(
+								this.anchorTableName, null))
+					.getResultList(refsFetchResultMap);
+			}
+
+			// return the result
+			return mainResult;
+
+		} finally {
+
+			// execute post-statements
+			if (mainQuery.postStatements != null)
+				for (final PersistenceUpdateImpl stmt :
+						mainQuery.postStatements)
+					stmt.execute();
+		}
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public R getFirstResult() {
+
+		// build the query
+		final QueryBuilder qb = this.buildQuery();
+
+		// setup references fetch result
+		final Map<String, Object> refsFetchResultMap =
+			this.getRefsFetchResultMap();
+
+		// get the main query
+		final MainQuery mainQuery = this.getMainQuery(qb);
+
+		// execute pre-statements
+		if (mainQuery.preStatements != null)
+			for (final PersistenceUpdateImpl stmt : mainQuery.preStatements)
+				stmt.execute();
+		try {
+
+			// get the records count if requested
+			if (mainQuery.countQuery != null)
+				this.rangeResult.setTotalCount(
+						mainQuery.countQuery.getFirstResult(null).longValue());
+
+			// execute the main query
+			final R mainResult =
+				mainQuery.dataQuery.getFirstResult(refsFetchResultMap);
+
+			// check if nothing
+			if (mainResult == null)
+				return null;
+
+			// execute branch queries
+			for (final QueryBranch branch : qb.getBranches()) {
+				mainQuery.dataQuery.setQueryText(
+						branch.getQueryBuilder().buildAnchoredSelectQuery(
+								this.anchorTableName, null))
+					.getFirstResult(refsFetchResultMap);
+			}
+
+			// return the result
+			return mainResult;
+
+		} finally {
+
+			// execute post-statements
+			if (mainQuery.postStatements != null)
+				for (final PersistenceUpdateImpl stmt :
+						mainQuery.postStatements)
+					stmt.execute();
+		}
+	}
+
+	/**
+	 * Build the query.
+	 *
+	 * @return The top query builder.
+	 */
+	private QueryBuilder buildQuery() {
+
+		return QueryBuilder.createQueryBuilder(this.resources, this.dialect,
+				this.paramsFactory, this.actor, this.prsrcHandler,
+				this.propsFetch, this.refsFetch, this.filter, this.order);
+	}
+
+	/**
+	 * Build, prepare and return the main query.
+	 *
+	 * @param qb Top query builder.
+	 *
+	 * @return The main query.
+	 */
+	private MainQuery getMainQuery(final QueryBuilder qb) {
+
+		// the queries, the pre- and post- statements, the parameters
+		final List<String> preStmtTexts = new ArrayList<>();
+		final List<String> postStmtTexts = new ArrayList<>();
+		final String countQueryText;
+		final String dataQueryText;
+		final Map<String, JDBCParameterValue> params = new HashMap<>();
+
+		// get "WHERE" and "ORDER BY" clauses
+		final WhereClause whereClause = (this.filter == null ? null :
+			qb.buildWhereClause(params));
+		final OrderByClause orderByClause = (this.order == null ? null :
+			qb.buildOrderByClause());
+
+		// check if no branches
+		if (qb.getBranches().isEmpty()) {
+
+			// check if no range
+			if (this.range == null) {
+
+				// no count
+				countQueryText = null;
+
+				// direct select
+				final String q =
+					qb.buildDirectSelectQuery(whereClause, orderByClause);
+				if (this.lockType == null)
+					dataQueryText = q;
+				else switch (this.lockType) {
+				case SHARED:
+					dataQueryText = this.dialect.makeSelectWithShareLock(
+							q, qb.getRootTableAlias());
+					break;
+				case EXCLUSIVE:
+					dataQueryText = this.dialect.makeSelectWithExclusiveLock(
+							q, qb.getRootTableAlias());
+					break;
+				default: // cannot happen
+					throw new RuntimeException("Unknown lock type.");
+				}
+
+			} else { // ranged query
+
+				// do we need the count?
+				if (this.rangeResult != null)
+					countQueryText = qb.buildCountQuery(whereClause);
+				else
+					countQueryText = null;
+
+				// check if no collections
+				if (!qb.hasCollections()) {
+
+					// ranged direct select
+					final String q = this.dialect.makeRangedSelect(
+							qb.buildDirectSelectQuery(whereClause,
+									orderByClause),
+							this.range, this.paramsFactory, params);
+					switch (this.lockType) {
+					case SHARED:
+						dataQueryText = this.dialect.makeSelectWithShareLock(
+								q, qb.getRootTableAlias());
+						break;
+					case EXCLUSIVE:
+						dataQueryText =
+							this.dialect.makeSelectWithExclusiveLock(
+									q, qb.getRootTableAlias());
+						break;
+					default:
+						dataQueryText = q;
+						break;
+					}
+
+				} else { // ranged and has collections
+
+					// create anchor table
+					final String q = this.dialect.makeRangedSelect(
+							qb.buildIdsQuery(whereClause, orderByClause),
+							this.range, this.paramsFactory, params);
+					this.dialect.makeSelectIntoTempTable(
+							this.anchorTableName,
+							(this.lockType == LockType.EXCLUSIVE
+									? this.dialect.makeSelectWithExclusiveLock(
+											q, qb.getRootTableAlias())
+									: this.dialect.makeSelectWithShareLock(
+											q, qb.getRootTableAlias())),
+							preStmtTexts, postStmtTexts);
+
+					// anchored select
+					dataQueryText =
+						qb.buildAnchoredSelectQuery(this.anchorTableName,
+								orderByClause);
+				}
+			}
+
+		} else { // branched query
+
+			// check if no range
+			if (this.range == null) {
+
+				// no count
+				countQueryText = null;
+
+				// create anchor table
+				final String q = qb.buildIdsQuery(whereClause, null);
+				this.dialect.makeSelectIntoTempTable(
+						this.anchorTableName,
+						(this.lockType == LockType.EXCLUSIVE
+								? this.dialect.makeSelectWithExclusiveLock(
+										q, qb.getRootTableAlias())
+								: this.dialect.makeSelectWithShareLock(
+										q, qb.getRootTableAlias())),
+						preStmtTexts, postStmtTexts);
+
+			} else {  // ranged query
+
+				// do we need the count?
+				if (this.rangeResult != null)
+					countQueryText = qb.buildCountQuery(whereClause);
+				else
+					countQueryText = null;
+
+				// create anchor table
+				final String q = this.dialect.makeRangedSelect(
+						qb.buildIdsQuery(whereClause, orderByClause),
+						this.range, this.paramsFactory, params);
+				this.dialect.makeSelectIntoTempTable(
+						this.anchorTableName,
+						(this.lockType == LockType.EXCLUSIVE
+								? this.dialect.makeSelectWithExclusiveLock(
+										q, qb.getRootTableAlias())
+								: this.dialect.makeSelectWithShareLock(
+										q, qb.getRootTableAlias())),
+						preStmtTexts, postStmtTexts);
+			}
+
+			// anchored select
+			dataQueryText =
+				qb.buildAnchoredSelectQuery(this.anchorTableName,
+						orderByClause);
+		}
+
+		// prepare pre- and post- statements
+		final List<PersistenceUpdateImpl> preStmts;
+		if (!preStmtTexts.isEmpty()) {
+			preStmts = new ArrayList<>(preStmtTexts.size());
+			for (final String stmtText : preStmtTexts)
+				preStmts.add(new PersistenceUpdateImpl(this.con,
+						this.paramsFactory, stmtText, params));
+		} else {
+			preStmts = null;
+		}
+		final List<PersistenceUpdateImpl> postStmts;
+		if (!postStmtTexts.isEmpty()) {
+			postStmts = new ArrayList<>(postStmtTexts.size());
+			for (final String stmtText : postStmtTexts)
+				postStmts.add(new PersistenceUpdateImpl(this.con,
+						this.paramsFactory, stmtText, params));
+		} else {
+			postStmts = null;
+		}
+
+		// create the query
+		ResourcePersistenceQueryImpl<R> query =
+			new ResourcePersistenceQueryImpl<>(this.resources, this.con,
+					this.paramsFactory, dataQueryText,
+					this.prsrcHandler.getResourceClass(), this.actor, params);
+		query.setSessionCache(new ResourceReadSessionCache());
+
+		// create and return the main query object
+		return new MainQuery(preStmts, postStmts, query,
+				(countQueryText == null ? null :
+					new SimpleValuePersistenceQueryImpl<>(this.con,
+							this.paramsFactory, countQueryText,
+							ResultSetValueReader.LONG_VALUE_READER, params)));
+	}
+
+	/**
+	 * Get map for the references fetch result.
+	 *
+	 * @return The references fetch result map, or {@code null} if not required.
+	 */
+	private Map<String, Object> getRefsFetchResultMap() {
+
+		if (this.refsFetchResult == null)
+			return null;
+
+		final Map<String, Object> refsFetchResultMap = new HashMap<>();
+		this.refsFetchResult.setRefs(refsFetchResultMap);
+
+		return refsFetchResultMap;
+	}
+}
