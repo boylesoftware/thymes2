@@ -129,7 +129,7 @@
 			the application.
 		</description>
 		<param-name>x2.service.serialization.provider</param-name>
-		<param-value>com.boylesoftware.x2.services.serialization.impl.json.JsonResourceSerializationServiceProvider</param-value>
+		<param-value>org.bsworks.x2.services.serialization.impl.json.JsonResourceSerializationServiceProvider</param-value>
 	</context-param>
 
 
@@ -143,7 +143,7 @@
 			used by the application.
 		</description>
 		<param-name>x2.service.versioning.provider</param-name>
-		<param-value>com.boylesoftware.x2.services.versioning.impl.memory.MemoryPersistentResourceVersioningServiceProvider</param-value>
+		<param-value>org.bsworks.x2.services.versioning.impl.memory.MemoryPersistentResourceVersioningServiceProvider</param-value>
 	</context-param>
 
 
