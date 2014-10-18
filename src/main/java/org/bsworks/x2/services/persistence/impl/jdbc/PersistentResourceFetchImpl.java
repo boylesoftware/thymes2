@@ -457,7 +457,9 @@ class PersistentResourceFetchImpl<R>
 							qb.buildDirectSelectQuery(whereClause,
 									orderByClause),
 							this.range, this.paramsFactory, params);
-					switch (this.lockType) {
+					if (this.lockType == null)
+						dataQueryText = q;
+					else switch (this.lockType) {
 					case SHARED:
 						dataQueryText = this.dialect.makeSelectWithShareLock(
 								q, qb.getRootTableAlias());
@@ -467,9 +469,8 @@ class PersistentResourceFetchImpl<R>
 							this.dialect.makeSelectWithExclusiveLock(
 									q, qb.getRootTableAlias());
 						break;
-					default:
-						dataQueryText = q;
-						break;
+					default: // cannot happen
+						throw new RuntimeException("Unknown lock type.");
 					}
 
 				} else { // ranged and has collections

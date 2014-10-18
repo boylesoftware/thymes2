@@ -64,24 +64,20 @@ class PostgreSQLDialect
 	 * See overridden method.
 	 */
 	@Override
-	public String prefixMatch(final String valExpr, final String prefix,
+	public String prefixMatch(final String valExpr, final String prefixExpr,
 			final boolean negate, final boolean caseSensitive) {
 
 		final String resExpr;
 		if (negate) {
 			if (caseSensitive)
-				resExpr = valExpr + " NOT LIKE '"
-						+ prefix.replace("'", "''") + "%'";
+				resExpr = valExpr + " NOT LIKE " + prefixExpr + " || '%'";
 			else
-				resExpr = valExpr + " NOT ILIKE '"
-						+ prefix.replace("'", "''") + "%'";
+				resExpr = valExpr + " NOT ILIKE " + prefixExpr + " || '%'";
 		} else {
 			if (caseSensitive)
-				resExpr = valExpr + " LIKE '"
-						+ prefix.replace("'", "''") + "%'";
+				resExpr = valExpr + " LIKE " + prefixExpr + " || '%'";
 			else
-				resExpr = valExpr + " ILIKE '"
-						+ prefix.replace("'", "''") + "%'";
+				resExpr = valExpr + " ILIKE " + prefixExpr + " || '%'";
 		}
 
 		return resExpr;

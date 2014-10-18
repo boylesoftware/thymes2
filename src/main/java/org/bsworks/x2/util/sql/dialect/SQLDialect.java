@@ -67,13 +67,13 @@ public interface SQLDialect {
 	 * Create Boolean expression that tests a value starts with a prefix.
 	 *
 	 * @param valExpr SQL expression for the value to test.
-	 * @param prefix The prefix value.
+	 * @param prefixExpr SQL expression for the prefix value.
 	 * @param negate {@code true} to test if does not start with the prefix.
 	 * @param caseSensitive {@code true} if case sensitive.
 	 *
 	 * @return SQL expression that evaluates to a Boolean.
 	 */
-	String prefixMatch(String valExpr, String prefix, boolean negate,
+	String prefixMatch(String valExpr, String prefixExpr, boolean negate,
 			boolean caseSensitive);
 
 	/**

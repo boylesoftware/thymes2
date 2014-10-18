@@ -69,24 +69,24 @@ class MySQLDialect
 	 * See overridden method.
 	 */
 	@Override
-	public String prefixMatch(final String valExpr, final String prefix,
+	public String prefixMatch(final String valExpr, final String prefixExpr,
 			final boolean negate, final boolean caseSensitive) {
 
 		final String resExpr;
 		if (negate) {
 			if (caseSensitive)
 				resExpr = valExpr + " COLLATE utf8_bin"
-						+ " NOT LIKE '" + prefix.replace("'", "''") + "%'";
+						+ " NOT LIKE CONCAT(" + prefixExpr + ", '%')";
 			else
 				resExpr = valExpr + " COLLATE utf8_general_ci"
-						+ " NOT LIKE '" + prefix.replace("'", "''") + "%'";
+						+ " NOT LIKE CONCAT(" + prefixExpr + ", '%')";
 		} else {
 			if (caseSensitive)
 				resExpr = valExpr + " COLLATE utf8_bin"
-						+ " LIKE '" + prefix.replace("'", "''") + "%'";
+						+ " LIKE CONCAT(" + prefixExpr + ", '%')";
 			else
 				resExpr = valExpr + " COLLATE utf8_general_ci"
-						+ " LIKE '" + prefix.replace("'", "''") + "%'";
+						+ " LIKE CONCAT(" + prefixExpr + ", '%')";
 		}
 
 		return resExpr;
