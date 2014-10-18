@@ -74,6 +74,15 @@ class SetResourcePropertyValueHandler
 	 * See overridden method.
 	 */
 	@Override
+	public Class<?> getValueClass() {
+
+		return this.elementValueHandler.getValueClass();
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PersistentValueType getPersistentValueType() {
 
 		return this.elementValueHandler.getPersistentValueType();

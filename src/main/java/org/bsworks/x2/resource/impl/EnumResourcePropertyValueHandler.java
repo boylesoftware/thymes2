@@ -60,6 +60,15 @@ class EnumResourcePropertyValueHandler
 	 * See overridden method.
 	 */
 	@Override
+	public Class<?> getValueClass() {
+
+		return this.enumClass;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PersistentValueType getPersistentValueType() {
 
 		return PersistentValueType.STRING;

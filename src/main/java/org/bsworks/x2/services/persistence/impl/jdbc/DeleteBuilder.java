@@ -393,9 +393,10 @@ class DeleteBuilder {
 					prsrcClass));
 		} else {
 			executionPlan.add(new ExecutionPlanStep(
-					"DELETE FROM " + objTableName + " AS " + objTableAlias
-						+ (whereClause == null ? "" :
-							" WHERE " + whereClause),
+					dialect.createDeleteFromAliasedTable(
+							objTableName,
+							objTableAlias,
+							whereClause),
 					params,
 					prsrcClass));
 		}

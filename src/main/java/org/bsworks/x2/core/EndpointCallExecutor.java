@@ -257,7 +257,7 @@ class EndpointCallExecutor<E>
 			// check if aborted
 			this.checkAborted();
 
-			//check if call is allowed to the actor
+			// check if call is allowed to the actor
 			if (!this.handler.isAllowed(this.requestMethod, this.requestURI,
 					this.uriParams, actor)) {
 				if (actor == null)

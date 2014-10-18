@@ -646,19 +646,6 @@ class UpdateBuilder {
 		}
 
 		/**
-		 * Add parameterless expression to the "UPDATE" statement's "SET"
-		 * clause.
-		 *
-		 * @param expr The expression.
-		 */
-		void addSet(final String expr) {
-
-			if (this.setClause.length() > 0)
-				this.setClause.append(", ");
-			this.setClause.append(expr);
-		}
-
-		/**
 		 * Add "DELETE" statement to the context pre-execution plan to delete
 		 * rows from a simple/reference value(s) table.
 		 *
@@ -948,30 +935,49 @@ class UpdateBuilder {
 			final MetaPropertyHandler verPropHandler =
 				prsrcHandler.getMetaProperty(MetaPropertyType.VERSION);
 			if (verPropHandler != null) {
-				final String verColName =
-					verPropHandler.getPersistence().getFieldName();
-				topCtx.addSet(verColName + " = " + verColName + " + 1");
+				final Number curVer = (Number) verPropHandler.getValue(rec);
+				final Object newVer;
+				if (curVer instanceof Integer)
+					newVer = Integer.valueOf(curVer.intValue() + 1);
+				else if (curVer instanceof Long)
+					newVer = Long.valueOf(curVer.longValue() + 1);
+				else // cannot happen
+					throw new RuntimeException("Unsupported record version"
+							+ " property class " + curVer.getClass().getName()
+							+ ".");
+				verPropHandler.setValue(rec, newVer);
+				topCtx.addSet(
+						verPropHandler.getPersistence().getFieldName(),
+						paramsFactory.getParameterValue(
+								verPropHandler.getValueHandler()
+									.getPersistentValueType(),
+								newVer));
 			}
 			final MetaPropertyHandler lastModTSPropHandler =
 				prsrcHandler.getMetaProperty(
 						MetaPropertyType.MODIFICATION_TIMESTAMP);
-			if (lastModTSPropHandler != null)
+			if (lastModTSPropHandler != null) {
+				final Date now = new Date();
+				lastModTSPropHandler.setValue(rec, now);
 				topCtx.addSet(
 						lastModTSPropHandler.getPersistence().getFieldName(),
 						paramsFactory.getParameterValue(
 								lastModTSPropHandler.getValueHandler()
 									.getPersistentValueType(),
-								new Date()));
+								now));
+			}
 			final MetaPropertyHandler lastModByPropHandler =
 				prsrcHandler.getMetaProperty(
 						MetaPropertyType.MODIFICATION_ACTOR);
-			if (lastModByPropHandler != null)
+			if (lastModByPropHandler != null) {
+				lastModByPropHandler.setValue(rec, actor.getUsername());
 				topCtx.addSet(
 						lastModByPropHandler.getPersistence().getFieldName(),
 						paramsFactory.getParameterValue(
 								lastModByPropHandler.getValueHandler()
 									.getPersistentValueType(),
 								actor.getUsername()));
+			}
 		}
 
 		// get execution plan

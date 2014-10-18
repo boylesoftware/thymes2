@@ -130,6 +130,22 @@ public interface SQLDialect {
 			String... lockTables);
 
 	/**
+	 * Create "DELETE" statement that deletes rows from the specified table with
+	 * the specified "WHERE" clause, in which the table is addressed using an
+	 * alias.
+	 *
+	 * @param fromTable Name of the table to delete from.
+	 * @param fromTableAlias Alias for the "FROM" table used in the the "WHERE"
+	 * clause.
+	 * @param whereClause Body of the "WHERE" clause. May be {@code null} for
+	 * nothing.
+	 *
+	 * @return The constructed "DELETE" statement.
+	 */
+	String createDeleteFromAliasedTable(String fromTable, String fromTableAlias,
+			String whereClause);
+
+	/**
 	 * Create "DELETE" statement that deletes rows from the specified table and
 	 * uses specified joined reference tables in the "WHERE" clause.
 	 *

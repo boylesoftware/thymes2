@@ -63,6 +63,15 @@ class BooleanResourcePropertyValueHandler
 	 * See overridden method.
 	 */
 	@Override
+	public Class<Boolean> getValueClass() {
+
+		return Boolean.class;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PersistentValueType getPersistentValueType() {
 
 		return PersistentValueType.BOOLEAN;

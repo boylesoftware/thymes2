@@ -175,6 +175,17 @@ class PostgreSQLDialect
 	 * See overridden method.
 	 */
 	@Override
+	public String createDeleteFromAliasedTable(final String fromTable,
+			final String fromTableAlias, final String whereClause) {
+
+		return "DELETE FROM " + fromTable + " AS " + fromTableAlias
+				+ (whereClause == null ? "" : " WHERE " + whereClause);
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public String createDeleteWithJoins(final String fromTable,
 			final String fromTableAlias, final String joinedTables,
 			final String joinConditions, final String whereClause) {

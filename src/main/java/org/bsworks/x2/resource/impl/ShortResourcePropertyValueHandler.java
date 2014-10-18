@@ -62,6 +62,15 @@ class ShortResourcePropertyValueHandler
 	 * See overridden method.
 	 */
 	@Override
+	public Class<Short> getValueClass() {
+
+		return Short.class;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PersistentValueType getPersistentValueType() {
 
 		return PersistentValueType.NUMERIC;

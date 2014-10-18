@@ -62,6 +62,15 @@ class IntegerResourcePropertyValueHandler
 	 * See overridden method.
 	 */
 	@Override
+	public Class<Integer> getValueClass() {
+
+		return Integer.class;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PersistentValueType getPersistentValueType() {
 
 		return PersistentValueType.NUMERIC;

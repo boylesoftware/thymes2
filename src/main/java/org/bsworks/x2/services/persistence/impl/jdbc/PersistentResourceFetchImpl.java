@@ -272,6 +272,37 @@ class PersistentResourceFetchImpl<R>
 	 * See overridden method.
 	 */
 	@Override
+	public long getCount() {
+
+		// build the query
+		final QueryBuilder qb = this.buildQuery();
+
+		// get the main query
+		final MainQuery mainQuery = this.getMainQuery(qb, true);
+
+		// execute pre-statements
+		if (mainQuery.preStatements != null)
+			for (final PersistenceUpdateImpl stmt : mainQuery.preStatements)
+				stmt.execute();
+		try {
+
+			// return the records count
+			return mainQuery.countQuery.getFirstResult(null).longValue();
+
+		} finally {
+
+			// execute post-statements
+			if (mainQuery.postStatements != null)
+				for (final PersistenceUpdateImpl stmt :
+						mainQuery.postStatements)
+					stmt.execute();
+		}
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public List<R> getResultList() {
 
 		// build the query
@@ -282,7 +313,7 @@ class PersistentResourceFetchImpl<R>
 			this.getRefsFetchResultMap();
 
 		// get the main query
-		final MainQuery mainQuery = this.getMainQuery(qb);
+		final MainQuery mainQuery = this.getMainQuery(qb, false);
 
 		// execute pre-statements
 		if (mainQuery.preStatements != null)
@@ -338,7 +369,7 @@ class PersistentResourceFetchImpl<R>
 			this.getRefsFetchResultMap();
 
 		// get the main query
-		final MainQuery mainQuery = this.getMainQuery(qb);
+		final MainQuery mainQuery = this.getMainQuery(qb, false);
 
 		// execute pre-statements
 		if (mainQuery.preStatements != null)
@@ -396,10 +427,13 @@ class PersistentResourceFetchImpl<R>
 	 * Build, prepare and return the main query.
 	 *
 	 * @param qb Top query builder.
+	 * @param forceCount {@code true} to build records count query even if no
+	 * range set in the fetch.
 	 *
 	 * @return The main query.
 	 */
-	private MainQuery getMainQuery(final QueryBuilder qb) {
+	private MainQuery getMainQuery(final QueryBuilder qb,
+			final boolean forceCount) {
 
 		// the queries, the pre- and post- statements, the parameters
 		final List<String> preStmtTexts = new ArrayList<>();
@@ -420,9 +454,6 @@ class PersistentResourceFetchImpl<R>
 			// check if no range
 			if (this.range == null) {
 
-				// no count
-				countQueryText = null;
-
 				// direct select
 				final String q =
 					qb.buildDirectSelectQuery(whereClause, orderByClause);
@@ -442,12 +473,6 @@ class PersistentResourceFetchImpl<R>
 				}
 
 			} else { // ranged query
-
-				// do we need the count?
-				if (this.rangeResult != null)
-					countQueryText = qb.buildCountQuery(whereClause);
-				else
-					countQueryText = null;
 
 				// check if no collections
 				if (!qb.hasCollections()) {
@@ -500,9 +525,6 @@ class PersistentResourceFetchImpl<R>
 			// check if no range
 			if (this.range == null) {
 
-				// no count
-				countQueryText = null;
-
 				// create anchor table
 				final String q = qb.buildIdsQuery(whereClause, null);
 				this.dialect.makeSelectIntoTempTable(
@@ -515,12 +537,6 @@ class PersistentResourceFetchImpl<R>
 						preStmtTexts, postStmtTexts);
 
 			} else {  // ranged query
-
-				// do we need the count?
-				if (this.rangeResult != null)
-					countQueryText = qb.buildCountQuery(whereClause);
-				else
-					countQueryText = null;
 
 				// create anchor table
 				final String q = this.dialect.makeRangedSelect(
@@ -568,6 +584,12 @@ class PersistentResourceFetchImpl<R>
 					this.paramsFactory, dataQueryText,
 					this.prsrcHandler.getResourceClass(), this.actor, params);
 		query.setSessionCache(new ResourceReadSessionCache());
+
+		// create records count query
+		if ((this.rangeResult != null) || forceCount)
+			countQueryText = qb.buildCountQuery(whereClause);
+		else
+			countQueryText = null;
 
 		// create and return the main query object
 		return new MainQuery(preStmts, postStmts, query,

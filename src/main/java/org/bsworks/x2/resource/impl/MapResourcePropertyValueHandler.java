@@ -92,6 +92,15 @@ class MapResourcePropertyValueHandler
 	 * See overridden method.
 	 */
 	@Override
+	public Class<?> getValueClass() {
+
+		return this.entryValueHandler.getValueClass();
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PersistentValueType getPersistentValueType() {
 
 		return this.entryValueHandler.getPersistentValueType();

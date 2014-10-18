@@ -62,6 +62,15 @@ class ByteResourcePropertyValueHandler
 	 * See overridden method.
 	 */
 	@Override
+	public Class<Byte> getValueClass() {
+
+		return Byte.class;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PersistentValueType getPersistentValueType() {
 
 		return PersistentValueType.NUMERIC;

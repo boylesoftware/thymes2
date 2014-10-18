@@ -111,6 +111,15 @@ class RefResourcePropertyValueHandler
 	 * See overridden method.
 	 */
 	@Override
+	public Class<?> getValueClass() {
+
+		return Ref.class;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PersistentValueType getPersistentValueType() {
 
 		if (this.wildcard

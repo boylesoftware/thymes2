@@ -93,6 +93,15 @@ public interface PersistentResourceFetch<R> {
 	PersistentResourceFetch<R> lockResult(LockType lockType);
 
 	/**
+	 * Get number of records that would be returned by the
+	 * {@link #getResultList()} method. Note, that the range, if set, is not
+	 * taken into the account.
+	 *
+	 * @return Number of records.
+	 */
+	long getCount();
+
+	/**
 	 * Execute the fetch and get the result list.
 	 *
 	 * @return Unmodifiable result list. Never {@code null}, but may be empty.
@@ -100,7 +109,7 @@ public interface PersistentResourceFetch<R> {
 	List<R> getResultList();
 
 	/**
-	 * Execute the fetch that returns a single result.
+	 * Execute the fetch and return the first fetched result.
 	 *
 	 * @return The result, or {@code null} if none.
 	 */

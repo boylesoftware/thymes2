@@ -45,6 +45,15 @@ class StringResourcePropertyValueHandler
 	 * See overridden method.
 	 */
 	@Override
+	public Class<String> getValueClass() {
+
+		return String.class;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PersistentValueType getPersistentValueType() {
 
 		return PersistentValueType.STRING;

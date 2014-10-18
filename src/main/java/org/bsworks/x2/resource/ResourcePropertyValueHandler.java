@@ -57,6 +57,14 @@ public interface ResourcePropertyValueHandler {
 		throws InvalidResourceDataException;
 
 	/**
+	 * Get value class. Collection and map property value handlers return value
+	 * class of the elements.
+	 *
+	 * @return The value class.
+	 */
+	Class<?> getValueClass();
+
+	/**
 	 * Get persistent value type corresponding to the property value type.
 	 *
 	 * <p>Note, that collection and map property value handlers return value

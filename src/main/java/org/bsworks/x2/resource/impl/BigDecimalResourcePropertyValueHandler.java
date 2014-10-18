@@ -55,6 +55,15 @@ class BigDecimalResourcePropertyValueHandler
 	 * See overridden method.
 	 */
 	@Override
+	public Class<BigDecimal> getValueClass() {
+
+		return BigDecimal.class;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PersistentValueType getPersistentValueType() {
 
 		return PersistentValueType.NUMERIC;

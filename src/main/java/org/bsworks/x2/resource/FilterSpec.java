@@ -95,6 +95,20 @@ public interface FilterSpec<R> {
 			boolean negate, Object... operands);
 
 	/**
+	 * Shortcut for
+	 * {@link #addCondition(String, FilterConditionType, boolean, Object...)}
+	 * with "negate" parameter {@code false}.
+	 *
+	 * @param propPath Property path.
+	 * @param type Condition type.
+	 * @param operands Condition operands.
+	 *
+	 * @return This filter specification (for chaining).
+	 */
+	FilterSpec<R> addTrueCondition(String propPath, FilterConditionType type,
+			Object... operands);
+
+	/**
 	 * Get filter conditions.
 	 *
 	 * @return Unmodifiable collection of conditions. May be empty, never

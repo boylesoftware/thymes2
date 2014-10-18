@@ -62,6 +62,15 @@ class LongResourcePropertyValueHandler
 	 * See overridden method.
 	 */
 	@Override
+	public Class<Long> getValueClass() {
+
+		return Long.class;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PersistentValueType getPersistentValueType() {
 
 		return PersistentValueType.NUMERIC;

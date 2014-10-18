@@ -903,10 +903,13 @@ class InsertBuilder {
 					try (final ResultSet rs = pstmt.getGeneratedKeys()) {
 						rs.next();
 						Utils.logWarnings(log, rs.getWarnings());
-						newRecId = rs.getObject(1);
+						newRecId = rs.getObject(1,
+								step.idPropHandler.getValueHandler()
+									.getValueClass());
 					}
 					if (debug)
-						log.debug("auto-generated record id: " + newRecId);
+						log.debug("auto-generated record id: " + newRecId
+								+ " (" + newRecId.getClass().getName() + ")");
 
 					// set record id in the object
 					step.idPropHandler.setValue(step.obj, newRecId);

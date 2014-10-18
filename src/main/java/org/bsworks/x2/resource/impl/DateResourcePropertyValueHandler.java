@@ -80,6 +80,15 @@ class DateResourcePropertyValueHandler
 	 * See overridden method.
 	 */
 	@Override
+	public Class<Date> getValueClass() {
+
+		return Date.class;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PersistentValueType getPersistentValueType() {
 
 		return PersistentValueType.DATE;

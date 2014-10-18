@@ -62,6 +62,15 @@ class FloatResourcePropertyValueHandler
 	 * See overridden method.
 	 */
 	@Override
+	public Class<Float> getValueClass() {
+
+		return Float.class;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PersistentValueType getPersistentValueType() {
 
 		return PersistentValueType.NUMERIC;

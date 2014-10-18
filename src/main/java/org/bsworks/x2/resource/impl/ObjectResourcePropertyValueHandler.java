@@ -128,6 +128,15 @@ class ObjectResourcePropertyValueHandler
 	 * See overridden method.
 	 */
 	@Override
+	public Class<?> getValueClass() {
+
+		return this.objProps.getContainerClass();
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PersistentValueType getPersistentValueType() {
 
 		return PersistentValueType.OBJECT;

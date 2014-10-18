@@ -63,6 +63,15 @@ class DoubleResourcePropertyValueHandler
 	 * See overridden method.
 	 */
 	@Override
+	public Class<Double> getValueClass() {
+
+		return Double.class;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PersistentValueType getPersistentValueType() {
 
 		return PersistentValueType.NUMERIC;

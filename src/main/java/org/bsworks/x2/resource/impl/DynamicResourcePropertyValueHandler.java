@@ -69,6 +69,17 @@ class DynamicResourcePropertyValueHandler
 	 * See overridden method.
 	 */
 	@Override
+	public Class<?> getValueClass() {
+
+		throw new UnsupportedOperationException(
+				"Dynamic property values do not have predetermined value"
+						+ " class.");
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PersistentValueType getPersistentValueType() {
 
 		throw new UnsupportedOperationException(

@@ -191,6 +191,16 @@ class FilterSpecImpl<R>
 	 * See overridden method.
 	 */
 	@Override
+	public FilterSpec<R> addTrueCondition(final String propPath,
+			final FilterConditionType type, final Object... operands) {
+
+		return this.addCondition(propPath, type, false, operands);
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public Collection<FilterConditionImpl> getConditions() {
 
 		return this.conditionsRO;
