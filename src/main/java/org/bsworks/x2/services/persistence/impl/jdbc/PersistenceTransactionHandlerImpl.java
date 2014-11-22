@@ -35,11 +35,6 @@ class PersistenceTransactionHandlerImpl
 	private final Resources resources;
 
 	/**
-	 * Actor performing the transaction, or {@code null} if unauthenticated.
-	 */
-	private final Actor actor;
-
-	/**
 	 * The database connection.
 	 */
 	private final Connection con;
@@ -77,7 +72,6 @@ class PersistenceTransactionHandlerImpl
 		throws SQLException {
 
 		this.resources = resources;
-		this.actor = actor;
 
 		boolean success = false;
 		try {
@@ -96,7 +90,7 @@ class PersistenceTransactionHandlerImpl
 		}
 
 		this.tx = new JDBCPersistenceTransaction(this.resources, this.con,
-				dialect, this.actor, paramsFactory);
+				dialect, actor, paramsFactory);
 	}
 
 
