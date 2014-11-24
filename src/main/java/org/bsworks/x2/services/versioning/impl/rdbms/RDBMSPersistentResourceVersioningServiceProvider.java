@@ -4,7 +4,6 @@ import javax.servlet.ServletContext;
 
 import org.apache.commons.logging.LogFactory;
 
-import org.bsworks.x2.InitializationException;
 import org.bsworks.x2.RuntimeContext;
 import org.bsworks.x2.ServiceProvider;
 import org.bsworks.x2.resource.Resources;
@@ -28,13 +27,16 @@ import org.bsworks.x2.util.StringUtils;
  * persistent resource collections versioning information. The table needs to
  * have three columns: the persistent resource name, which is the key (short
  * name is used, see {@link Class#getSimpleName()}), the collection version
- * number (an integer), and the collection last modification timestamp.</dd>
+ * number (an integer), and the collection last modification timestamp. Default
+ * is {@value #DEFAULT_TABLE}.</dd>
  * <dt>{@value #NAME_COLUMN_INITPARAM}</dt><dd>Name of the persistent resource
- * name column.</dd>
+ * name column. Default is {@value #DEFAULT_NAME_COLUMN}.</dd>
  * <dt>{@value #VERSION_COLUMN_INITPARAM}</dt><dd>Name of the persistent
- * resource collection version number column.</dd>
+ * resource collection version number column. Default is
+ * {@value #DEFAULT_VERSION_COLUMN}.</dd>
  * <dt>{@value #TIMESTAMP_COLUMN_INITPARAM}</dt><dd>Name of the persistent
- * resource collection last modification timestamp column.</dd>
+ * resource collection last modification timestamp column. Default is
+ * {@value #DEFAULT_TIMESTAMP_COLUMN}.</dd>
  * </dl>
  *
  * <p>There are no default values for any of these parameters. They must be
@@ -54,11 +56,21 @@ public class RDBMSPersistentResourceVersioningServiceProvider
 		"x2.service.versioning.rdbms.table";
 
 	/**
+	 * Default collection versioning information table name.
+	 */
+	public static final String DEFAULT_TABLE = "x2prsrccol";
+
+	/**
 	 * Name of web-application context initialization parameter used to specify
 	 * name of the column for the persistent resource names.
 	 */
 	public static final String NAME_COLUMN_INITPARAM =
 		"x2.service.versioning.rdbms.nameColumn";
+
+	/**
+	 * Default name of the column for the persistent resource names.
+	 */
+	public static final String DEFAULT_NAME_COLUMN = "name";
 
 	/**
 	 * Name of web-application context initialization parameter used to specify
@@ -68,12 +80,24 @@ public class RDBMSPersistentResourceVersioningServiceProvider
 		"x2.service.versioning.rdbms.versionColumn";
 
 	/**
+	 * Default name of the column for the persistent resource collection
+	 * versions.
+	 */
+	public static final String DEFAULT_VERSION_COLUMN = "version";
+
+	/**
 	 * Name of web-application context initialization parameter used to specify
 	 * name of the column for the persistent resource collection last
 	 * modification timestamps.
 	 */
 	public static final String TIMESTAMP_COLUMN_INITPARAM =
 		"x2.service.versioning.rdbms.timestampColumn";
+
+	/**
+	 * Default name of the column for the persistent resource collection last
+	 * modification timestamps.
+	 */
+	public static final String DEFAULT_TIMESTAMP_COLUMN = "modified_on";
 
 
 	/* (non-Javadoc)
@@ -91,17 +115,18 @@ public class RDBMSPersistentResourceVersioningServiceProvider
 	@Override
 	public PersistentResourceVersioningService createService(
 			final ServletContext sc, final String serviceInstanceId,
-			final Resources resources, final RuntimeContext runtimeCtx)
-		throws InitializationException {
+			final Resources resources, final RuntimeContext runtimeCtx) {
 
 		LogFactory.getLog(this.getClass()).debug("creating RDBMS table-based"
 				+ " persistent resource collections versioning service");
 
 		return new RDBMSPersistentResourceVersioningService(
-				getInitParam(sc, TABLE_INITPARAM),
-				getInitParam(sc, NAME_COLUMN_INITPARAM),
-				getInitParam(sc, VERSION_COLUMN_INITPARAM),
-				getInitParam(sc, TIMESTAMP_COLUMN_INITPARAM));
+				getInitParam(sc, TABLE_INITPARAM, DEFAULT_TABLE),
+				getInitParam(sc, NAME_COLUMN_INITPARAM, DEFAULT_NAME_COLUMN),
+				getInitParam(sc, VERSION_COLUMN_INITPARAM,
+						DEFAULT_VERSION_COLUMN),
+				getInitParam(sc, TIMESTAMP_COLUMN_INITPARAM,
+						DEFAULT_TIMESTAMP_COLUMN));
 	}
 
 	/**
@@ -109,22 +134,17 @@ public class RDBMSPersistentResourceVersioningServiceProvider
 	 *
 	 * @param sc Servlet context.
 	 * @param paramName Parameter name.
+	 * @param defaultVal Default value.
 	 *
 	 * @return Parameter value.
-	 *
-	 * @throws InitializationException If parameter is not specified.
 	 */
 	private static String getInitParam(final ServletContext sc,
-			final String paramName)
-		throws InitializationException {
+			final String paramName, final String defaultVal) {
 
 		final String paramVal =
 			StringUtils.nullIfEmpty(sc.getInitParameter(paramName));
-		if (paramVal == null)
-			throw new InitializationException("Web-application must specify "
-					+ paramName + " context initialization parameter.");
 
-		return paramVal;
+		return (paramVal != null ? paramVal : defaultVal);
 	}
 
 	/* (non-Javadoc)
