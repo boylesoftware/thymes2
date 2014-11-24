@@ -130,6 +130,12 @@ public interface EndpointCallContext {
 	 * is successfully authenticated via the application's
 	 * {@link ActorAuthenticationService} implementation.
 	 *
+	 * <p>If there is an active persistence transaction associated with the
+	 * context, calling this method commits it. Any side tasks delayed until
+	 * commit are submitted for execution. Next call to
+	 * {@link #getPersistenceTransaction()} will create and begin a new
+	 * transaction on behalf for the new actor.
+	 *
 	 * @param actor The authenticated actor, or {@code null} to make context
 	 * unauthenticated (e.g. logout).
 	 */
@@ -166,6 +172,10 @@ public interface EndpointCallContext {
 	 * @param delayUntilCommit If {@code true}, the task is submitted for
 	 * execution just after the persistence transaction associated with the
 	 * context is committed and only if it is committed successfully.
+	 *
+	 * @throws IllegalStateException If {@code delayUntilCommit} is {@code true}
+	 * and there is no persistence transaction associated with the context
+	 * ({@link #getPersistenceTransaction()} has not been called}.
 	 */
 	void submitSideTask(Runnable task, boolean delayUntilCommit);
 

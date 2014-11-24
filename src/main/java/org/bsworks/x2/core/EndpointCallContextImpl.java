@@ -124,15 +124,28 @@ class EndpointCallContextImpl
 	 */
 	void close(final boolean commit) {
 
-		if (this.tx != null) {
+		this.endPersistenceTransaction(commit);
+	}
+
+	/**
+	 * End persistence transaction associated with the context, if any.
+	 *
+	 * @param commit {@code true} to commit the persistence transaction.
+	 */
+	private void endPersistenceTransaction(final boolean commit) {
+
+		final PersistenceTransactionHandler tx = this.tx;
+		if (tx != null) {
+			this.tx = null;
 			try {
 				if (commit) {
-					this.tx.commitTransaction();
+					tx.commitTransaction();
 					for (final Runnable task : this.tasksOnCommit)
 						this.runtimeCtx.submitSideTask(task);
 				}
 			} finally {
-				this.tx.close();
+				this.tasksOnCommit.clear();
+				tx.close();
 			}
 		}
 	}
@@ -261,6 +274,8 @@ class EndpointCallContextImpl
 	@Override
 	public void assumeActor(final Actor actor) {
 
+		this.endPersistenceTransaction(true);
+
 		this.actor = actor;
 		this.assumedActor = true;
 	}
@@ -294,10 +309,14 @@ class EndpointCallContextImpl
 	public void submitSideTask(final Runnable task,
 			final boolean delayUntilCommit) {
 
-		if (delayUntilCommit)
+		if (delayUntilCommit) {
+			if (this.tx == null)
+				throw new IllegalStateException("There is no persistence"
+						+ " transaction associated with the context.");
 			this.tasksOnCommit.add(task);
-		else
+		} else {
 			this.runtimeCtx.submitSideTask(task);
+		}
 	}
 
 	/* (non-Javadoc)

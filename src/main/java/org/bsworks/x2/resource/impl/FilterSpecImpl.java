@@ -23,6 +23,11 @@ class FilterSpecImpl<R>
 	implements FilterSpec<R> {
 
 	/**
+	 * Application resources manager.
+	 */
+	private final ResourcesImpl resources;
+
+	/**
 	 * Persistent resource handler.
 	 */
 	private final PersistentResourceHandlerImpl<R> prsrcHandler;
@@ -78,13 +83,16 @@ class FilterSpecImpl<R>
 	/**
 	 * Create new specification object.
 	 *
+	 * @param resources Application resources manager.
 	 * @param prsrcHandler Persistent resource handler.
 	 * @param disjunction {@code true} if disjunction.
 	 * @param parent Parent filter or {@code null} for the top.
 	 */
-	FilterSpecImpl(final PersistentResourceHandlerImpl<R> prsrcHandler,
+	FilterSpecImpl(final ResourcesImpl resources,
+			final PersistentResourceHandlerImpl<R> prsrcHandler,
 			final boolean disjunction, final FilterSpecImpl<R> parent) {
 
+		this.resources = resources;
 		this.prsrcHandler = prsrcHandler;
 		this.disjunction = disjunction;
 		this.parent = parent;
@@ -148,7 +156,8 @@ class FilterSpecImpl<R>
 	public FilterSpecImpl<R> addConjunction() {
 
 		final FilterSpecImpl<R> j =
-			new FilterSpecImpl<>(this.prsrcHandler, false, this);
+			new FilterSpecImpl<>(this.resources, this.prsrcHandler, false,
+					this);
 
 		this.junctions.add(j);
 
@@ -162,7 +171,7 @@ class FilterSpecImpl<R>
 	public FilterSpecImpl<R> addDisjunction() {
 
 		final FilterSpecImpl<R> j =
-			new FilterSpecImpl<>(this.prsrcHandler, true, this);
+			new FilterSpecImpl<>(this.resources, this.prsrcHandler, true, this);
 
 		this.junctions.add(j);
 
@@ -177,8 +186,9 @@ class FilterSpecImpl<R>
 			final FilterConditionType type, final boolean negate,
 			final Object... operands) {
 
-		final FilterConditionImpl c = new FilterConditionImpl(type, negate,
-				this.prsrcHandler, propPath, operands, this.prsrcClasses);
+		final FilterConditionImpl c = new FilterConditionImpl(this.resources,
+				type, negate, this.prsrcHandler, propPath, operands,
+				this.prsrcClasses);
 
 		this.conditions.add(c);
 

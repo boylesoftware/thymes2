@@ -346,7 +346,7 @@ public class ResourcesImpl
 	@Override
 	public <R> FilterSpecImpl<R> getFilterSpec(final Class<R> prsrcClass) {
 
-		return new FilterSpecImpl<>(
+		return new FilterSpecImpl<>(this,
 				this.getPersistentResourceHandler(prsrcClass), false, null);
 	}
 
