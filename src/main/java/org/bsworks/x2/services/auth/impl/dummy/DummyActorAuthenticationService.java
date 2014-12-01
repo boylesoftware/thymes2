@@ -16,7 +16,7 @@ class DummyActorAuthenticationService
 	 * Always returns {@code null}.
 	 */
 	@Override
-	public Actor getActor(final String username, final String opaque) {
+	public Actor getActor(final String actorId, final String opaque) {
 
 		return null;
 	}

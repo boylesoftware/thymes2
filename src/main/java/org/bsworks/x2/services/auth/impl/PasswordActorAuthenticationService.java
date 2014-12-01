@@ -16,13 +16,13 @@ public interface PasswordActorAuthenticationService
 	/**
 	 * Authenticate actor.
 	 *
-	 * @param username Username.
-	 * @param password Password.
+	 * @param loginName User login name.
+	 * @param password User password.
 	 * @param opaque Service implementation specific value associated with the
 	 * actor, or {@code null} if not used.
 	 *
-	 * @return The authenticated actor, or {@code null} if username, password
-	 * and opaque values combination is invalid.
+	 * @return The authenticated actor, or {@code null} if login name, password
+	 * and opaque value combination is invalid.
 	 */
-	Actor authenticate(String username, String password, String opaque);
+	Actor authenticate(String loginName, String password, String opaque);
 }

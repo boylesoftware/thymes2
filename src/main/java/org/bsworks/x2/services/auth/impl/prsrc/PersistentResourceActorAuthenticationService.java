@@ -8,6 +8,10 @@ import java.util.Arrays;
 import org.bsworks.x2.Actor;
 import org.bsworks.x2.RuntimeContext;
 import org.bsworks.x2.resource.FilterConditionType;
+import org.bsworks.x2.resource.FilterSpec;
+import org.bsworks.x2.resource.IdPropertyHandler;
+import org.bsworks.x2.resource.InvalidResourceDataException;
+import org.bsworks.x2.resource.PersistentResourceHandler;
 import org.bsworks.x2.resource.PropertiesFetchSpec;
 import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.services.auth.impl.PasswordActorAuthenticationService;
@@ -17,9 +21,11 @@ import org.bsworks.x2.services.persistence.PersistenceTransactionHandler;
 /**
  * Persistent resource actor authentication service implementation.
  *
+ * @param <A> Actor persistent resource type.
+ *
  * @author Lev Himmelfarb
  */
-class PersistentResourceActorAuthenticationService
+public class PersistentResourceActorAuthenticationService<A extends Actor>
 	implements PasswordActorAuthenticationService {
 
 	/**
@@ -30,12 +36,12 @@ class PersistentResourceActorAuthenticationService
 	/**
 	 * Class of the persistent resource representing actor record.
 	 */
-	private final Class<? extends Actor> actorPRsrcClass;
+	private final Class<A> actorPRsrcClass;
 
 	/**
-	 * Username property path.
+	 * Login name property path.
 	 */
-	private final String usernamePropPath;
+	private final String loginNamePropPath;
 
 	/**
 	 * Other property paths.
@@ -54,20 +60,19 @@ class PersistentResourceActorAuthenticationService
 	 * @param runtimeCtx Application runtime context.
 	 * @param actorPRsrcClass Class of the persistent resource representing
 	 * actor record.
-	 * @param usernamePropPath Username property path.
+	 * @param loginNamePropPath Login name property path.
 	 * @param otherPropPaths Other property paths.
 	 * @param passwordDigestAlg Password digest algorithm, or {@code null} for
 	 * no digest.
 	 */
 	PersistentResourceActorAuthenticationService(
 			final RuntimeContext runtimeCtx,
-			final Class<? extends Actor> actorPRsrcClass,
-			final String usernamePropPath, final String[] otherPropPaths,
-			final String passwordDigestAlg) {
+			final Class<A> actorPRsrcClass, final String loginNamePropPath,
+			final String[] otherPropPaths, final String passwordDigestAlg) {
 
 		this.runtimeCtx = runtimeCtx;
 		this.actorPRsrcClass = actorPRsrcClass;
-		this.usernamePropPath = usernamePropPath;
+		this.loginNamePropPath = loginNamePropPath;
 		this.otherPropPaths = otherPropPaths;
 		this.passwordDigestAlg = passwordDigestAlg;
 	}
@@ -77,16 +82,41 @@ class PersistentResourceActorAuthenticationService
 	 * See overridden method.
 	 */
 	@Override
-	public Actor getActor(final String username, final String opaque) {
+	public A getActor(final String actorId, final String opaque) {
 
-		final Actor actor;
+		final Resources resources = this.runtimeCtx.getResources();
+
+		final PersistentResourceHandler<A> actorPRsrcHandler =
+			resources.getPersistentResourceHandler(this.actorPRsrcClass);
+		final IdPropertyHandler idPropHandler =
+			actorPRsrcHandler.getIdProperty();
+
+		final PropertiesFetchSpec<A> propsFetch =
+			resources.getPropertiesFetchSpec(this.actorPRsrcClass);
+		propsFetch.include(this.loginNamePropPath);
+		for (final String propPath : this.otherPropPaths)
+			propsFetch.include(propPath);
+
+		final A actor;
 		try (final PersistenceTransactionHandler txh =
 				this.runtimeCtx.getPersistenceService()
 					.createPersistenceTransaction(null, true)) {
 
-			actor = this.getActor(this.actorPRsrcClass, txh, username);
+			actor = txh
+					.getTransaction()
+					.createPersistentResourceFetch(this.actorPRsrcClass)
+					.setPropertiesFetch(propsFetch)
+					.setFilter(resources.getFilterSpec(this.actorPRsrcClass)
+							.addTrueCondition(idPropHandler.getName(),
+									FilterConditionType.EQ,
+									idPropHandler.getValueHandler().valueOf(
+											actorId)))
+					.getFirstResult();
 
 			txh.commitTransaction();
+
+		} catch (final InvalidResourceDataException e) {
+			return null;
 		}
 
 		return actor;
@@ -96,10 +126,27 @@ class PersistentResourceActorAuthenticationService
 	 * See overridden method.
 	 */
 	@Override
-	public Actor authenticate(final String username, final String password,
+	public Actor authenticate(final String loginName, final String password,
 			final String opaque) {
 
-		final Actor actor = this.getActor(username, opaque);
+		final FilterSpec<A> filter =
+			this.runtimeCtx.getResources().getFilterSpec(this.actorPRsrcClass);
+		this.addAuthenticationFilter(filter, loginName, opaque);
+
+		final A actor;
+		try (final PersistenceTransactionHandler txh =
+				this.runtimeCtx.getPersistenceService()
+					.createPersistenceTransaction(null, true)) {
+
+			actor = txh
+					.getTransaction()
+					.createPersistentResourceFetch(this.actorPRsrcClass)
+					.setFilter(filter)
+					.getFirstResult();
+
+			txh.commitTransaction();
+		}
+
 		if (actor == null)
 			return null;
 
@@ -123,33 +170,19 @@ class PersistentResourceActorAuthenticationService
 	}
 
 	/**
-	 * Get the actor record.
+	 * Add conditions to the filter for the
+	 * {@link #authenticate(String, String, String)} method. The default
+	 * implementation adds condition for the login name equality.
 	 *
-	 * @param prsrcClass Actor persistent resource class.
-	 * @param txh Transaction handler.
-	 * @param username Actor username.
-	 *
-	 * @return Actor record, or {@code null} if not found.
+	 * @param filter The filter, to which to add conditions.
+	 * @param loginName Supplied login name.
+	 * @param opaque Supplied opaque value.
 	 */
-	private <A extends Actor> A getActor(final Class<A> prsrcClass,
-			final PersistenceTransactionHandler txh, final String username) {
+	protected void addAuthenticationFilter(final FilterSpec<A> filter,
+			final String loginName,
+			@SuppressWarnings("unused") final String opaque) {
 
-		final Resources resources = this.runtimeCtx.getResources();
-		final PropertiesFetchSpec<A> propsFetch =
-			resources.getPropertiesFetchSpec(prsrcClass);
-		propsFetch.include(this.usernamePropPath);
-		for (final String propPath : this.otherPropPaths)
-			propsFetch.include(propPath);
-
-		return txh
-				.getTransaction()
-				.createPersistentResourceFetch(prsrcClass)
-				.setPropertiesFetch(propsFetch)
-				.setFilter(resources
-						.getFilterSpec(prsrcClass)
-						.addCondition(this.usernamePropPath,
-								FilterConditionType.EQ, false,
-								username))
-				.getFirstResult();
+		filter.addTrueCondition(this.loginNamePropPath, FilterConditionType.EQ,
+				loginName);
 	}
 }

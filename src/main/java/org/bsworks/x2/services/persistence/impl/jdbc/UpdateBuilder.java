@@ -970,13 +970,13 @@ class UpdateBuilder {
 				prsrcHandler.getMetaProperty(
 						MetaPropertyType.MODIFICATION_ACTOR);
 			if (lastModByPropHandler != null) {
-				lastModByPropHandler.setValue(rec, actor.getUsername());
+				lastModByPropHandler.setValue(rec, actor.getActorName());
 				topCtx.addSet(
 						lastModByPropHandler.getPersistence().getFieldName(),
 						paramsFactory.getParameterValue(
 								lastModByPropHandler.getValueHandler()
 									.getPersistentValueType(),
-								actor.getUsername()));
+								actor.getActorName()));
 			}
 		}
 

@@ -248,13 +248,13 @@ public class JDBCPersistenceTransaction
 				}
 				break;
 			case CREATION_ACTOR:
-				metaPropHandler.setValue(recTmpl, this.actor.getUsername());
+				metaPropHandler.setValue(recTmpl, this.actor.getActorName());
 				break;
 			case CREATION_TIMESTAMP:
 				metaPropHandler.setValue(recTmpl, now);
 				break;
 			case MODIFICATION_ACTOR:
-				metaPropHandler.setValue(recTmpl, this.actor.getUsername());
+				metaPropHandler.setValue(recTmpl, this.actor.getActorName());
 				break;
 			case MODIFICATION_TIMESTAMP:
 				metaPropHandler.setValue(recTmpl, now);

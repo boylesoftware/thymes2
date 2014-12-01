@@ -83,6 +83,26 @@
 
 	<context-param>
 		<description>
+			Encryption algorithm for the non-credential part of the
+			authentication token.
+		</description>
+		<param-name>x2.auth.tokenEncAlg</param-name>
+		<param-value>AES</param-value>
+	</context-param>
+
+	<context-param>
+		<description>
+			Application-wide secret key the non-credential part of the
+			authentication token. The key is in hexadecimal encoding and must
+			be suitable for the algorithm specified by x2.auth.tokenEncAlg
+			parameter.
+		</description>
+		<param-name>x2.auth.secretKey</param-name>
+		<param-value>00000000000000000000000000000000</param-value>
+	</context-param>
+
+	<context-param>
+		<description>
 			Number of milliseconds a newly issued authentication token is valid.
 		</description>
 		<param-name>x2.auth.tokenTTL</param-name>

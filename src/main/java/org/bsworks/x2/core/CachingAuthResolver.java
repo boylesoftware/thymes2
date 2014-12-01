@@ -35,9 +35,9 @@ class CachingAuthResolver {
 		private final long ts = System.currentTimeMillis();
 
 		/**
-		 * Requested actor username.
+		 * Requested actor id.
 		 */
-		private final String username;
+		private final String actorId;
 
 		/**
 		 * Requested actor opaque value.
@@ -67,7 +67,7 @@ class CachingAuthResolver {
 		 */
 		CacheElement(final Actor actor) {
 
-			this.username = null;
+			this.actorId = null;
 			this.opaque = null;
 			this.loaded = true;
 			this.actor = actor;
@@ -76,12 +76,12 @@ class CachingAuthResolver {
 		/**
 		 * Create uninitialized cache element that loads the actor upon get.
 		 *
-		 * @param username Requested actor username.
+		 * @param actorId Requested actor id.
 		 * @param opaque Requested actor opaque value.
 		 */
-		CacheElement(final String username, final String opaque) {
+		CacheElement(final String actorId, final String opaque) {
 
-			this.username = username;
+			this.actorId = actorId;
 			this.opaque = opaque;
 			this.loaded = false;
 		}
@@ -123,7 +123,7 @@ class CachingAuthResolver {
 							CachingAuthResolver.this.log.debug(
 									"synchronously loading actor");
 						this.actor = CachingAuthResolver.this.getAuthService()
-								.getActor(this.username, this.opaque);
+								.getActor(this.actorId, this.opaque);
 						this.loaded = true;
 					} else {
 						if (CachingAuthResolver.this.log.isDebugEnabled())
@@ -211,21 +211,21 @@ class CachingAuthResolver {
 	/**
 	 * Get actor.
 	 *
-	 * @param username Actor username.
+	 * @param actorId Actor id.
 	 * @param opaque Actor opaque value, or {@code null} if not used.
 	 *
 	 * @return The actor, or {@code null} if not found.
 	 */
-	Actor getActor(final String username, final String opaque) {
+	Actor getActor(final String actorId, final String opaque) {
 
 		final boolean debug = this.log.isDebugEnabled();
 
 		// caching disabled?
 		if (this.discardAfter == 0)
-			return this.getAuthService().getActor(username, opaque);
+			return this.getAuthService().getActor(actorId, opaque);
 
 		// get the key
-		final String key = createKey(username, opaque);
+		final String key = createKey(actorId, opaque);
 
 		// look up cached element
 		final Lock readLock = this.lock.readLock();
@@ -242,7 +242,7 @@ class CachingAuthResolver {
 				cacheEl = this.cache.get(key);
 				if (cacheEl == null) {
 					this.purgeExpired();
-					cacheEl = new CacheElement(username, opaque);
+					cacheEl = new CacheElement(actorId, opaque);
 					this.cache.put(key, cacheEl);
 				} else {
 					if (debug)
@@ -266,7 +266,7 @@ class CachingAuthResolver {
 							|| (cacheEl.getAge(System.currentTimeMillis())
 									>= this.discardAfter)) {
 						this.purgeExpired();
-						cacheEl = new CacheElement(username, opaque);
+						cacheEl = new CacheElement(actorId, opaque);
 						this.cache.put(key, cacheEl);
 					} else {
 						if (debug)
@@ -288,7 +288,7 @@ class CachingAuthResolver {
 									"refreshing cached element");
 						final CacheElement newCacheEl = new CacheElement(
 								CachingAuthResolver.this.getAuthService()
-									.getActor(username, opaque));
+									.getActor(actorId, opaque));
 						writeLock.lock();
 						CachingAuthResolver.this.cache.put(key, newCacheEl);
 						writeLock.unlock();
@@ -343,17 +343,17 @@ class CachingAuthResolver {
 	/**
 	 * Create cache key.
 	 *
-	 * @param username Actor username.
+	 * @param actorId Actor id.
 	 * @param opaque Actor opaque value, or {@code null} if not used.
 	 *
 	 * @return Cache key.
 	 */
-	private static String createKey(final String username,
+	private static String createKey(final String actorId,
 			final String opaque) {
 
 		if (opaque == null)
-			return username;
+			return actorId;
 
-		return username + "&" + opaque;
+		return actorId + "&" + opaque;
 	}
 }

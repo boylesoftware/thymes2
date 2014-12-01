@@ -1,5 +1,7 @@
 package org.bsworks.x2.resource;
 
+import org.bsworks.x2.Actor;
+
 
 /**
  * Persistent resource meta-property type.
@@ -21,8 +23,9 @@ public enum MetaPropertyType {
 	CREATION_TIMESTAMP,
 
 	/**
-	 * Username of the actor that created the resource record. The value of the
-	 * property is {@link String}.
+	 * Name of the actor that created the resource record (value returned by
+	 * {@link Actor#getActorName()}). The value of the property is
+	 * {@link String}.
 	 */
 	CREATION_ACTOR,
 
@@ -33,8 +36,9 @@ public enum MetaPropertyType {
 	MODIFICATION_TIMESTAMP,
 
 	/**
-	 * Username of the actor that last time modified the resource record. The
-	 * value of the property is {@link String}.
+	 * Name of the actor that last time modified the resource record (value
+	 * returned by {@link Actor#getActorName()}). The value of the property is
+	 * {@link String}.
 	 */
 	MODIFICATION_ACTOR
 }

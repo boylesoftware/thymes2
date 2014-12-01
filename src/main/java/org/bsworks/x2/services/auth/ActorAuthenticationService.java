@@ -16,11 +16,11 @@ public interface ActorAuthenticationService
 	/**
 	 * Get actor.
 	 *
-	 * @param username Actor username.
+	 * @param actorId Actor id as in {@link Actor#getActorId()}.
 	 * @param opaque Service implementation specific value associated with the
-	 * actor, or {@code null} if not used.
+	 * actor, or {@code null} if not used (see {@link Actor#getOpaque()}).
 	 *
 	 * @return The actor, or {@code null} if not found.
 	 */
-	Actor getActor(String username, String opaque);
+	Actor getActor(String actorId, String opaque);
 }

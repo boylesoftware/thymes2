@@ -8,27 +8,46 @@ import org.bsworks.x2.services.auth.ActorAuthenticationService;
 
 
 /**
- * Actor, such as a user, performing operation. Actor objects are provided by an
- * implementation of {@link ActorAuthenticationService}, provided by the
- * web-application. Actor objects are used by the framework for the "AuthToken"
- * HTTP authentication scheme.
+ * Actor, such as a user, performing an operation. Actor objects are looked up
+ * by the framework in an implementation of {@link ActorAuthenticationService},
+ * provided by the web-application. Actor objects are used by the framework for
+ * the "AuthToken" HTTP authentication scheme, which uses an encrypted
+ * authentication token passed between the client and the server in
+ * "Authorization" (from the client to the server) and "Authentication-Info"
+ * (from the server to the client) HTTP headers.
  *
  * @author Lev Himmelfarb
  */
 public interface Actor {
 
 	/**
-	 * Get actor username.
+	 * Get actor id in the actor authentication service. The actor id together
+	 * with the opaque value, if used, are used to lookup the actor in the
+	 * authentication service. The actor id is included in the authentication
+	 * token.
 	 *
-	 * @return The username.
+	 * @return The actor id.
 	 */
-	String getUsername();
+	String getActorId();
 
 	/**
-	 * Get actor authentication service implementation specific value associated
-	 * with the actor. The opaque value, if used, is communicated in an
-	 * unencrypted form between the client and the server using HTTP headers
-	 * "Authentication-Info" and "Authorization".
+	 * Get actor name. The actor name is used by the framework to identify the
+	 * actor for logging and auditing purposes. That includes, for example,
+	 * such persistent resource meta-properties as "created by" and
+	 * "last modified by". The actor name is not used to identify the actor and
+	 * can change over time.
+	 *
+	 * @return The actor name.
+	 */
+	String getActorName();
+
+	/**
+	 * Get value associated with the actor by the authentication service
+	 * implementation. The opaque value, if used, is included in the
+	 * authentication token and together with the actor id is used to lookup the
+	 * actor in the authentication service. The exact meaning of the value is
+	 * specific to the implementation and therefore is "opaque" from the point
+	 * of view of the framework.
 	 *
 	 * @return The opaque value, or {@code null} if not used.
 	 */
@@ -36,22 +55,21 @@ public interface Actor {
 
 	/**
 	 * Get secret key associated with the actor. The secret key is used by the
-	 * framework to encrypt and decrypt the authentication token passed between
-	 * the client and the server using HTTP headers "Authentication-Info" and
-	 * "Authorization".
+	 * framework to encrypt and decrypt the authentication token.
 	 *
 	 * <p>The secret key is normally assigned by the web-application and is not
 	 * known to the actor. It is recommended to have an individual secret key
-	 * for each individual actor. This way, if the secret key is compromised for
+	 * for each individual actor. That way, if the secret key is compromised for
 	 * a given actor, only that actor's account is compromised. In simple
-	 * setups, however, that do not support storing additional secret key with
-	 * the actor account, the key can be shared for the whole web-application.
+	 * setups, however, that do not support storing additional secret keys with
+	 * actor accounts, the key can be shared for the whole web-application.
 	 *
 	 * <p>The symmetric encryption algorithm used by the framework to encrypt
-	 * and decrypt the authentication token is taken from this key. "AES"
+	 * and decrypt the authentication token is determined by this key. "AES"
 	 * algorithm is recommended and most commonly used.
 	 *
-	 * @return The secret key.
+	 * @return The secret key, or {@code null} to use application-wide key for
+	 * the authentication token encryption.
 	 */
 	SecretKey getSecretKey();
 

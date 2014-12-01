@@ -15,16 +15,16 @@ import org.bsworks.x2.services.auth.impl.PasswordActorAuthenticationService;
 
 /**
  * Password-based actor login endpoint handler. The handler takes three request
- * parameters&mdash;{@value #USERNAME_PARAM}, {@value #PASSWORD_PARAM} and
+ * parameters&mdash;{@value #LOGIN_NAME_PARAM}, {@value #PASSWORD_PARAM} and
  * optional {@value #OPAQUE_PARAM}&mdash;and attempts to authenticate the actor
  * assuming that the application uses a
  * {@link PasswordActorAuthenticationService} authentication service
  * implementation.
  *
- * <p>If authentication is successful, the endpoint returns an HTTP OK (200)
+ * <p>If authentication is successful, the endpoint returns an HTTP 200 (OK)
  * response with the authenticated actor in the response body and the
- * appropriate authentication headers. If the authentication failed, an HTTP Bad
- * Request (400) response is returned.
+ * appropriate authentication headers. If the authentication failed, an HTTP 400
+ * (Bad Request) response is returned.
  *
  * @author Lev Himmelfarb
  */
@@ -32,9 +32,9 @@ public class PasswordLoginEndpointCallHandler
 	extends ReadOnlyEndpointCallHandler {
 
 	/**
-	 * Name of the username request parameter.
+	 * Name of the login name request parameter.
 	 */
-	public static final String USERNAME_PARAM = "username";
+	public static final String LOGIN_NAME_PARAM = "user";
 
 	/**
 	 * Name of the password request parameter.
@@ -71,7 +71,7 @@ public class PasswordLoginEndpointCallHandler
 			.getActorAuthenticationService();
 
 		final Actor actor = authService.authenticate(
-				ctx.getRequestParam(USERNAME_PARAM),
+				ctx.getRequestParam(LOGIN_NAME_PARAM),
 				ctx.getRequestParam(PASSWORD_PARAM),
 				ctx.getRequestParam(OPAQUE_PARAM));
 		if (actor == null)

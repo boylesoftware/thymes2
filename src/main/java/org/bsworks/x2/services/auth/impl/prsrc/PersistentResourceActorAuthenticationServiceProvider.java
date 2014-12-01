@@ -6,13 +6,14 @@ import java.security.NoSuchAlgorithmException;
 import javax.servlet.ServletContext;
 
 import org.apache.commons.logging.LogFactory;
-
 import org.bsworks.x2.Actor;
 import org.bsworks.x2.InitializationException;
 import org.bsworks.x2.RuntimeContext;
 import org.bsworks.x2.ServiceProvider;
+import org.bsworks.x2.resource.PersistentResourceHandler;
 import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.services.auth.ActorAuthenticationService;
+import org.bsworks.x2.services.auth.impl.PasswordActorAuthenticationService;
 import org.bsworks.x2.util.StringUtils;
 
 
@@ -30,12 +31,17 @@ import org.bsworks.x2.util.StringUtils;
  * addition of being a persistent resource, the class also must implement
  * {@link Actor} interface. There is no default value for this parameter, it
  * must be specified.</dd>
- * <dt>{@value #USERNAME_PROP_INITPARAM}</dt><dd>Path of the username property
- * in the actor persistent resource. If not specified, "username" is used.</dd>
+ * <dt>{@value #LOGIN_NAME_PROP_INITPARAM}</dt><dd>Path of the login name
+ * property in the actor persistent resource. Must be specified if the
+ * implementation uses it.</dd>
  * <dt>{@value #ACTOR_PROPS_INITPARAM}</dt><dd>Comma-separated list of paths of
- * other properties of the actor persistent resource (not including the username
- * property) that need to be fetched because they participate in creating values
- * returned by the {@link Actor} interface methods.</dd>
+ * other properties of the actor persistent resource (not including the login
+ * name property) that need to be fetched because they participate in creating
+ * values returned by the {@link Actor} interface methods. These affect the
+ * object returned by the
+ * {@link ActorAuthenticationService#getActor(String, String)} method. The
+ * {@link PasswordActorAuthenticationService#authenticate(String, String, String)}
+ * method always returns the completely fetched resource record.</dd>
  * <dt>{@value #PASSWORD_DIGEST_ALG_INITPARAM}</dt><dd>Password digest
  * algorithm, such as "SHA-1". If not specified, plain password bytes are
  * used.</dd>
@@ -55,10 +61,10 @@ public class PersistentResourceActorAuthenticationServiceProvider
 
 	/**
 	 * Name of web-application context initialization parameter used to specify
-	 * username property path in the actor persistent resource.
+	 * login name property path in the actor persistent resource.
 	 */
-	public static final String USERNAME_PROP_INITPARAM =
-		"x2.service.auth.prsrc.usernameProperty";
+	public static final String LOGIN_NAME_PROP_INITPARAM =
+		"x2.service.auth.prsrc.loginNameProperty";
 
 	/**
 	 * Name of web-application context initialization parameter used to specify
@@ -111,26 +117,41 @@ public class PersistentResourceActorAuthenticationServiceProvider
 			throw new InitializationException(
 					"Invalid actor persistent resource class.", e);
 		}
-		if (!resources.isPersistentResource(actorPRsrcClass))
-			throw new InitializationException("Specifiled actor class is not a"
-					+ " persistent resource.");
-
-		// get and validate username property
-		final String usernamePropPath = StringUtils.defaultIfEmpty(
-				sc.getInitParameter(USERNAME_PROP_INITPARAM), "username");
+		final PersistentResourceHandler<? extends Actor> actorPRsrcHandler;
 		try {
-			resources.getPersistentResourceHandler(actorPRsrcClass)
-				.getPersistentPropertyChain(usernamePropPath);
+			actorPRsrcHandler =
+				resources.getPersistentResourceHandler(actorPRsrcClass);
 		} catch (final IllegalArgumentException e) {
-			throw new InitializationException("Specified username property"
-					+ " does not exist or is not persistent.", e);
+			throw new InitializationException("Specifiled actor class is not a"
+					+ " persistent resource.", e);
 		}
 
-		// get list of other properties to fetch
+		// get and validate login name property
+		final String loginNamePropPath =
+			sc.getInitParameter(LOGIN_NAME_PROP_INITPARAM);
+		if (loginNamePropPath != null) {
+			try {
+				actorPRsrcHandler.getPersistentPropertyChain(loginNamePropPath);
+			} catch (final IllegalArgumentException e) {
+				throw new InitializationException("Specified login name"
+						+ " property does not exist or is not persistent.", e);
+			}
+		}
+
+		// get and validate list of other properties to fetch
 		final String otherPropPathsStr = StringUtils.nullIfEmpty(
 				sc.getInitParameter(ACTOR_PROPS_INITPARAM));
 		final String[] otherPropPaths = (otherPropPathsStr == null ?
 				new String[0] : otherPropPathsStr.trim().split("\\s*,\\s*"));
+		for (final String propPath : otherPropPaths) {
+			try {
+				actorPRsrcHandler.getPersistentPropertyChain(propPath);
+			} catch (final IllegalArgumentException e) {
+				throw new InitializationException("Specified actor resource"
+						+ " property " + propPath
+						+ " does not exist or is not persistent.", e);
+			}
+		}
 
 		// get and validate password digest algorithm
 		final String passwordDigestAlg =
@@ -145,10 +166,36 @@ public class PersistentResourceActorAuthenticationServiceProvider
 		}
 
 		// create the service
-		return new PersistentResourceActorAuthenticationService(
+		return this.createActorAuthenticationService(runtimeCtx,
+				actorPRsrcClass, loginNamePropPath, otherPropPaths,
+				passwordDigestAlg);
+	}
+
+	/**
+	 * Create service instance. Default implementation returns new instance of
+	 * {@link PersistentResourceActorAuthenticationService}.
+	 *
+	 * @param runtimeCtx Runtime context.
+	 * @param actorPRsrcClass Actor persistent resource class.
+	 * @param loginNamePropPath Login name property path, or {@code null} if not
+	 * used (default implementation requires it!).
+	 * @param otherPropPaths Other actor resource properties to fetch. May be
+	 * empty but never {@code null}.
+	 * @param passwordDigestAlg Password digest algorithm or {@code null} if no
+	 * digest.
+	 *
+	 * @return Service instance.
+	 */
+	protected ActorAuthenticationService createActorAuthenticationService(
+			final RuntimeContext runtimeCtx,
+			final Class<? extends Actor> actorPRsrcClass,
+			final String loginNamePropPath, final String[] otherPropPaths,
+			final String passwordDigestAlg) {
+
+		return new PersistentResourceActorAuthenticationService<>(
 				runtimeCtx,
 				actorPRsrcClass,
-				usernamePropPath,
+				loginNamePropPath,
 				otherPropPaths,
 				passwordDigestAlg);
 	}
