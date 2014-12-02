@@ -1,6 +1,7 @@
 package org.bsworks.x2.services.auth.impl;
 
 import org.bsworks.x2.Actor;
+import org.bsworks.x2.EndpointCallContext;
 import org.bsworks.x2.services.auth.ActorAuthenticationService;
 
 
@@ -16,6 +17,7 @@ public interface PasswordActorAuthenticationService
 	/**
 	 * Authenticate actor.
 	 *
+	 * @param ctx Endpoint call context.
 	 * @param loginName User login name.
 	 * @param password User password.
 	 * @param opaque Service implementation specific value associated with the
@@ -24,5 +26,6 @@ public interface PasswordActorAuthenticationService
 	 * @return The authenticated actor, or {@code null} if login name, password
 	 * and opaque value combination is invalid.
 	 */
-	Actor authenticate(String loginName, String password, String opaque);
+	Actor authenticate(EndpointCallContext ctx, String loginName,
+			String password, String opaque);
 }

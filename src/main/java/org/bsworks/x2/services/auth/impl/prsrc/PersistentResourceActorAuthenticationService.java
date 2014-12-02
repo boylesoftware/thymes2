@@ -6,6 +6,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 
 import org.bsworks.x2.Actor;
+import org.bsworks.x2.EndpointCallContext;
 import org.bsworks.x2.RuntimeContext;
 import org.bsworks.x2.resource.FilterConditionType;
 import org.bsworks.x2.resource.FilterSpec;
@@ -126,26 +127,19 @@ public class PersistentResourceActorAuthenticationService<A extends Actor>
 	 * See overridden method.
 	 */
 	@Override
-	public Actor authenticate(final String loginName, final String password,
+	public Actor authenticate(final EndpointCallContext ctx,
+			final String loginName, final String password,
 			final String opaque) {
 
 		final FilterSpec<A> filter =
 			this.runtimeCtx.getResources().getFilterSpec(this.actorPRsrcClass);
 		this.addAuthenticationFilter(filter, loginName, opaque);
 
-		final A actor;
-		try (final PersistenceTransactionHandler txh =
-				this.runtimeCtx.getPersistenceService()
-					.createPersistenceTransaction(null, true)) {
-
-			actor = txh
-					.getTransaction()
-					.createPersistentResourceFetch(this.actorPRsrcClass)
-					.setFilter(filter)
-					.getFirstResult();
-
-			txh.commitTransaction();
-		}
+		final A actor = ctx
+				.getPersistenceTransaction()
+				.createPersistentResourceFetch(this.actorPRsrcClass)
+				.setFilter(filter)
+				.getFirstResult();
 
 		if (actor == null)
 			return null;
@@ -171,8 +165,9 @@ public class PersistentResourceActorAuthenticationService<A extends Actor>
 
 	/**
 	 * Add conditions to the filter for the
-	 * {@link #authenticate(String, String, String)} method. The default
-	 * implementation adds condition for the login name equality.
+	 * {@link #authenticate(EndpointCallContext, String, String, String)}
+	 * method. The default implementation adds condition for the login name
+	 * equality.
 	 *
 	 * @param filter The filter, to which to add conditions.
 	 * @param loginName Supplied login name.

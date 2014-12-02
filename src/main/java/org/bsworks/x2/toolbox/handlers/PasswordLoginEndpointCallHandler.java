@@ -70,7 +70,7 @@ public class PasswordLoginEndpointCallHandler
 			(PasswordActorAuthenticationService) ctx.getRuntimeContext()
 			.getActorAuthenticationService();
 
-		final Actor actor = authService.authenticate(
+		final Actor actor = authService.authenticate(ctx,
 				ctx.getRequestParam(LOGIN_NAME_PARAM),
 				ctx.getRequestParam(PASSWORD_PARAM),
 				ctx.getRequestParam(OPAQUE_PARAM));

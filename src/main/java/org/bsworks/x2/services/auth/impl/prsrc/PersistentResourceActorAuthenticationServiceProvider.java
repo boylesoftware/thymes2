@@ -40,7 +40,7 @@ import org.bsworks.x2.util.StringUtils;
  * values returned by the {@link Actor} interface methods. These affect the
  * object returned by the
  * {@link ActorAuthenticationService#getActor(String, String)} method. The
- * {@link PasswordActorAuthenticationService#authenticate(String, String, String)}
+ * {@link PasswordActorAuthenticationService#authenticate(org.bsworks.x2.EndpointCallContext, String, String, String)}
  * method always returns the completely fetched resource record.</dd>
  * <dt>{@value #PASSWORD_DIGEST_ALG_INITPARAM}</dt><dd>Password digest
  * algorithm, such as "SHA-1". If not specified, plain password bytes are
