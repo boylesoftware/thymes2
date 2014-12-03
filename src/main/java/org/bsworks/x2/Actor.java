@@ -79,7 +79,7 @@ public interface Actor {
 	 * the actor password. The credentials value is included in the encrypted
 	 * authentication token.
 	 *
-	 * @return The credentials.
+	 * @return The credentials. Must not be {@code null}.
 	 */
 	byte[] getCredentials();
 

@@ -147,7 +147,7 @@ abstract class AbstractResourcePropertyHandlerImpl
 
 		if (this.getter == null)
 			throw new UnsupportedOperationException(
-					"The property is not readable.");
+					"The property " + this.name + " is not readable.");
 
 		try {
 			return this.getter.invoke(obj);
@@ -173,7 +173,7 @@ abstract class AbstractResourcePropertyHandlerImpl
 
 		if (this.setter == null)
 			throw new UnsupportedOperationException(
-					"The property is not writable.");
+					"The property " + this.name + " is not writable.");
 
 		try {
 			this.setter.invoke(obj, val);
