@@ -219,9 +219,14 @@ class WhereClause {
 		final StringBuilder fromClause = new StringBuilder(64);
 
 		/**
-		 * Body of the "WHERE" clause.
+		 * Body of the "WHERE" clause with the conditions for joining tables.
 		 */
-		final StringBuilder whereClause = new StringBuilder(64);
+		final StringBuilder whereClauseJoins = new StringBuilder(64);
+
+		/**
+		 * Body of the "WHERE" clause with conditions for the filter.
+		 */
+		final StringBuilder whereClauseConditions = new StringBuilder(64);
 
 		/**
 		 * Aliases of tables included in the "FROM" clause by table names.
@@ -244,9 +249,36 @@ class WhereClause {
 			this.stump = stump;
 			this.fromClause.append(stump.getCollectionTableName())
 				.append(" AS ").append(stump.getCollectionTableAlias());
-			this.whereClause.append(stump.getCollectionTableJoinCondition());
+			this.whereClauseJoins.append(
+					stump.getCollectionTableJoinCondition());
 			this.includedTableAliases.put(stump.getCollectionTableName(),
 					stump.getCollectionTableAlias());
+		}
+
+
+		/**
+		 * Build sub-query and append it to the specified buffer.
+		 *
+		 * @param buf Buffer, to which to append the sub-query.
+		 * @param whereClauseBuf Re-usable buffer for internal use by the method
+		 * for building the sub-query's "WHERE" clause.
+		 */
+		void appendSubQuery(final StringBuilder buf,
+				final StringBuilder whereClauseBuf) {
+
+			buf.append("SELECT 1 FROM ").append(this.fromClause);
+
+			whereClauseBuf.setLength(0);
+			if (this.whereClauseJoins.length() > 0)
+				whereClauseBuf.append(this.whereClauseJoins);
+			if (this.whereClauseConditions.length() > 0) {
+				if (this.whereClauseJoins.length() > 0)
+					whereClauseBuf.append(" AND ");
+				whereClauseBuf.append("(").append(this.whereClauseConditions)
+					.append(")");
+			}
+			if (whereClauseBuf.length() > 0)
+				buf.append(" WHERE ").append(whereClauseBuf);
 		}
 	}
 
@@ -382,22 +414,26 @@ class WhereClause {
 
 				// add condition to the sub-query
 				newNextParamInd = appendConditionToSubquery(resources, subquery,
-						newNextParamInd, dialect, paramsFactory, cond, params);
+						newNextParamInd, dialect, paramsFactory, disjunction,
+						cond, params);
 			}
 		}
 
 		// add collection conditions
+		final StringBuilder subqueryWhereClause = new StringBuilder(128);
 		for (final SubQueryBuilder subquery : pSubqueries.values()) {
 			if (buf.length() > 0)
 				buf.append(disjunction ? " OR " : " AND ");
-			buf.append("EXISTS (SELECT 1 FROM ").append(subquery.fromClause)
-				.append(" WHERE ").append(subquery.whereClause).append(")");
+			buf.append("EXISTS (");
+			subquery.appendSubQuery(buf, subqueryWhereClause);
+			buf.append(")");
 		}
 		for (final SubQueryBuilder subquery : nSubqueries.values()) {
 			if (buf.length() > 0)
 				buf.append(disjunction ? " OR " : " AND ");
-			buf.append("NOT EXISTS (SELECT 1 FROM ").append(subquery.fromClause)
-				.append(" WHERE ").append(subquery.whereClause).append(")");
+			buf.append("NOT EXISTS (");
+			subquery.appendSubQuery(buf, subqueryWhereClause);
+			buf.append(")");
 		}
 
 		// add sub-junctions
@@ -429,6 +465,8 @@ class WhereClause {
 	 * @param nextParamInd Index for the next query parameter placeholder name.
 	 * @param dialect SQL dialect.
 	 * @param paramsFactory Query parameter value handlers factory.
+	 * @param disjunction {@code true} if the condition is part of a
+	 * disjunction.
 	 * @param cond The condition descriptor.
 	 * @param params Parameters collection, to which to add any query
 	 * parameters.
@@ -439,7 +477,7 @@ class WhereClause {
 			final SubQueryBuilder subquery, final int nextParamInd,
 			final SQLDialect dialect,
 			final ParameterValuesFactoryImpl paramsFactory,
-			final FilterCondition cond,
+			final boolean disjunction, final FilterCondition cond,
 			final Map<String, JDBCParameterValue> params) {
 
 		// find the stump property in the condition property chain
@@ -504,7 +542,7 @@ class WhereClause {
 					propTableAlias = "c" + (subquery.nextTableAliasChar++);
 					subquery.fromClause.append(", ").append(propTable)
 						.append(" AS ").append(propTableAlias);
-					subquery.whereClause.append(" AND ")
+					subquery.whereClauseJoins.append(" AND ")
 						.append(propTableAlias).append(".")
 						.append(propPersistence.getParentIdFieldName())
 						.append(" = ").append(propValExpr);
@@ -543,7 +581,7 @@ class WhereClause {
 					subquery.fromClause.append(", ")
 						.append(targetHandler.getPersistentCollectionName())
 						.append(" AS ").append(propTableAlias);
-					subquery.whereClause.append(" AND ")
+					subquery.whereClauseJoins.append(" AND ")
 						.append(propTableAlias).append(".")
 						.append(targetHandler.getIdProperty().getPersistence()
 								.getFieldName())
@@ -597,8 +635,9 @@ class WhereClause {
 		}
 
 		// append condition to the sub-query
-		return appendCondition(subquery.whereClause, nextParamInd, dialect,
-				paramsFactory, false, cond, valueExpr, valueType, params);
+		return appendCondition(subquery.whereClauseConditions, nextParamInd,
+				dialect, paramsFactory, disjunction, cond, valueExpr, valueType,
+				params);
 	}
 
 	/**
