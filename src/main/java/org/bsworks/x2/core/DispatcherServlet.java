@@ -100,7 +100,7 @@ public class DispatcherServlet
 			// check if no mapping
 			if (mapping == null)
 				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_NOT_FOUND,
+						HttpServletResponse.SC_NOT_FOUND, null,
 						"No API endpoint mapped to the request URI.");
 
 			// got endpoint request
@@ -132,7 +132,7 @@ public class DispatcherServlet
 			}
 			if (!methodAllowed)
 				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_METHOD_NOT_ALLOWED,
+						HttpServletResponse.SC_METHOD_NOT_ALLOWED, null,
 						"The API endpoint does not allow the request method.");
 
 			// get the call handler from the mapping
@@ -142,7 +142,7 @@ public class DispatcherServlet
 			// check that it is not "HEAD" request for a "long job" call
 			if (isHead && handler.isLongJob())
 				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_METHOD_NOT_ALLOWED,
+						HttpServletResponse.SC_METHOD_NOT_ALLOWED, null,
 						"The API endpoint does not allow the request method.");
 
 			// submit the endpoint request for asynchronous execution

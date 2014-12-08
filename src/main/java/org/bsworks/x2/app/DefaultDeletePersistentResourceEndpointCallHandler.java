@@ -91,7 +91,7 @@ public class DefaultDeletePersistentResourceEndpointCallHandler<R>
 		final Object recId = this.getAddressedRecordId(ctx);
 		if (recId == null)
 			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_METHOD_NOT_ALLOWED,
+					HttpServletResponse.SC_METHOD_NOT_ALLOWED, null,
 					"No record id in the URL.");
 
 		// get the record filter
@@ -119,7 +119,7 @@ public class DefaultDeletePersistentResourceEndpointCallHandler<R>
 			// resource not found if no record
 			if (recVerInfo == null)
 				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_NOT_FOUND,
+						HttpServletResponse.SC_NOT_FOUND, null,
 						"No resource record with this id.");
 		}
 
@@ -130,7 +130,7 @@ public class DefaultDeletePersistentResourceEndpointCallHandler<R>
 		// check that the record existed
 		if (affectedResources.isEmpty())
 			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_NOT_FOUND,
+					HttpServletResponse.SC_NOT_FOUND, null,
 					"No resource record with this id.");
 
 		// update the affected persistent resource collection versions

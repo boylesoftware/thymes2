@@ -185,7 +185,7 @@ class EndpointCallExecutor<E>
 							null,
 							new EndpointCallErrorException(
 									HttpServletResponse.SC_REQUEST_TIMEOUT,
-									"Request timeout."));
+									null, "Request timeout."));
 
 				} catch (final IOException e) {
 					this.log.warn("I/O error sending timout error response", e);
@@ -262,10 +262,10 @@ class EndpointCallExecutor<E>
 					this.uriParams, actor)) {
 				if (actor == null)
 					throw new EndpointCallErrorException(
-							HttpServletResponse.SC_UNAUTHORIZED,
+							HttpServletResponse.SC_UNAUTHORIZED, null,
 							"Authentication required.");
 				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_FORBIDDEN,
+						HttpServletResponse.SC_FORBIDDEN, null,
 						"Insufficient permissions.");
 			}
 
@@ -285,7 +285,7 @@ class EndpointCallExecutor<E>
 						serializer.getContentType() + "(?:;.*)?"))
 					throw new EndpointCallErrorException(
 							HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE,
-							"The request entity is not JSON.");
+							null, "The request entity is not JSON.");
 
 				// check content length
 				final int maxSize = this.runtimeCtx.getMaxRequestSize();
@@ -293,7 +293,7 @@ class EndpointCallExecutor<E>
 				if (contentLength > maxSize)
 					throw new EndpointCallErrorException(
 							HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE,
-							"The request entity is too large.");
+							null, "The request entity is too large.");
 
 				// read the content
 				buf = new byte[maxSize];
@@ -306,7 +306,7 @@ class EndpointCallExecutor<E>
 				} catch (final IndexOutOfBoundsException e) {
 					throw new EndpointCallErrorException(
 							HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE,
-							"The request entity is too large.");
+							null, "The request entity is too large.");
 				}
 
 				// parse the content
@@ -318,12 +318,12 @@ class EndpointCallExecutor<E>
 				} catch (final UnsupportedEncodingException e) {
 					throw new EndpointCallErrorException(
 							HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE,
-							"Invalid request entity character set.");
+							null, "Invalid request entity character set.");
 				} catch (final InvalidResourceDataException e) {
 					if (debug)
 						this.log.debug("invalid request entity", e);
 					throw new EndpointCallErrorException(
-							HttpServletResponse.SC_BAD_REQUEST,
+							HttpServletResponse.SC_BAD_REQUEST, null,
 							"Invalid request entity.");
 				}
 
@@ -348,7 +348,7 @@ class EndpointCallExecutor<E>
 
 					// build error
 					throw new EndpointCallErrorException(
-							HttpServletResponse.SC_BAD_REQUEST,
+							HttpServletResponse.SC_BAD_REQUEST, null,
 							"Invalid request entity.",
 							new RequestEntityValidationErrors<>(cvs));
 				}
@@ -407,7 +407,7 @@ class EndpointCallExecutor<E>
 					this.createEndpointCallErrorContext(buf, dataLen));
 
 			error = new EndpointCallErrorException(
-					HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+					HttpServletResponse.SC_INTERNAL_SERVER_ERROR, null,
 					e.getMessage());
 
 		} finally {
@@ -530,14 +530,14 @@ class EndpointCallExecutor<E>
 		if (Thread.currentThread().isInterrupted()) {
 			this.log.info("interrupted, aborting endpoint call execution");
 			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_SERVICE_UNAVAILABLE,
+					HttpServletResponse.SC_SERVICE_UNAVAILABLE, null,
 					"Call execution aborted by the server.");
 		}
 
 		if ((this.endpointCallTask != null) && this.endpointCallTask.isDone()) {
 			this.log.info("cancelled, aborting endpoint call execution");
 			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_SERVICE_UNAVAILABLE,
+					HttpServletResponse.SC_SERVICE_UNAVAILABLE, null,
 					"Call execution aborted by the server.");
 		}
 	}

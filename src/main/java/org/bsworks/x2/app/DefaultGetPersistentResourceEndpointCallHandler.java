@@ -286,7 +286,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 		// resource not found if no record
 		if (recVerInfo == null)
 			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_NOT_FOUND,
+					HttpServletResponse.SC_NOT_FOUND, null,
 					"No resource record with this id.");
 
 		// get the full record
@@ -349,7 +349,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 		// resource not found if no record
 		if (recVerInfo == null)
 			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_NOT_FOUND,
+					HttpServletResponse.SC_NOT_FOUND, null,
 					"No resource record with this id.");
 
 		// get the record
@@ -506,7 +506,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 		if ((includePropsFetchParam != null)
 				&& (excludePropsFetchParam != null))
 			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_BAD_REQUEST,
+					HttpServletResponse.SC_BAD_REQUEST, null,
 					"Either \"" + INCLUDE_PROPS_FETCH_PARAM + "\" or  \""
 					+ EXCLUDE_PROPS_FETCH_PARAM
 					+ "\" request parameter can be specified, but not both.");
@@ -526,7 +526,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			if (this.log.isDebugEnabled())
 				this.log.debug("invalid parameter", e);
 			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_BAD_REQUEST,
+					HttpServletResponse.SC_BAD_REQUEST, null,
 					"Invalid properties fetch specification parameter.");
 		}
 
@@ -555,7 +555,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 
 			if (!m.reset(filterParam).matches())
 				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_BAD_REQUEST,
+						HttpServletResponse.SC_BAD_REQUEST, null,
 						"Invalid filter specification parameter.");
 
 			final boolean negate = (m.group(2) != null);
@@ -601,7 +601,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 				if (this.log.isDebugEnabled())
 					this.log.debug("invalid parameter", e);
 				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_BAD_REQUEST,
+						HttpServletResponse.SC_BAD_REQUEST, null,
 						"Invalid filter specification parameter.");
 			}
 		}
@@ -650,7 +650,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 				if (this.log.isDebugEnabled())
 					this.log.debug("invalid parameter", e);
 				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_BAD_REQUEST,
+						HttpServletResponse.SC_BAD_REQUEST, null,
 						"Invalid order specification parameter.");
 			}
 		}
@@ -685,7 +685,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			if (this.log.isDebugEnabled())
 				this.log.debug("invalid parameter", e);
 			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_BAD_REQUEST,
+					HttpServletResponse.SC_BAD_REQUEST, null,
 					"Invalid range specification parameter.");
 		}
 
@@ -718,7 +718,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 				if (this.log.isDebugEnabled())
 					this.log.debug("invalid parameter", e);
 				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_BAD_REQUEST,
+						HttpServletResponse.SC_BAD_REQUEST, null,
 						"Invalid references fetch specification parameter.");
 			}
 		}

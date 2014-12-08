@@ -220,6 +220,7 @@ class EndpointCallResponder {
 		final ByteArrayOutputStream buf = new ByteArrayOutputStream(512);
 		this.serializer.serialize(buf, Charset.forName("UTF-8"),
 				new ErrorResponse(
+						error.getErrorCode(),
 						StringUtils.defaultIfEmpty(error.getMessage(),
 								"Error."),
 						error.getErrorDetails()),

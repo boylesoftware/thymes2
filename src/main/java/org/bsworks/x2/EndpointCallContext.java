@@ -1,6 +1,7 @@
 package org.bsworks.x2;
 
 import java.util.Date;
+import java.util.List;
 import java.util.Set;
 
 import org.bsworks.x2.resource.FilterSpec;
@@ -48,6 +49,14 @@ public interface EndpointCallContext {
 	 * @return Context-relative request URI.
 	 */
 	String getRequestURI();
+
+	/**
+	 * Get positional request URI parameters.
+	 *
+	 * @return Unmodifiable list of parameter values. Never {@code null}, but
+	 * may be empty. Some elements may be {@code null}.
+	 */
+	List<String> getRequestURIParams();
 
 	/**
 	 * Get positional request URI parameter value.

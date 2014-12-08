@@ -105,13 +105,13 @@ public class DefaultPutPersistentResourceEndpointCallHandler<R>
 		final Object recId = this.getAddressedRecordId(ctx);
 		if (recId == null)
 			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_METHOD_NOT_ALLOWED,
+					HttpServletResponse.SC_METHOD_NOT_ALLOWED, null,
 					"No record id in the URL.");
 
 		// verify the record id in the submitted record data
 		if (!recId.equals(this.idPropHandler.getValue(requestEntity)))
 			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_BAD_REQUEST,
+					HttpServletResponse.SC_BAD_REQUEST, null,
 					"Record id in the submitted data does not match record id"
 							+ " in the URL.");
 
@@ -135,14 +135,14 @@ public class DefaultPutPersistentResourceEndpointCallHandler<R>
 			// make sure not an auto-generated id
 			if (this.idPropHandler.getHandling() == IdHandling.AUTO_GENERATED)
 				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_NOT_FOUND,
+						HttpServletResponse.SC_NOT_FOUND, null,
 						"No resource record with this id.");
 
 			// make sure the actor is allowed to persist the resource
 			if (!this.prsrcHandler.isAllowed(ResourcePropertyAccess.PERSIST,
 						ctx.getActor()))
 				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_FORBIDDEN,
+						HttpServletResponse.SC_FORBIDDEN, null,
 						"Not allowed to create new records.");
 
 			// persist the record
@@ -164,7 +164,7 @@ public class DefaultPutPersistentResourceEndpointCallHandler<R>
 			if (!this.versionPropHandler.getValue(rec).equals(
 					this.versionPropHandler.getValue(requestEntity)))
 				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_CONFLICT,
+						HttpServletResponse.SC_CONFLICT, null,
 						"Record version in the submitted data does not match"
 								+ " version of the existing record.",
 						new ExistingPersistentResourceRecord(rec));

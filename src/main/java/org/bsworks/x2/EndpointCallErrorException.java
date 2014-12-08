@@ -1,5 +1,7 @@
 package org.bsworks.x2;
 
+import org.bsworks.x2.util.StringUtils;
+
 
 /**
  * Exception used to send error response to an endpoint call.
@@ -21,6 +23,11 @@ public class EndpointCallErrorException
 	private final int httpStatusCode;
 
 	/**
+	 * Application-specific error code.
+	 */
+	private final String errorCode;
+
+	/**
 	 * Optional error details object.
 	 */
 	private final Object errorDetails;
@@ -30,29 +37,38 @@ public class EndpointCallErrorException
 	 * Create new exception.
 	 *
 	 * @param httpStatusCode HTTP response status code.
+	 * @param errorCode Application-specific error code. If {@code null}, the
+	 * error code is initialized with "X2-CCC", where "CCC" is the HTTP response
+	 * status code.
 	 * @param errorMessage Error message. Can be retrieved via
 	 * {@link Exception#getMessage()} method.
 	 * @param errorDetails Optional error details object, or {@code null} for
 	 * none.
 	 */
 	public EndpointCallErrorException(final int httpStatusCode,
-			final String errorMessage, final Object errorDetails) {
+			final String errorCode, final String errorMessage,
+			final Object errorDetails) {
 		super(errorMessage);
 
 		this.httpStatusCode = httpStatusCode;
+		this.errorCode = StringUtils.defaultIfEmpty(errorCode,
+				"X2-" + httpStatusCode);
 		this.errorDetails = errorDetails;
 	}
 
 	/**
-	 * Create new exception for an error with no properties.
+	 * Create new exception for an error with no properties. Equivalent to
+	 * calling
+	 * {@code EndpointCallErrorException(httpStatusCode, errorCode, errorMessage, null)}.
 	 *
 	 * @param httpStatusCode HTTP response status code.
+	 * @param errorCode Application-specific error code.
 	 * @param errorMessage Error message. Can be retrieved via
 	 * {@link Exception#getMessage()} method.
 	 */
 	public EndpointCallErrorException(final int httpStatusCode,
-			final String errorMessage) {
-		this(httpStatusCode, errorMessage, null);
+			final String errorCode, final String errorMessage) {
+		this(httpStatusCode, errorCode, errorMessage, null);
 	}
 
 
@@ -64,6 +80,16 @@ public class EndpointCallErrorException
 	public int getHttpStatusCode() {
 
 		return this.httpStatusCode;
+	}
+
+	/**
+	 * Get application-specific error code.
+	 *
+	 * @return The error code.
+	 */
+	public String getErrorCode() {
+
+		return this.errorCode;
 	}
 
 	/**

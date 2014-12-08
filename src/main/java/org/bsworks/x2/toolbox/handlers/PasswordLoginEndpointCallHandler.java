@@ -76,7 +76,8 @@ public class PasswordLoginEndpointCallHandler
 				ctx.getRequestParam(OPAQUE_PARAM));
 		if (actor == null)
 			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_BAD_REQUEST, "Invalid login.");
+					HttpServletResponse.SC_BAD_REQUEST,
+					"APP-400-INVALID_LOGIN", "Invalid login.");
 
 		ctx.assumeActor(actor);
 

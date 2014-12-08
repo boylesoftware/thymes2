@@ -88,7 +88,7 @@ public class DefaultPostPersistentResourceEndpointCallHandler<R>
 		// make sure there is not record id in the call URL
 		if (this.getAddressedRecordId(ctx) != null)
 			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_METHOD_NOT_ALLOWED,
+					HttpServletResponse.SC_METHOD_NOT_ALLOWED, null,
 					"Existing record id is in the URL.");
 
 		// persist the record

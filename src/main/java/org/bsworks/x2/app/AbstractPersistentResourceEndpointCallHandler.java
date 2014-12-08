@@ -152,7 +152,7 @@ public abstract class AbstractPersistentResourceEndpointCallHandler<R, E>
 			if (this.log.isDebugEnabled())
 				this.log.debug("invalid parameter", e);
 			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_BAD_REQUEST,
+					HttpServletResponse.SC_BAD_REQUEST, null,
 					"Invalid record id value.");
 		}
 	}
@@ -337,7 +337,7 @@ public abstract class AbstractPersistentResourceEndpointCallHandler<R, E>
 			if (!this.evaluateETagMatchCondition(ifMatchHeader,
 					requestedRecDoesNotExist, eTag))
 				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_PRECONDITION_FAILED,
+						HttpServletResponse.SC_PRECONDITION_FAILED, null,
 						"No matching resource at the specified URI.");
 
 		} else if (ifUnmodifiedSinceHeader != null) {
@@ -345,7 +345,7 @@ public abstract class AbstractPersistentResourceEndpointCallHandler<R, E>
 			if (this.evaluateModifiedSinceCondition(ifUnmodifiedSinceHeader,
 					lastModTS))
 				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_PRECONDITION_FAILED,
+						HttpServletResponse.SC_PRECONDITION_FAILED, null,
 						"The resource has since been modified.");
 		}
 
@@ -360,7 +360,7 @@ public abstract class AbstractPersistentResourceEndpointCallHandler<R, E>
 				if (ctx.getRequestMethod() == HttpMethod.GET)
 					return false; // unmodified
 				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_PRECONDITION_FAILED,
+						HttpServletResponse.SC_PRECONDITION_FAILED, null,
 						"There is a matching resource at the specified URI.");
 			}
 

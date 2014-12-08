@@ -2,6 +2,7 @@ package org.bsworks.x2.core;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -50,6 +51,11 @@ class EndpointCallContextImpl
 	 * Positional URI parameters.
 	 */
 	private final List<String> uriParams;
+
+	/**
+	 * Read-only view of the URI parameters.
+	 */
+	private List<String> uriParamsRO = null;
 
 	/**
 	 * The HTTP request.
@@ -185,6 +191,18 @@ class EndpointCallContextImpl
 	public String getRequestURI() {
 
 		return this.requestURI;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public List<String> getRequestURIParams() {
+
+		if (this.uriParamsRO == null)
+			this.uriParamsRO = Collections.unmodifiableList(this.uriParams);
+
+		return this.uriParamsRO;
 	}
 
 	/* (non-Javadoc)
