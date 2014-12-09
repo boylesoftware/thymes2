@@ -275,7 +275,7 @@ class PersistentResourceFetchImpl<R>
 	public long getCount() {
 
 		// build the query
-		final QueryBuilder qb = this.buildQuery();
+		final QueryBuilder qb = this.buildQueryForCount();
 
 		// get the main query
 		final MainQuery mainQuery = this.getMainQuery(qb, true);
@@ -421,6 +421,21 @@ class PersistentResourceFetchImpl<R>
 		return QueryBuilder.createQueryBuilder(this.resources, this.dialect,
 				this.paramsFactory, this.actor, this.prsrcHandler,
 				this.propsFetch, this.refsFetch, this.filter, this.order);
+	}
+
+	/**
+	 * Build query for count only. Same query query builder as returned by
+	 * {@link #buildQuery()}, but with empty properties fetch.
+	 *
+	 * @return The count only query builder.
+	 */
+	private QueryBuilder buildQueryForCount() {
+
+		return QueryBuilder.createQueryBuilder(this.resources, this.dialect,
+				this.paramsFactory, this.actor, this.prsrcHandler,
+				this.resources.getPropertiesFetchSpec(
+						this.prsrcHandler.getResourceClass()),
+				this.refsFetch, this.filter, this.order);
 	}
 
 	/**
