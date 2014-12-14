@@ -1,6 +1,6 @@
 package org.bsworks.x2.resource;
 
-import java.util.Map;
+import java.util.SortedMap;
 
 
 /**
@@ -36,11 +36,14 @@ public interface RefsFetchSpec<R> {
 	RefsFetchSpec<R> add(String propPath);
 
 	/**
-	 * Tell if the specified reference property needs to be fetched. This is
-	 * equivalent to calling
+	 * Tell if the specified reference property is fetched by this
+	 * specification. If the property path is not a template (see "propPath"
+	 * parameter description), this is equivalent to calling
 	 * {@code getFetchedRefProperties().containsKey(propPath)}.
 	 *
 	 * @param propPath Property path with nested properties separated with dots.
+	 * If ends with ".*", then checks if any nested properties of the specified
+	 * path are fetched.
 	 *
 	 * @return {@code true} if needs to be fetched.
 	 */
@@ -53,5 +56,5 @@ public interface RefsFetchSpec<R> {
 	 * @return Unmodifiable map referred persistent resource classes by
 	 * reference property paths.
 	 */
-	Map<String, Class<?>> getFetchedRefProperties();
+	SortedMap<String, Class<?>> getFetchedRefProperties();
 }

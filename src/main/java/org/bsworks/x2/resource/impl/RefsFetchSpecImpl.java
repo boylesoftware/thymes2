@@ -2,8 +2,8 @@ package org.bsworks.x2.resource.impl;
 
 import java.util.Collections;
 import java.util.Deque;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
 import org.bsworks.x2.resource.RefPropertyHandler;
@@ -29,13 +29,13 @@ class RefsFetchSpecImpl<R>
 	/**
 	 * Fetched referred persistent resource classes by reference property paths.
 	 */
-	private final Map<String, Class<?>> fetchedRefProps = new HashMap<>();
+	private final SortedMap<String, Class<?>> fetchedRefProps = new TreeMap<>();
 
 	/**
 	 * Read-only view of fetched reference properties.
 	 */
-	private final Map<String, Class<?>> fetchedRefPropsRO =
-		Collections.unmodifiableMap(this.fetchedRefProps);
+	private final SortedMap<String, Class<?>> fetchedRefPropsRO =
+		Collections.unmodifiableSortedMap(this.fetchedRefProps);
 
 
 	/**
@@ -99,6 +99,12 @@ class RefsFetchSpecImpl<R>
 	@Override
 	public boolean isFetchRequested(final String propPath) {
 
+		if (propPath.endsWith(".*"))
+			return !this.fetchedRefProps
+					.subMap(propPath,
+							propPath.substring(0, propPath.length() - 2) + "/")
+					.isEmpty();
+
 		return this.fetchedRefProps.containsKey(propPath);
 	}
 
@@ -106,7 +112,7 @@ class RefsFetchSpecImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public Map<String, Class<?>> getFetchedRefProperties() {
+	public SortedMap<String, Class<?>> getFetchedRefProperties() {
 
 		return this.fetchedRefPropsRO;
 	}
