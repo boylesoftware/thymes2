@@ -15,13 +15,11 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import org.bsworks.x2.Actor;
-import org.bsworks.x2.EndpointCallContext;
 import org.bsworks.x2.EndpointCallErrorException;
 import org.bsworks.x2.EndpointCallHandler;
 import org.bsworks.x2.EndpointCallResponse;
 import org.bsworks.x2.HttpMethod;
 import org.bsworks.x2.services.serialization.ResourceSerializationService;
-import org.bsworks.x2.util.StringUtils;
 
 
 /**
@@ -162,7 +160,8 @@ class EndpointCallResponder {
 	 */
 	void sendSuccessResponse(final HttpServletRequest httpRequest,
 			final HttpServletResponse httpResponse,
-			final EndpointCallContext ctx, final EndpointCallResponse response,
+			final EndpointCallContextImpl ctx,
+			final EndpointCallResponse response,
 			final ByteArrayOutputStream responseEntityBuf,
 			final boolean omitResponseEntity)
 		throws IOException {
@@ -174,6 +173,9 @@ class EndpointCallResponder {
 			httpResponse.setStatus(response.getHttpStatusCode());
 			response.prepareHttpResponse(ctx, httpRequest, httpResponse);
 		}
+
+		// apply response hooks from the context
+		ctx.applyHttpResponseHooks(httpResponse, null);
 
 		// add authentication information to the response
 		final Actor actor = ctx.getActor();
@@ -206,28 +208,28 @@ class EndpointCallResponder {
 	 *
 	 * @param httpRequest The HTTP request.
 	 * @param httpResponse The HTTP response.
-	 * @param actor Actor making the request, if known.
+	 * @param ctx Request context, or {@code null} if unavailable.
 	 * @param error The error.
 	 *
 	 * @throws IOException If an I/O error happens sending the response.
 	 */
 	void sendErrorResponse(final HttpServletRequest httpRequest,
-			final HttpServletResponse httpResponse, final Actor actor,
+			final HttpServletResponse httpResponse,
+			final EndpointCallContextImpl ctx,
 			final EndpointCallErrorException error)
 		throws IOException {
 
 		// build error response JSON body
 		final ByteArrayOutputStream buf = new ByteArrayOutputStream(512);
-		this.serializer.serialize(buf, Charset.forName("UTF-8"),
-				new ErrorResponse(
-						error.getErrorCode(),
-						StringUtils.defaultIfEmpty(error.getMessage(),
-								"Error."),
-						error.getErrorDetails()),
-				actor);
+		this.serializer.serialize(buf, Charset.forName("UTF-8"), error,
+				(ctx == null ? null : ctx.getActor()));
 
 		// set HTTP response status code and message
 		httpResponse.setStatus(error.getHttpStatusCode());
+
+		// apply response hooks from the context
+		if (ctx != null)
+			ctx.applyHttpResponseHooks(httpResponse, error);
 
 		// add CORS headers to the response
 		this.addCORSHeaders(httpRequest, httpResponse);

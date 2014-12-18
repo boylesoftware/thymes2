@@ -421,9 +421,7 @@ class EndpointCallExecutor<E>
 						try {
 							if (error != null)
 								this.callResponder.sendErrorResponse(
-										httpRequest, httpResponse,
-										(ctx == null ? null : ctx.getActor()),
-										error);
+										httpRequest, httpResponse, ctx, error);
 							else
 								this.callResponder.sendSuccessResponse(
 										httpRequest, httpResponse, ctx,

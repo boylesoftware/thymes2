@@ -28,10 +28,9 @@ public interface EndpointCallResponse {
 	Object getEntity();
 
 	/**
-	 * Put any additional information, such as HTTP headers, to the response.
-	 * The response status code and entity are handled by the framework.
+	 * Make adjustments, such as add HTTP headers, to the response.
 	 *
-	 * @param ctx The endpoint call context.
+	 * @param ctx The endpoint call context, or {@code null} if unavailable.
 	 * @param httpRequest The HTTP request.
 	 * @param httpResponse The HTTP response.
 	 */

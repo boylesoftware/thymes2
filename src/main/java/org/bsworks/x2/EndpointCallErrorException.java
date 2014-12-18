@@ -1,5 +1,9 @@
 package org.bsworks.x2;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.bsworks.x2.resource.annotations.Property;
 import org.bsworks.x2.util.StringUtils;
 
 
@@ -9,7 +13,8 @@ import org.bsworks.x2.util.StringUtils;
  * @author Lev Himmelfarb
  */
 public class EndpointCallErrorException
-	extends Exception {
+	extends Exception
+	implements EndpointCallResponse {
 
 	/**
 	 * Serial version id.
@@ -41,7 +46,8 @@ public class EndpointCallErrorException
 	 * error code is initialized with "X2-CCC", where "CCC" is the HTTP response
 	 * status code.
 	 * @param errorMessage Error message. Can be retrieved via
-	 * {@link Exception#getMessage()} method.
+	 * {@link Exception#getMessage()} method. May be {@code null}, in which case
+	 * the error message in the call response is simply "Error.".
 	 * @param errorDetails Optional error details object, or {@code null} for
 	 * none.
 	 */
@@ -63,8 +69,7 @@ public class EndpointCallErrorException
 	 *
 	 * @param httpStatusCode HTTP response status code.
 	 * @param errorCode Application-specific error code.
-	 * @param errorMessage Error message. Can be retrieved via
-	 * {@link Exception#getMessage()} method.
+	 * @param errorMessage Error message.
 	 */
 	public EndpointCallErrorException(final int httpStatusCode,
 			final String errorCode, final String errorMessage) {
@@ -72,32 +77,64 @@ public class EndpointCallErrorException
 	}
 
 
-	/**
-	 * Get HTTP response status code.
-	 *
-	 * @return The status code.
+	/* (non-Javadoc)
+	 * See overridden method.
 	 */
+	@Override
 	public int getHttpStatusCode() {
 
 		return this.httpStatusCode;
 	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public Object getEntity() {
+
+		return this;
+	}
+
+	/**
+	 * The default implementation does nothing.
+	 */
+	@Override
+	public void prepareHttpResponse(final EndpointCallContext ctx,
+			final HttpServletRequest httpRequest,
+			final HttpServletResponse httpResponse) {
+
+		// nothing
+	}
+
 
 	/**
 	 * Get application-specific error code.
 	 *
 	 * @return The error code.
 	 */
+	@Property
 	public String getErrorCode() {
 
 		return this.errorCode;
 	}
 
 	/**
-	 * Get optional error details object. The object is included in the error
-	 * response body, so it needs to be an application resource.
+	 * Get error message.
 	 *
-	 * @return Error specific object, or {@code null} if none.
+	 * @return The error message.
 	 */
+	@Property
+	public String getErrorMessage() {
+
+		return StringUtils.defaultIfEmpty(this.getMessage(), "Error.");
+	}
+
+	/**
+	 * Get optional error details.
+	 *
+	 * @return Error details descriptor, or {@code null} if none.
+	 */
+	@Property
 	public Object getErrorDetails() {
 
 		return this.errorDetails;

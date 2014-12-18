@@ -4,8 +4,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
-import javax.servlet.http.HttpServletRequest;
-
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.OrderSpec;
 import org.bsworks.x2.resource.PropertiesFetchSpec;
@@ -129,12 +127,15 @@ public interface EndpointCallContext {
 	<Y> Y getAttribute(String name, Class<Y> valueClass);
 
 	/**
-	 * Get underlying HTTP request. The method can be used to communicate with
-	 * servlets and filters outside the framework stack.
+	 * Add hook used to adjust the HTTP response before it is sent to the
+	 * caller. The hooks are called for both success and error responses in the
+	 * order they've been added to the context. They are called after
+	 * {@link EndpointCallResponse#prepareHttpResponse(EndpointCallContext, javax.servlet.http.HttpServletRequest, javax.servlet.http.HttpServletResponse)},
+	 * if applicable.
 	 *
-	 * @return The HTTP request.
+	 * @param hook The hook.
 	 */
-	HttpServletRequest getHttpRequest();
+	void addHttpResponseHook(EndpointCallHttpResponseHook hook);
 
 	/**
 	 * Get actor making the call.

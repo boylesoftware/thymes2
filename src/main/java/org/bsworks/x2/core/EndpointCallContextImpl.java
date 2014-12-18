@@ -11,9 +11,12 @@ import java.util.Map;
 import java.util.Set;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.bsworks.x2.Actor;
 import org.bsworks.x2.EndpointCallContext;
+import org.bsworks.x2.EndpointCallErrorException;
+import org.bsworks.x2.EndpointCallHttpResponseHook;
 import org.bsworks.x2.HttpMethod;
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.OrderSpec;
@@ -61,6 +64,11 @@ class EndpointCallContextImpl
 	 * The HTTP request.
 	 */
 	private final HttpServletRequest httpRequest;
+
+	/**
+	 * HTTP response hooks.
+	 */
+	private List<EndpointCallHttpResponseHook> httpResponseHooks;
 
 	/**
 	 * The actor making the request, or {@code null}.
@@ -154,6 +162,23 @@ class EndpointCallContextImpl
 				tx.close();
 			}
 		}
+	}
+
+	/**
+	 * Apply HTTP response hooks if any.
+	 *
+	 * @param httpResponse The HTTP response.
+	 * @param error Error, or {@code null} if successful response.
+	 */
+	void applyHttpResponseHooks(final HttpServletResponse httpResponse,
+			final EndpointCallErrorException error) {
+
+		if (this.httpResponseHooks == null)
+			return;
+
+		for (final EndpointCallHttpResponseHook hook : this.httpResponseHooks)
+			hook.adjustHttpResponse(this, error, this.httpRequest,
+					httpResponse);
 	}
 
 
@@ -281,9 +306,12 @@ class EndpointCallContextImpl
 	 * See overridden method.
 	 */
 	@Override
-	public HttpServletRequest getHttpRequest() {
+	public void addHttpResponseHook(final EndpointCallHttpResponseHook hook) {
 
-		return this.httpRequest;
+		if (this.httpResponseHooks == null)
+			this.httpResponseHooks = new ArrayList<>();
+
+		this.httpResponseHooks.add(hook);
 	}
 
 	/* (non-Javadoc)
