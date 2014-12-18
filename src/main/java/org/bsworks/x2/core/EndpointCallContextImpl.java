@@ -281,6 +281,15 @@ class EndpointCallContextImpl
 	 * See overridden method.
 	 */
 	@Override
+	public HttpServletRequest getHttpRequest() {
+
+		return this.httpRequest;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public Actor getActor() {
 
 		return this.actor;

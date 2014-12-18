@@ -4,6 +4,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
+import javax.servlet.http.HttpServletRequest;
+
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.OrderSpec;
 import org.bsworks.x2.resource.PropertiesFetchSpec;
@@ -125,6 +127,14 @@ public interface EndpointCallContext {
 	 * @return Attribute value, or {@code null}.
 	 */
 	<Y> Y getAttribute(String name, Class<Y> valueClass);
+
+	/**
+	 * Get underlying HTTP request. The method can be used to communicate with
+	 * servlets and filters outside the framework stack.
+	 *
+	 * @return The HTTP request.
+	 */
+	HttpServletRequest getHttpRequest();
 
 	/**
 	 * Get actor making the call.
