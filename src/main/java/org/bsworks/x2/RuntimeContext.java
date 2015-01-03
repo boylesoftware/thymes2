@@ -1,5 +1,7 @@
 package org.bsworks.x2;
 
+import javax.crypto.SecretKey;
+
 import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.services.auth.ActorAuthenticationService;
 import org.bsworks.x2.services.monitor.MonitorService;
@@ -66,6 +68,33 @@ public interface RuntimeContext {
 	static final String APP_MANIFEST_INITPARAM =
 		"x2.app.manifest";
 
+	/**
+	 * Name of web-application context initialization parameter used to specify
+	 * application-wide secret key used in particular for endpoint calls
+	 * authentication but also available to the application via the
+	 * {@link #getAuthSecretKey()} method.
+	 */
+	static final String AUTH_SECRET_KEY_INITPARAM =
+		"x2.auth.secretKey";
+
+	/**
+	 * Name of web-application context initialization parameter used to specify
+	 * the name of the symmetric algorithm used in the endpoint calls
+	 * authentication token encryption. The algorithm matches the secret key
+	 * specified by the {@value #AUTH_SECRET_KEY_INITPARAM} context
+	 * initialization parameter.
+	 */
+	static final String AUTH_TOKEN_ENC_ALG_INITPARAM =
+		"x2.auth.tokenEncAlg";
+
+	/**
+	 * Name of web-application context initialization parameter used to specify
+	 * the validity period of an authentication token used for the endpoint
+	 * calls authentication. The time period is specified in milliseconds.
+	 */
+	static final String AUTH_TOKEN_TTL_INITPARAM =
+		"x2.auth.tokenTTL";
+
 
 	/**
 	 * Get instance id. A unique application instance id is assigned to the
@@ -103,6 +132,19 @@ public interface RuntimeContext {
 	 * @return The application version.
 	 */
 	String getApplicationVersion();
+
+	/**
+	 * Get application-wide secret key used, in particular, for the endpoint
+	 * calls authentication. The key can be conveniently used by the custom
+	 * application for encryption of various application-specific tokens and
+	 * other data. The key and the encryption algorithm are specified by
+	 * {@value #AUTH_SECRET_KEY_INITPARAM} and
+	 * {@value #AUTH_TOKEN_ENC_ALG_INITPARAM} web-application context
+	 * initialization parameters.
+	 *
+	 * @return The secret key.
+	 */
+	SecretKey getAuthSecretKey();
 
 	/**
 	 * Submit a job for execution in a "long job" thread. "Long jobs" are

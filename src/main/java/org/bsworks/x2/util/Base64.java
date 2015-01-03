@@ -47,8 +47,44 @@ public final class Base64 {
 
 
 	/**
-	 * Encode bytes in the specified byte buffer and write the Base64 characters
-	 * to the specified character buffer.
+	 * Encode bytes in the specified byte array and return the Base64 string.
+	 *
+	 * @param src Bytes to encode.
+	 *
+	 * @return Encoded Base64 string.
+	 */
+	public static String encode(final byte[] src) {
+
+		final CharBuffer res = CharBuffer.allocate(
+				(src.length * 8) / 6 + 3);
+
+		Base64.encode(ByteBuffer.wrap(src), res);
+
+		return res.toString();
+	}
+
+	/**
+	 * Encode remaining bytes in the specified byte buffer and return the Base64
+	 * string.
+	 *
+	 * @param src Buffer with bytes to encode.
+	 *
+	 * @return Encoded Base64 string.
+	 */
+	public static String encode(final ByteBuffer src) {
+
+		final CharBuffer res = CharBuffer.allocate(
+				(src.remaining() * 8) / 6 + 3);
+
+		Base64.encode(src, res);
+		res.flip();
+
+		return res.toString();
+	}
+
+	/**
+	 * Encode remaining bytes in the specified byte buffer and write the Base64
+	 * characters to the specified character buffer.
 	 *
 	 * @param src Buffer with bytes to encode.
 	 * @param dst Buffer, to which to write the result.

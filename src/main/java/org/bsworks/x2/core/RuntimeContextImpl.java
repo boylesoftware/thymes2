@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.security.GeneralSecurityException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
@@ -16,13 +17,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.jar.Attributes;
 import java.util.jar.Manifest;
 
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import javax.servlet.ServletContext;
 import javax.validation.Validation;
 import javax.validation.ValidatorFactory;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.bsworks.x2.EndpointCallHandler;
 import org.bsworks.x2.InitializationException;
 import org.bsworks.x2.RuntimeContext;
@@ -33,6 +36,7 @@ import org.bsworks.x2.services.monitor.MonitorService;
 import org.bsworks.x2.services.persistence.PersistenceService;
 import org.bsworks.x2.services.serialization.ResourceSerializationService;
 import org.bsworks.x2.services.versioning.PersistentResourceVersioningService;
+import org.bsworks.x2.util.Hex;
 
 
 /**
@@ -108,6 +112,11 @@ class RuntimeContextImpl
 	 * Application version.
 	 */
 	private final String appVersion;
+
+	/**
+	 * Authentication token secret key.
+	 */
+	private final SecretKey appSecretKey;
 
 	/**
 	 * Executor service used to execute top-level endpoint calls.
@@ -255,6 +264,22 @@ class RuntimeContextImpl
 				sc.log("\n###################################################"
 					+ "\n# !!! INSTANCE IS RUNNING IN DEVELOPMENT MODE !!! #"
 					+ "\n###################################################");
+			}
+
+			// get the authentication token secret key
+			try {
+				this.appSecretKey = new SecretKeySpec(
+						Hex.decode(sc.getInitParameter(
+								RuntimeContext.AUTH_SECRET_KEY_INITPARAM)),
+						sc.getInitParameter(
+								RuntimeContext.AUTH_TOKEN_ENC_ALG_INITPARAM));
+				final Cipher cipher =
+					Cipher.getInstance(this.appSecretKey.getAlgorithm());
+				cipher.init(Cipher.ENCRYPT_MODE, this.appSecretKey);
+			} catch (final IllegalArgumentException |
+					GeneralSecurityException e) {
+				throw new InitializationException("Invalid authentication token"
+						+ " encryption configuration.", e);
 			}
 
 			// create executor services
@@ -590,6 +615,15 @@ class RuntimeContextImpl
 	public String getApplicationVersion() {
 
 		return this.appVersion;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public SecretKey getAuthSecretKey() {
+
+		return this.appSecretKey;
 	}
 
 	/* (non-Javadoc)

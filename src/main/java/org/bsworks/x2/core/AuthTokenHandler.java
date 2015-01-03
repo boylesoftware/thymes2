@@ -10,7 +10,6 @@ import java.util.regex.Pattern;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -19,8 +18,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.bsworks.x2.Actor;
 import org.bsworks.x2.InitializationException;
+import org.bsworks.x2.RuntimeContext;
 import org.bsworks.x2.util.Base64;
-import org.bsworks.x2.util.Hex;
 
 
 /**
@@ -77,20 +76,10 @@ class AuthTokenHandler {
 			final RuntimeContextImpl runtimeCtx)
 		throws InitializationException {
 
-		try {
-			this.appSecretKey = new SecretKeySpec(
-					Hex.decode(sc.getInitParameter("x2.auth.secretKey")),
-					sc.getInitParameter("x2.auth.tokenEncAlg"));
-			final Cipher cipher =
-				Cipher.getInstance(this.appSecretKey.getAlgorithm());
-			cipher.init(Cipher.ENCRYPT_MODE, this.appSecretKey);
-		} catch (final IllegalArgumentException | GeneralSecurityException e) {
-			throw new InitializationException("Invalid authentication token"
-					+ " encryption configuration.", e);
-		}
+		this.appSecretKey = runtimeCtx.getAuthSecretKey();
 
 		this.authTokenTTL = Long.parseLong(
-				sc.getInitParameter("x2.auth.tokenTTL"));
+				sc.getInitParameter(RuntimeContext.AUTH_TOKEN_TTL_INITPARAM));
 
 		this.authResolver = new CachingAuthResolver(sc, runtimeCtx);
 	}

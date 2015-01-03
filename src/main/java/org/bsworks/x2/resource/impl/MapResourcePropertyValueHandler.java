@@ -147,8 +147,8 @@ class MapResourcePropertyValueHandler
 		for (String keyStr = in.readKey(); keyStr != null;
 				keyStr = in.readKey()) {
 			final Object key = this.entryKeyHandler.valueOf(keyStr);
-			if (res.put(key, this.entryValueHandler.readValue(access, in))
-					!= null)
+			final Object val = this.entryValueHandler.readValue(access, in);
+			if (res.put(key, val) != null)
 				throw new InvalidResourceDataException(
 						"Multiple entries for key \"" + keyStr + "\".");
 		}

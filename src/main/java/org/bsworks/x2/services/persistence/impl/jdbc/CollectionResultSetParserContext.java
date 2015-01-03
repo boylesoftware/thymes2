@@ -37,6 +37,11 @@ class CollectionResultSetParserContext
 	private boolean subsequentRead;
 
 	/**
+	 * Tells if just read the map key.
+	 */
+	private boolean mapKeyRead;
+
+	/**
 	 * Result set status left after reading collection element.
 	 */
 	private ResultSetStatus rsStatus;
@@ -90,6 +95,7 @@ class CollectionResultSetParserContext
 			this.parentKeyValues[i] = this.parentKeyCtxs[i].getKey();
 
 		this.subsequentRead = false;
+		this.mapKeyRead = false;
 		this.rsStatus = ResultSetStatus.ON_LAST_ROW;
 		this.numRows = 0;
 	}
@@ -123,6 +129,9 @@ class CollectionResultSetParserContext
 		if (this.isCollectionEnd(true))
 			return null;
 
+		// reading value now
+		this.mapKeyRead = false;
+
 		// read and return the value
 		try {
 			return reader.readValue(this.rs, this.valColInd);
@@ -140,6 +149,9 @@ class CollectionResultSetParserContext
 		// check if collection end reached
 		if (this.isCollectionEnd(true))
 			return null;
+
+		// reading value now
+		this.mapKeyRead = false;
 
 		// get child context
 		if (this.childContext == null)
@@ -170,15 +182,16 @@ class CollectionResultSetParserContext
 				ResultSetStatus collectionEndStatus = null;
 				switch (this.rsStatus) {
 				case ON_LAST_ROW:
-					if (this.rs.next()) {
-						if (!setSubsequentRead)
-							this.rsStatus = ResultSetStatus.ON_NEXT_ROW;
-						if (!this.isSameParent())
-							collectionEndStatus = ResultSetStatus.ON_NEXT_ROW;
-					} else {
-						collectionEndStatus = ResultSetStatus.AFTER_LAST;
+					if (!this.mapKeyRead) {
+						if (this.rs.next()) {
+							if (!this.isSameParent())
+								collectionEndStatus =
+									ResultSetStatus.ON_NEXT_ROW;
+						} else {
+							collectionEndStatus = ResultSetStatus.AFTER_LAST;
+						}
+						this.numRows++;
 					}
-					this.numRows++;
 					break;
 				case ON_NEXT_ROW:
 					if (!this.isSameParent())
@@ -256,6 +269,9 @@ class CollectionResultSetParserContext
 		// check if collection end reached
 		if (this.isCollectionEnd(false))
 			return null;
+
+		// reading map key
+		this.mapKeyRead = true;
 
 		// return the key
 		return this.getKey();

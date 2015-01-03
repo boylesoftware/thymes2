@@ -12,10 +12,10 @@ import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.bsworks.x2.Actor;
 import org.bsworks.x2.resource.IdHandling;
 import org.bsworks.x2.resource.IdPropertyHandler;
+import org.bsworks.x2.resource.InvalidResourceDataException;
 import org.bsworks.x2.resource.MetaPropertyHandler;
 import org.bsworks.x2.resource.MetaPropertyType;
 import org.bsworks.x2.resource.ObjectPropertyHandler;
@@ -837,6 +837,7 @@ class InsertBuilder {
 	 *
 	 * @throws SQLException If a database error happens.
 	 */
+	@SuppressWarnings("resource") // prepared statements are closed in finally
 	void execute(final Connection con)
 		throws SQLException {
 
@@ -863,7 +864,6 @@ class InsertBuilder {
 				}
 
 				// get prepared statement
-				@SuppressWarnings("resource")
 				PreparedStatement pstmt = pstmts.get(step.tableId);
 				if (pstmt == null) {
 					pstmt = (step.generatedIdColName != null
@@ -903,9 +903,11 @@ class InsertBuilder {
 					try (final ResultSet rs = pstmt.getGeneratedKeys()) {
 						rs.next();
 						Utils.logWarnings(log, rs.getWarnings());
-						newRecId = rs.getObject(1,
-								step.idPropHandler.getValueHandler()
-									.getValueClass());
+						newRecId = step.idPropHandler.getValueHandler().valueOf(
+								rs.getString(1));
+					} catch (final InvalidResourceDataException e) {
+						throw new RuntimeException(
+								"Invalid generated record id value.", e);
 					}
 					if (debug)
 						log.debug("auto-generated record id: " + newRecId
