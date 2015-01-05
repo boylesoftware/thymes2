@@ -146,6 +146,27 @@ public final class Base64 {
 	}
 
 	/**
+	 * Decode Base64 string and return the decoded bytes.
+	 *
+	 * @param src Base64-encoded string.
+	 *
+	 * @return Decoded bytes.
+	 */
+	public static byte[] decode(final String src) {
+
+		final ByteBuffer resBuf = ByteBuffer.allocate(
+				(src.length() * 6) / 8 + 1);
+
+		Base64.decode(CharBuffer.wrap(src), resBuf);
+		resBuf.flip();
+
+		final byte[] res = new byte[resBuf.remaining()];
+		resBuf.get(res);
+
+		return res;
+	}
+
+	/**
 	 * Decode Base64 characters in the specified character buffer and write the
 	 * decoded bytes to the specified byte buffer.
 	 *
