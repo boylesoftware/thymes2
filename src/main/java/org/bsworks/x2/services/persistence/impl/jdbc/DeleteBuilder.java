@@ -135,7 +135,7 @@ class DeleteBuilder {
 					CollectionUtils.<String, String>emptySortedMap(),
 					params);
 			final List<JDBCParameterValue> paramsList = new ArrayList<>();
-			final String whereClause = Utils.convertNamedParams(
+			final String whereClause = Utils.processSQL(resources,
 					whereClauseBuilder.getBody(), params, paramsList);
 
 			createSteps(
@@ -188,8 +188,8 @@ class DeleteBuilder {
 			final List<JDBCParameterValue> paramsList = new ArrayList<>();
 			for (final String preStatement : preStatements) {
 				paramsList.clear();
-				final String stmtText = Utils.convertNamedParams(preStatement,
-						params, paramsList);
+				final String stmtText = Utils.processSQL(resources,
+						preStatement, params, paramsList);
 				this.executionPlan.add(new ExecutionPlanStep(stmtText,
 						(paramsList.isEmpty()
 								? Collections.<JDBCParameterValue>emptyList()
@@ -220,8 +220,8 @@ class DeleteBuilder {
 
 			for (final String postStatement : postStatements) {
 				paramsList.clear();
-				final String stmtText = Utils.convertNamedParams(postStatement,
-						params, paramsList);
+				final String stmtText = Utils.processSQL(resources,
+						postStatement, params, paramsList);
 				this.executionPlan.add(new ExecutionPlanStep(stmtText,
 						(paramsList.isEmpty()
 								? Collections.<JDBCParameterValue>emptyList()

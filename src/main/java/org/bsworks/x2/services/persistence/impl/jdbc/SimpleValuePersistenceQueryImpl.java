@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.bsworks.x2.resource.ResourceReadSessionCache;
+import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.services.persistence.PersistenceException;
 import org.bsworks.x2.services.persistence.PersistenceQuery;
 import org.bsworks.x2.services.persistence.PersistentValueType;
@@ -44,17 +45,19 @@ class SimpleValuePersistenceQueryImpl<Y>
 	/**
 	 * Create new query.
 	 *
+	 * @param resources Application resources manager.
 	 * @param con Database connection.
 	 * @param paramsFactory Query parameter value handlers factory.
 	 * @param queryText The query text.
 	 * @param valueReader Query result value reader.
 	 * @param params Initial parameters. May be {@code null} for none.
 	 */
-	SimpleValuePersistenceQueryImpl(final Connection con,
+	SimpleValuePersistenceQueryImpl(final Resources resources,
+			final Connection con,
 			final ParameterValuesFactoryImpl paramsFactory,
 			final String queryText, final ResultSetValueReader<Y> valueReader,
 			final Map<String, JDBCParameterValue> params) {
-		super(con, paramsFactory, params);
+		super(resources, con, paramsFactory, params);
 
 		this.valueReader = valueReader;
 

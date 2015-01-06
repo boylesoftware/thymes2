@@ -187,8 +187,8 @@ public class JDBCPersistenceTransaction
 			SIMPLE_READERS.get(resultClass);
 		if (simpleValueReader != null)
 			return (PersistenceQuery<X>) new SimpleValuePersistenceQueryImpl<>(
-					this.con, this.paramsFactory, queryText, simpleValueReader,
-					null);
+					this.resources, this.con, this.paramsFactory, queryText,
+					simpleValueReader, null);
 
 		return new ResourcePersistenceQueryImpl<>(this.resources, this.con,
 				this.paramsFactory, queryText, resultClass, this.actor, null);
@@ -200,8 +200,8 @@ public class JDBCPersistenceTransaction
 	@Override
 	public PersistenceUpdate createUpdate(final String stmtText) {
 
-		return new PersistenceUpdateImpl(this.con, this.paramsFactory, stmtText,
-				null);
+		return new PersistenceUpdateImpl(this.resources, this.con,
+				this.paramsFactory, stmtText, null);
 	}
 
 	/* (non-Javadoc)

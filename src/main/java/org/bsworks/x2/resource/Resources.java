@@ -48,6 +48,18 @@ public interface Resources {
 	boolean isPersistentResource(Class<?> prsrcClass);
 
 	/**
+	 * Tell if the specified persistent resource type is valid and can be used
+	 * with {@link #getPersistentResourceHandler(String)} to get the resource
+	 * handler.
+	 *
+	 * @param prsrcType Persistent resource type, which is the resource class
+	 * simple name (see {@link Class#getSimpleName()}) as used in references.
+	 *
+	 * @return {@code true} if specified string is a persistent resource type.
+	 */
+	boolean isPersistentResource(String prsrcType);
+
+	/**
 	 * Get persistent application resource handler.
 	 *
 	 * @param prsrcClass Persistent application resource class.
@@ -61,6 +73,22 @@ public interface Resources {
 	 */
 	<R> PersistentResourceHandler<R> getPersistentResourceHandler(
 			Class<R> prsrcClass);
+
+	/**
+	 * Get persistent application resource handler.
+	 *
+	 * @param prsrcType Persistent application resource type, which is the
+	 * resource class simple name (see {@link Class#getSimpleName()}) as used in
+	 * references.
+	 *
+	 * @return Persistent application resource handler.
+	 *
+	 * @throws IllegalArgumentException If the specified type does not match any
+	 * persistent application resource. Use
+	 * {@link #isPersistentResource(String)} to test if a string is a valid
+	 * persistent application resource type.
+	 */
+	PersistentResourceHandler<?> getPersistentResourceHandler(String prsrcType);
 
 	/**
 	 * Get empty referred resources fetch specification object.

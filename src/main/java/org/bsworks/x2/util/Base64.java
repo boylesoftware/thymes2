@@ -157,7 +157,7 @@ public final class Base64 {
 		final ByteBuffer resBuf = ByteBuffer.allocate(
 				(src.length() * 6) / 8 + 1);
 
-		Base64.decode(CharBuffer.wrap(src), resBuf);
+		Base64.decode(CharBuffer.wrap(src.toCharArray()), resBuf);
 		resBuf.flip();
 
 		final byte[] res = new byte[resBuf.remaining()];

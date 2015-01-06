@@ -18,7 +18,6 @@ import javax.servlet.ServletContext;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.bsworks.x2.InitializationException;
 import org.bsworks.x2.resource.InvalidResourceDataException;
 import org.bsworks.x2.resource.OrderSpec;
@@ -299,7 +298,16 @@ public class ResourcesImpl
 	@Override
 	public boolean isPersistentResource(final Class<?> prsrcClass) {
 
-		return this.persistentResources.containsKey(prsrcClass.getSimpleName());
+		return this.isPersistentResource(prsrcClass.getSimpleName());
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public boolean isPersistentResource(final String prsrcType) {
+
+		return this.persistentResources.containsKey(prsrcType);
 	}
 
 	/* (non-Javadoc)
@@ -316,6 +324,22 @@ public class ResourcesImpl
 		if (prsrcHandler == null)
 			throw new IllegalArgumentException("Class " + prsrcClass.getName()
 					+ " is not a valid persistent resource class.");
+
+		return prsrcHandler;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public PersistentResourceHandlerImpl<?> getPersistentResourceHandler(
+			final String prsrcType) {
+
+		final PersistentResourceHandlerImpl<?> prsrcHandler =
+			this.persistentResources.get(prsrcType);
+		if (prsrcHandler == null)
+			throw new IllegalArgumentException(prsrcType
+					+ " is not a valid persistent resource type.");
 
 		return prsrcHandler;
 	}

@@ -7,7 +7,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.logging.Log;
-
+import org.bsworks.x2.resource.PersistentResourceHandler;
+import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.services.persistence.PersistenceException;
 
 
@@ -23,7 +24,7 @@ final class Utils {
 	 * string literals.
 	 */
 	private static final Pattern TOKEN_PATTERN = Pattern.compile(
-			"\\?\\??([a-zA-Z]\\w+)|(')");
+			"\\{([^}]+)\\}|\\?\\??([a-zA-Z]\\w+)|(')");
 
 	/**
 	 * Pattern used to find end of string literal in SQL.
@@ -59,16 +60,20 @@ final class Utils {
 	}
 
 	/**
-	 * Convert named parameter placeholders in the specified SQL to positional
-	 * parameters directly supported by JDBC.
+	 * Process specified SQL statement and replace all macro-placeholders with
+	 * corresponding values. That includes replacing resource and resource
+	 * property macros with table and column names and converting named
+	 * parameter placeholders to positional parameters directly supported by
+	 * JDBC.
 	 *
-	 * @param sql SQL with named parameter placeholders.
+	 * @param resources Application resources manager.
+	 * @param sql SQL with resource macros and named parameter placeholders.
 	 * @param namedParams Named parameter values by parameter names.
 	 * @param paramsList Output list for positional parameter values.
 	 *
-	 * @return SQL text with positional parameter placeholders.
+	 * @return SQL text ready to be submitted to JDBC.
 	 */
-	static String convertNamedParams(final String sql,
+	static String processSQL(final Resources resources, final String sql,
 			final Map<String, JDBCParameterValue> namedParams,
 			final List<JDBCParameterValue> paramsList) {
 
@@ -81,12 +86,12 @@ final class Utils {
 				m.appendReplacement(resBuf, m.group());
 				m.usePattern(TOKEN_PATTERN);
 				inLiteral = false;
-			} else if (m.group(2) != null) {
+			} else if (m.group(3) != null) {
 				m.appendReplacement(resBuf, m.group());
 				m.usePattern(LITERAL_END_PATTERN);
 				inLiteral = true;
-			} else {
-				final String paramName = m.group(1);
+			} else if (m.group(2) != null) {
+				final String paramName = m.group(2);
 				final JDBCParameterValue paramHandler =
 					namedParams.get(paramName);
 				if (paramHandler == null)
@@ -109,6 +114,25 @@ final class Utils {
 					m.appendReplacement(resBuf, "?");
 				}
 				paramsList.add(paramHandler);
+			} else {
+				final String expr = m.group(1);
+				final int dotInd = expr.indexOf('.');
+				if (dotInd < 0) {
+					m.appendReplacement(resBuf,
+							resources.getPersistentResourceHandler(expr)
+								.getPersistentCollectionName());
+				} else {
+					final PersistentResourceHandler<?> prsrcHandler =
+						resources.getPersistentResourceHandler(
+								expr.substring(0, dotInd));
+					m.appendReplacement(resBuf,
+							prsrcHandler
+								.getPersistentPropertyChain(
+										expr.substring(dotInd + 1))
+								.getLast()
+								.getPersistence()
+								.getFieldName());
+				}
 			}
 		}
 		if (inLiteral)

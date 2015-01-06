@@ -11,7 +11,7 @@ import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
+import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.services.persistence.PersistentValueType;
 
 
@@ -26,6 +26,11 @@ abstract class AbstractPersistenceStatement {
 	 * The log.
 	 */
 	protected final Log log = LogFactory.getLog(this.getClass());
+
+	/**
+	 * Application resources manager.
+	 */
+	protected final Resources resources;
 
 	/**
 	 * Database connection.
@@ -51,14 +56,17 @@ abstract class AbstractPersistenceStatement {
 	/**
 	 * Create new statement.
 	 *
+	 * @param resources Application resources manager.
 	 * @param con Database connection.
 	 * @param paramsFactory Query parameter value handlers factory.
 	 * @param params Initial parameters. May be {@code null} for none.
 	 */
-	protected AbstractPersistenceStatement(final Connection con,
+	protected AbstractPersistenceStatement(final Resources resources,
+			final Connection con,
 			final ParameterValuesFactoryImpl paramsFactory,
 			final Map<String, JDBCParameterValue> params) {
 
+		this.resources = resources;
 		this.con = con;
 		this.paramsFactory = paramsFactory;
 		this.params = (params != null ? params :
@@ -105,8 +113,8 @@ abstract class AbstractPersistenceStatement {
 
 		// build query SQL and arrange parameters
 		final List<JDBCParameterValue> paramsList = new ArrayList<>();
-		final String sql = Utils.convertNamedParams(this.stmtText, this.params,
-				paramsList);
+		final String sql = Utils.processSQL(this.resources, this.stmtText,
+				this.params, paramsList);
 
 		// log it
 		if (debug)

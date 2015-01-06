@@ -33,11 +33,6 @@ class ResourcePersistenceQueryImpl<R>
 	implements PersistenceQuery<R> {
 
 	/**
-	 * Application resources manager.
-	 */
-	private final Resources resources;
-
-	/**
 	 * Query result resource class.
 	 */
 	private final Class<R> rsrcClass;
@@ -84,9 +79,8 @@ class ResourcePersistenceQueryImpl<R>
 			final ParameterValuesFactoryImpl paramsFactory,
 			final String queryText, final Class<R> rsrcClass, final Actor actor,
 			final Map<String, JDBCParameterValue> params) {
-		super(con, paramsFactory, params);
+		super(resources, con, paramsFactory, params);
 
-		this.resources = resources;
 		this.rsrcClass = rsrcClass;
 		this.actor = actor;
 

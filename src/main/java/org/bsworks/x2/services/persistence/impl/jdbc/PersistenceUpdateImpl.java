@@ -5,6 +5,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Map;
 
+import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.services.persistence.PersistenceException;
 import org.bsworks.x2.services.persistence.PersistenceUpdate;
 import org.bsworks.x2.services.persistence.PersistentValueType;
@@ -22,16 +23,17 @@ class PersistenceUpdateImpl
 	/**
 	 * Create new statement.
 	 *
+	 * @param resources Application resources manager.
 	 * @param con Database connection.
 	 * @param paramsFactory Query parameter value handlers factory.
 	 * @param stmtText The statement text.
 	 * @param params Initial parameters. May be {@code null} for none.
 	 */
-	PersistenceUpdateImpl(final Connection con,
+	PersistenceUpdateImpl(final Resources resources, final Connection con,
 			final ParameterValuesFactoryImpl paramsFactory,
 			final String stmtText,
 			final Map<String, JDBCParameterValue> params) {
-		super(con, paramsFactory, params);
+		super(resources, con, paramsFactory, params);
 
 		this.setStatementText(stmtText);
 	}

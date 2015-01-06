@@ -578,7 +578,7 @@ class PersistentResourceFetchImpl<R>
 		if (!preStmtTexts.isEmpty()) {
 			preStmts = new ArrayList<>(preStmtTexts.size());
 			for (final String stmtText : preStmtTexts)
-				preStmts.add(new PersistenceUpdateImpl(this.con,
+				preStmts.add(new PersistenceUpdateImpl(this.resources, this.con,
 						this.paramsFactory, stmtText, params));
 		} else {
 			preStmts = null;
@@ -587,8 +587,8 @@ class PersistentResourceFetchImpl<R>
 		if (!postStmtTexts.isEmpty()) {
 			postStmts = new ArrayList<>(postStmtTexts.size());
 			for (final String stmtText : postStmtTexts)
-				postStmts.add(new PersistenceUpdateImpl(this.con,
-						this.paramsFactory, stmtText, params));
+				postStmts.add(new PersistenceUpdateImpl(this.resources,
+						this.con, this.paramsFactory, stmtText, params));
 		} else {
 			postStmts = null;
 		}
@@ -609,8 +609,8 @@ class PersistentResourceFetchImpl<R>
 		// create and return the main query object
 		return new MainQuery(preStmts, postStmts, query,
 				(countQueryText == null ? null :
-					new SimpleValuePersistenceQueryImpl<>(this.con,
-							this.paramsFactory, countQueryText,
+					new SimpleValuePersistenceQueryImpl<>(this.resources,
+							this.con, this.paramsFactory, countQueryText,
 							ResultSetValueReader.LONG_VALUE_READER, params)));
 	}
 
