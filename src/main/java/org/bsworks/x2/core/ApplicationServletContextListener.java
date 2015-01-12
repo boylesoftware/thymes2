@@ -6,6 +6,7 @@ import javax.servlet.ServletContextListener;
 import javax.servlet.annotation.WebListener;
 
 import org.bsworks.x2.InitializationException;
+import org.bsworks.x2.RuntimeContext;
 
 
 /**
@@ -65,5 +66,24 @@ public class ApplicationServletContextListener
 	static Application getApplication(final ServletContext sc) {
 
 		return (Application) sc.getAttribute(APP_ATTNAME);
+	}
+
+	/**
+	 * Get application runtime context. This method can be used to get access to
+	 * the framework from outside of endpoint call handlers: for example, from
+	 * servlets and filters.
+	 *
+	 * @param sc Servlet context.
+	 *
+	 * @return Runtime context, or {@code null} if the framework has not been
+	 * initialized.
+	 */
+	public static RuntimeContext getRuntimeContext(final ServletContext sc) {
+
+		final Application app = getApplication(sc);
+		if (app == null)
+			return null;
+
+		return app.getRuntimeContext();
 	}
 }
