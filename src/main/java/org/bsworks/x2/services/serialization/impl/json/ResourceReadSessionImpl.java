@@ -164,15 +164,11 @@ class ResourceReadSessionImpl
 		case START_ARRAY:
 			while ((ev = this.swallowValueInternal())
 					!= Event.END_ARRAY)  { /* nothing */ }
-			break;
+			return null;
 		case START_OBJECT:
 			while ((ev = this.swallowValueInternal())
 					!= Event.END_OBJECT)  { /* nothing */ }
-			break;
-		case END_ARRAY:
-		case END_OBJECT:
-		case KEY_NAME:
-			throw new IllegalStateException("Received " + ev + ".");
+			return null;
 		default:
 		}
 
