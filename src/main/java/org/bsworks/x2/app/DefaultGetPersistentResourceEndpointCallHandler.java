@@ -53,12 +53,12 @@ import org.bsworks.x2.util.StringUtils;
  * {@link PropertiesFetchSpec}). Either {@value #EXCLUDE_PROPS_FETCH_PARAM} or
  * {@value #INCLUDE_PROPS_FETCH_PARAM} may be specified in a single request, but
  * not both.</dd>
- * <dt>{@value #FILTER_PARAM}</dt><dd>Specified a filter condition (see
+ * <dt>{@value #FILTER_PARAM}</dt><dd>Specifies a filter condition (see
  * {@link FilterSpec}). Multiple {@value #FILTER_PARAM} parameters may be
- * specified for the same request to defined a filter with multiple conditions.
- * The conditions are combined using logic conjunction (Boolean "AND"). Each
+ * specified for the same request to define a filter with multiple conditions.
+ * The conditions are combined using logical conjunction (Boolean "AND"). Each
  * condition is a sequence of three parts: the persistent resource property
- * path, the conditional operation and a value. The following conditional
+ * path(s), the conditional operation and a value. The following conditional
  * operations are supported:
  * <dl>
  * <dt>:</dt><dd>Equals.</dd>
@@ -70,10 +70,14 @@ import org.bsworks.x2.util.StringUtils;
  * list.</dd>
  * </dl>
  * Each conditional operation can be prefixed with "!" to negate it.
- * <p>Condition may consist only of a property path, optionally followed by a
- * "!", and no conditional operation with values. In that case, the
+ * <p>A condition may consist of a property path (or paths), optionally followed
+ * by a "!", and no conditional operation with values. In that case, the
  * {@link FilterConditionType#NOT_EMPTY} or {@link FilterConditionType#EMPTY} is
- * used to test the condition.</dd>
+ * used to test the condition.
+ * <p>Multiple property paths may be specified separated with commas. In that
+ * case, the filter conditions are created for each of the property paths and
+ * the resulting list of conditions is combined using logical disjunction
+ * (Boolean "OR").</dd>
  * <dt>{@value #ORDER_PARAM}</dt><dd>Comma-separated list of persistent resource
  * property paths used to order the result (see {@link OrderSpec}). Each
  * property path in the list can be suffixed with ":asc" or ":desc" to specify
@@ -153,7 +157,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 */
 	private static final Pattern FILTER_COND_PATTERN = Pattern.compile(
 			// 1. property path(s)
-			"([a-z]\\w*(?:\\.[a-z]\\w*)*(?:\\|[a-z]\\w*(?:\\.[a-z]\\w*)*)*)"
+			"([a-z]\\w*(?:\\.[a-z]\\w*)*(?:,[a-z]\\w*(?:\\.[a-z]\\w*)*)*)"
 			+ "(?:"
 				+ "(!)?"     // 2. operation negation
 				+ "(?:"
@@ -588,7 +592,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			final Object[] operands =
 				operandsList.toArray(new Object[operandsList.size()]);
 			try {
-				final String[] propPaths = m.group(1).split("\\|");
+				final String[] propPaths = m.group(1).split(",");
 				if (propPaths.length > 1) {
 					final FilterSpec<R> junc = filter.addDisjunction();
 					for (final String propPath : propPaths)
