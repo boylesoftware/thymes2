@@ -79,6 +79,7 @@ public interface SQLDialect {
 	/**
 	 * Make the specified "SELECT" query ranged.
 	 *
+	 * @param <V> Parameter value type.
 	 * @param selectQuery The "SELECT" query.
 	 * @param range Range specification.
 	 * @param paramsFactory Query parameter values factory to use.

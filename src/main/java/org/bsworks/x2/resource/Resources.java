@@ -28,6 +28,7 @@ public interface Resources {
 	 * may be returned by {@link #getPersistentResourceHandler(Class)}, plus any
 	 * transient resource.
 	 *
+	 * @param <R> Application resource type.
 	 * @param rsrcClass Application resource class.
 	 *
 	 * @return Application resource handler.
@@ -62,6 +63,7 @@ public interface Resources {
 	/**
 	 * Get persistent application resource handler.
 	 *
+	 * @param <R> Persistent application resource type.
 	 * @param prsrcClass Persistent application resource class.
 	 *
 	 * @return Persistent application resource handler.
@@ -93,6 +95,7 @@ public interface Resources {
 	/**
 	 * Get empty referred resources fetch specification object.
 	 *
+	 * @param <R> Persistent application resource type.
 	 * @param prsrcClass Persistent application resource class, whose reference
 	 * properties need to be fetched.
 	 *
@@ -103,6 +106,7 @@ public interface Resources {
 	/**
 	 * Get empty properties fetch specification object.
 	 *
+	 * @param <R> Persistent application resource type.
 	 * @param prsrcClass Persistent application resource class, whose properties
 	 * need to be included or excluded in a fetch.
 	 *
@@ -114,6 +118,7 @@ public interface Resources {
 	/**
 	 * Get empty filter specification object.
 	 *
+	 * @param <R> Persistent application resource type.
 	 * @param prsrcClass Persistent application resource class at the top of the
 	 * fetch, for which the filter is intended.
 	 *
@@ -125,6 +130,7 @@ public interface Resources {
 	/**
 	 * Get empty order specification object.
 	 *
+	 * @param <R> Persistent application resource type.
 	 * @param prsrcClass Persistent application resource class at the top of the
 	 * fetch, for which the order specification is intended.
 	 *
@@ -147,6 +153,7 @@ public interface Resources {
 	/**
 	 * Create reference for the specified persistent resource record.
 	 *
+	 * @param <R> Persistent application resource type.
 	 * @param prsrcClass Persistent application resource class.
 	 * @param rec The record. Must be an instance of the specified resource
 	 * class or its subclass.

@@ -265,6 +265,7 @@ public interface RuntimeContext {
 	 * instance must be retrieved using {@link #getService(Class, String)}
 	 * method.
 	 *
+	 * @param <S> The service type.
 	 * @param serviceType The service type, usually an interface.
 	 *
 	 * @return The service.
@@ -280,6 +281,7 @@ public interface RuntimeContext {
 	 * instances may be different {@code serviceType} implementations or may be
 	 * configured differently for different purposes.
 	 *
+	 * @param <S> The service type.
 	 * @param serviceType The service type, usually an interface.
 	 * @param serviceInstanceId Service instance id.
 	 *

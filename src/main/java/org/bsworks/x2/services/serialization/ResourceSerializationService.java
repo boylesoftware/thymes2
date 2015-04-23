@@ -57,6 +57,7 @@ public interface ResourceSerializationService
 	/**
 	 * Create resource instance from its serialized form.
 	 *
+	 * @param <R> Resource type.
 	 * @param in Input stream, from which to read the serialized resource data.
 	 * @param charsetName Character encoding name, or {@code null} if
 	 * inapplicable or to auto-detect.

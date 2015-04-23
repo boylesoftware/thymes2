@@ -28,6 +28,9 @@ public final class CollectionUtils {
 	/**
 	 * Get empty sorted map.
 	 *
+	 * @param <K> Key type.
+	 * @param <V> Value type.
+	 *
 	 * @return Unmodifiable empty sorted map.
 	 */
 	@SuppressWarnings("unchecked")

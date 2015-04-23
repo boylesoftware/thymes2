@@ -119,6 +119,7 @@ public interface EndpointCallContext {
 	/**
 	 * Get context attribute.
 	 *
+	 * @param <Y> Attribute value type.
 	 * @param name Attribute name.
 	 * @param valueClass Attribute value class.
 	 *
@@ -204,6 +205,7 @@ public interface EndpointCallContext {
 	 * convenience shortcut method for
 	 * {@link Resources#createRef(Class, Object)}.
 	 *
+	 * @param <R> Persistent application resource type.
 	 * @param prsrcClass Persistent application resource class.
 	 * @param rec The record.
 	 *
@@ -247,6 +249,7 @@ public interface EndpointCallContext {
 	 * object. This is a convenience shortcut method for
 	 * {@link Resources#getRefsFetchSpec(Class)}.
 	 *
+	 * @param <R> Persistent application resource type.
 	 * @param prsrcClass Persistent application resource class.
 	 *
 	 * @return References fetch specification object.
@@ -258,6 +261,7 @@ public interface EndpointCallContext {
 	 * is a convenience shortcut method for
 	 * {@link Resources#getPropertiesFetchSpec(Class)}.
 	 *
+	 * @param <R> Persistent application resource type.
 	 * @param prsrcClass Persistent application resource class.
 	 *
 	 * @return Properties fetch specification object initially in "exclude by
@@ -269,6 +273,7 @@ public interface EndpointCallContext {
 	 * Get empty persistent resource fetch filter specification object. This is
 	 * a convenience shortcut method for {@link Resources#getFilterSpec(Class)}.
 	 *
+	 * @param <R> Persistent application resource type.
 	 * @param prsrcClass Persistent application resource class.
 	 *
 	 * @return Filter specification object.
@@ -279,6 +284,7 @@ public interface EndpointCallContext {
 	 * Get empty persistent resource fetch order specification object. This is a
 	 * convenience shortcut method for {@link Resources#getOrderSpec(Class)}.
 	 *
+	 * @param <R> Persistent application resource type.
 	 * @param prsrcClass Persistent application resource class.
 	 *
 	 * @return Order specification object.

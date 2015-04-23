@@ -110,6 +110,7 @@ public class DefaultPersistentResourceEndpointHandler<R>
 	 * method and has the following logic for each of the HTTP request methods:
 	 *
 	 * <table>
+	 * <caption>Conditions by Methods</caption>
 	 * <tr><th>Method<th>Condition to Allow
 	 * <tr><td>GET<td>Actor has {@link ResourcePropertyAccess#SEE} and
 	 * {@link ResourcePropertyAccess#LOAD} access to the resource.

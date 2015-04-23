@@ -24,6 +24,7 @@ public final class AnnotationUtils {
 	 * variable with the property name in the bean class and in the classes up
 	 * the inheritance chain.
 	 *
+	 * @param <T> The annotation type.
 	 * @param annotationClass The annotation class.
 	 * @param pd The bean property descriptor.
 	 * @param beanClass The bean class.

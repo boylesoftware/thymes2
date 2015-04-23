@@ -108,6 +108,7 @@
 				<artifactId>maven-javadoc-plugin</artifactId>
 				<version>2.10.3</version>
 				<configuration>
+					<source>1.7</source>
 					<links>
 						<link>http://docs.oracle.com/javaee/7/api/</link>
 						<link>http://commons.apache.org/proper/commons-logging/javadocs/api-release/</link>

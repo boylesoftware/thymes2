@@ -23,6 +23,7 @@ public interface PersistenceTransaction {
 	/**
 	 * Create persistent storage query.
 	 *
+	 * @param <X> Query result type.
 	 * @param queryText The query text. The query language is specific to the
 	 * persistence service implementation.
 	 * @param resultClass Query result class. May be an application resource
@@ -49,6 +50,7 @@ public interface PersistenceTransaction {
 	 * resource without any particular order and without fetching any referred
 	 * persistent resource records.
 	 *
+	 * @param <R> Persistent resource type.
 	 * @param prsrcClass Persistent resource class.
 	 *
 	 * @return The fetch builder.
@@ -64,6 +66,7 @@ public interface PersistenceTransaction {
 	 *
 	 * <p>The method is allowed only for authenticated transactions.
 	 *
+	 * @param <R> Persistent resource type.
 	 * @param prsrcClass Persistent resource class.
 	 * @param recTmpl Record template. After the record is created, the template
 	 * object is updated: the record id, if the id is auto-generated, and any
@@ -81,6 +84,7 @@ public interface PersistenceTransaction {
 	 *
 	 * <p>The method is allowed only for authenticated transactions.
 	 *
+	 * @param <R> Persistent resource type.
 	 * @param prsrcClass Persistent resource class.
 	 * @param rec The existing record. The record should be loaded before
 	 * calling this method, usually using the same transaction. Also, it is
@@ -106,6 +110,7 @@ public interface PersistenceTransaction {
 	 *
 	 * <p>The method is allowed only for authenticated transactions.
 	 *
+	 * @param <R> Persistent resource type.
 	 * @param prsrcClass Persistent resource class.
 	 * @param filter Filter that selects records to delete from the entire
 	 * persistent resource records collection, or {@code null} to empty the

@@ -8,7 +8,6 @@ import javax.sql.DataSource;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.bsworks.x2.Actor;
 import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.services.persistence.PersistenceException;
@@ -73,9 +72,9 @@ class PersistenceTransactionHandlerImpl
 
 		this.resources = resources;
 
+		this.con = ds.getConnection();
 		boolean success = false;
 		try {
-			this.con = ds.getConnection();
 			this.con.setReadOnly(!dialect.tempTablesRequireReadWrite()
 					&& readOnly);
 			this.con.setTransactionIsolation(txIsoLevel);

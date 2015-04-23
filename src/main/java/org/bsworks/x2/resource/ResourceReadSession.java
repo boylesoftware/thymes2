@@ -284,6 +284,7 @@ public interface ResourceReadSession {
 	/**
 	 * Read enumeration property value.
 	 *
+	 * @param <E> Enumeration type.
 	 * @param enumClass Enumeration class.
 	 *
 	 * @return The property value, or {@code null} if the property value was
