@@ -1,12 +1,6 @@
 package org.bsworks.x2.app;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -53,13 +47,10 @@ import org.bsworks.x2.util.StringUtils;
  * {@link PropertiesFetchSpec}). Either {@value #EXCLUDE_PROPS_FETCH_PARAM} or
  * {@value #INCLUDE_PROPS_FETCH_PARAM} may be specified in a single request, but
  * not both.</dd>
- * <dt>{@value #FILTER_PARAM}</dt><dd>Specifies a filter condition (see
- * {@link FilterSpec}). Multiple {@value #FILTER_PARAM} parameters may be
- * specified for the same request to define a filter with multiple conditions.
- * The conditions are combined using logical conjunction (Boolean "AND"). Each
- * condition is a sequence of three parts: the persistent resource property
- * path(s), the conditional operation and a value. The following conditional
- * operations are supported:
+ * <dt>{@value #FILTER_PARAM_RE}</dt><dd>Specifies a filter condition (see
+ * {@link FilterSpec}). A condition is a sequence of three parts: the persistent
+ * resource property path(s), the conditional operation and a value. The
+ * following conditional operations are supported:
  * <dl>
  * <dt>:</dt><dd>Equals.</dd>
  * <dt>{@literal <}</dt><dd>Less than or equal.</dd>
@@ -77,7 +68,17 @@ import org.bsworks.x2.util.StringUtils;
  * <p>Multiple property paths may be specified separated with commas. In that
  * case, the filter conditions are created for each of the property paths and
  * the resulting list of conditions is combined using logical disjunction
- * (Boolean "OR").</dd>
+ * (Boolean "OR").
+ * <p>Multiple parameters matching {@value #FILTER_PARAM_RE} may be specified
+ * for the same request to define a filter with multiple conditions. Conditions
+ * with the same parameter name are combined into groups. Conditions within a
+ * group are combined using logical conjunction or disjunction based on the
+ * value of the {@value #FILTER_COMB_PARAM} parameter. Then, if multiple groups
+ * are present, the groups are combined using the logical operator complementary
+ * to the {@value #FILTER_COMB_PARAM}.</dd>
+ * <dt>{@value #FILTER_COMB_PARAM}</dt><dd>Logical operator used to combine
+ * conditions in a single filter conditions group. May be "and", which is the
+ * default, or "or" for a disjunction.</dd>
  * <dt>{@value #ORDER_PARAM}</dt><dd>Comma-separated list of persistent resource
  * property paths used to order the result (see {@link OrderSpec}). Each
  * property path in the list can be suffixed with ":asc" or ":desc" to specify
@@ -132,9 +133,16 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	public static final String EXCLUDE_PROPS_FETCH_PARAM = "x";
 
 	/**
-	 * Name of request parameters used to specify {@link FilterSpec}.
+	 * Regular expression used to match names of request parameters used to
+	 * specify {@link FilterSpec}.
 	 */
-	public static final String FILTER_PARAM = "f";
+	public static final String FILTER_PARAM_RE = "f\\d*";
+
+	/**
+	 * Name of request parameter used to specify the mode of combining filter
+	 * conditions in a group.
+	 */
+	public static final String FILTER_COMB_PARAM = "fj";
 
 	/**
 	 * Name of request parameter used to specify {@link OrderSpec}.
@@ -151,6 +159,12 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 */
 	public static final String REFS_FETCH_PARAM = "e";
 
+
+	/**
+	 * Pattern for filter condition parameter names.
+	 */
+	private static final Pattern FILTER_PARAM_PATTERN =
+		Pattern.compile(FILTER_PARAM_RE);
 
 	/**
 	 * Pattern for filter condition parameters.
@@ -521,7 +535,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			if (includePropsFetchParam != null) {
 				for (final String propPath : includePropsFetchParam.split(","))
 					propsFetch.include(propPath);
-			} else if (excludePropsFetchParam != null) {
+			} else {
 				propsFetch.includeByDefault();
 				for (final String propPath : excludePropsFetchParam.split(","))
 					propsFetch.exclude(propPath);
@@ -549,12 +563,56 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	private FilterSpec<R> getFilterSpec(final EndpointCallContext ctx)
 		throws EndpointCallErrorException {
 
-		final String[] filterParams = ctx.getRequestParamValues(FILTER_PARAM);
-		if ((filterParams == null) || (filterParams.length == 0))
+		final Collection<String> filterParamNames =
+			ctx.getRequestParamNames(FILTER_PARAM_PATTERN);
+		if (filterParamNames.isEmpty())
 			return null;
 
+		final boolean useDisjunction =
+			"or".equalsIgnoreCase(ctx.getRequestParam(FILTER_COMB_PARAM));
+
+
 		final FilterSpec<R> filter = ctx.getFilterSpec(this.prsrcClass);
+
 		final Matcher m = FILTER_COND_PATTERN.matcher("");
+
+		if (filterParamNames.size() == 1) {
+			this.addFilterConditions(ctx,
+					(useDisjunction ? filter.addDisjunction() : filter),
+					filterParamNames.iterator().next(), m);
+		} else { // multiple groups
+			final FilterSpec<R> j =
+				(useDisjunction ? filter : filter.addDisjunction());
+			for (final String filterParamName : filterParamNames) {
+				this.addFilterConditions(ctx,
+						(useDisjunction ?
+								j.addDisjunction() : j.addConjunction()),
+						filterParamName, m);
+			}
+		}
+
+		return filter;
+	}
+
+	/**
+	 * Add filter conditions to the specified filter from the request parameters
+	 * for a single conditions group.
+	 *
+	 * @param ctx Call context.
+	 * @param filter Filter specification, to which to add the conditions.
+	 * @param filterParamName Request parameter name for the group.
+	 * @param m Matcher for filter condition pattern.
+	 *
+	 * @throws EndpointCallErrorException If request parameters are invalid.
+	 */
+	private void addFilterConditions(final EndpointCallContext ctx,
+			final FilterSpec<R> filter, final String filterParamName,
+			final Matcher m)
+		throws EndpointCallErrorException {
+
+		final String[] filterParams =
+			ctx.getRequestParamValues(filterParamName);
+
 		for (final String filterParam : filterParams) {
 
 			if (!m.reset(filterParam).matches())
@@ -590,7 +648,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			}
 
 			final Object[] operands =
-				operandsList.toArray(new Object[operandsList.size()]);
+					operandsList.toArray(new Object[operandsList.size()]);
 			try {
 				final String[] propPaths = m.group(1).split(",");
 				if (propPaths.length > 1) {
@@ -609,8 +667,6 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 						"Invalid filter specification parameter.");
 			}
 		}
-
-		return filter;
 	}
 
 	/**

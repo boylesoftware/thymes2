@@ -1,8 +1,10 @@
 package org.bsworks.x2;
 
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.OrderSpec;
@@ -71,6 +73,16 @@ public interface EndpointCallContext {
 	 * of placeholders in the endpoint URI mapping.
 	 */
 	String getRequestURIParam(int pos);
+
+	/**
+	 * Get names of all HTTP request parameters that match the given regular
+	 * expression.
+	 *
+	 * @param pattern Patter for the parameter names.
+	 *
+	 * @return Parameter names collection. Can be empty, but never {@code null}.
+	 */
+	Collection<String> getRequestParamNames(Pattern pattern);
 
 	/**
 	 * Get HTTP request parameter value.

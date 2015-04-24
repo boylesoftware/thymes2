@@ -1,14 +1,8 @@
 package org.bsworks.x2.core;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -245,6 +239,24 @@ class EndpointCallContextImpl
 	/* (non-Javadoc)
 	 * See overridden method.
 	 */
+	@Override
+	public Collection<String> getRequestParamNames(final Pattern pattern) {
+
+		final Collection<String> res = new ArrayList<>();
+		final Matcher m = pattern.matcher("");
+		for (final Enumeration<String> en =
+				this.httpRequest.getParameterNames(); en.hasMoreElements();) {
+			final String paramName = en.nextElement();
+			if (m.reset(paramName).matches())
+				res.add(paramName);
+		}
+
+		return res;
+	}
+
+	/* (non-Javadoc)
+		 * See overridden method.
+		 */
 	@Override
 	public String getRequestParam(final String name) {
 
