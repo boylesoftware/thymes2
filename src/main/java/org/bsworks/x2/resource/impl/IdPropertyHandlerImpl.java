@@ -7,6 +7,7 @@ import org.bsworks.x2.resource.IdPropertyHandler;
 import org.bsworks.x2.resource.ResourcePropertyAccess;
 import org.bsworks.x2.resource.annotations.AccessRestriction;
 import org.bsworks.x2.resource.annotations.IdProperty;
+import org.bsworks.x2.resource.impl.AccessChecker.TargetType;
 import org.bsworks.x2.util.StringUtils;
 
 
@@ -55,7 +56,8 @@ class IdPropertyHandlerImpl
 			final String ctxPersistentFieldsPrefix) {
 		super(pd, valueHandler,
 				new AccessChecker((IdPropertyHandlerImpl.class).getAnnotation(
-						AccessRestrictions.class).value(), true, false),
+						AccessRestrictions.class).value(),
+						TargetType.PERSISTENT),
 				new ResourcePropertyPersistenceImpl(
 						ctxPersistentFieldsPrefix
 							+ StringUtils.defaultIfEmpty(

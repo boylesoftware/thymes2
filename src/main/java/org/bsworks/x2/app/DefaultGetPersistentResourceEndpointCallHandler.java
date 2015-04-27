@@ -9,7 +9,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.bsworks.x2.EndpointCallContext;
 import org.bsworks.x2.EndpointCallErrorException;
 import org.bsworks.x2.EndpointCallResponse;
-import org.bsworks.x2.resource.DependentRefPropertyHandler;
+import org.bsworks.x2.resource.DependentResourcePropertyHandler;
 import org.bsworks.x2.resource.FilterConditionType;
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.OrderSpec;
@@ -466,10 +466,11 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			final RefsFetchSpec<R> refsFetch,
 			final Set<Class<?>> prsrcClasses) {
 
-		for (final DependentRefPropertyHandler ph :
-				this.prsrcHandler.getDependentRefProperties()) {
+		for (final DependentResourcePropertyHandler ph :
+				this.prsrcHandler.getDependentResourceProperties()) {
 
-			if ((propsFetch != null) && !propsFetch.isIncluded(ph.getName()))
+			if (((propsFetch != null) && !propsFetch.isIncluded(ph.getName()))
+				|| ((propsFetch == null) && !ph.isFetchedByDefault()))
 				continue;
 
 			prsrcClasses.add(ph.getReferredResourceClass());
@@ -489,11 +490,12 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			final Class<?> refTargetClass = entry.getValue();
 
 			if (prsrcClasses.add(refTargetClass)) {
-				for (final DependentRefPropertyHandler ph :
+				for (final DependentResourcePropertyHandler ph :
 						resources.getPersistentResourceHandler(refTargetClass)
-							.getDependentRefProperties()) {
-					if ((propsFetch != null) && !propsFetch.isIncluded(
+							.getDependentResourceProperties()) {
+					if (((propsFetch != null) && !propsFetch.isIncluded(
 							refPropPath + "." + ph.getName()))
+						|| ((propsFetch == null) && !ph.isFetchedByDefault()))
 						continue;
 					prsrcClasses.add(ph.getReferredResourceClass());
 				}
@@ -535,7 +537,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			if (includePropsFetchParam != null) {
 				for (final String propPath : includePropsFetchParam.split(","))
 					propsFetch.include(propPath);
-			} else {
+			} else { // excludePropsFetchParam may not be null
 				propsFetch.includeByDefault();
 				for (final String propPath : excludePropsFetchParam.split(","))
 					propsFetch.exclude(propPath);

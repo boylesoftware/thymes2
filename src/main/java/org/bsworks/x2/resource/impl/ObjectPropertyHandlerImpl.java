@@ -11,6 +11,7 @@ import java.util.Map;
 import org.bsworks.x2.resource.ObjectPropertyHandler;
 import org.bsworks.x2.resource.ResourcePropertyHandler;
 import org.bsworks.x2.resource.annotations.Property;
+import org.bsworks.x2.resource.impl.AccessChecker.TargetType;
 import org.bsworks.x2.util.StringUtils;
 
 
@@ -110,7 +111,8 @@ class ObjectPropertyHandlerImpl
 			final String concreteTypeName) {
 		super(pd, valueHandler,
 				new AccessChecker(propAnno.accessRestrictions(),
-						(persistenceDesc != null), false),
+						(persistenceDesc != null ?
+								TargetType.PERSISTENT : TargetType.TRANSIENT)),
 				persistenceDesc, propAnno.updateIfNull());
 
 		// check correctness of persistent property definition

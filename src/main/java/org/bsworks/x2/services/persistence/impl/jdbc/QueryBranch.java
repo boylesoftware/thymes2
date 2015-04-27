@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.bsworks.x2.resource.DependentAggregatePropertyHandler;
 import org.bsworks.x2.resource.ResourcePropertyHandler;
 
 
@@ -116,14 +117,19 @@ class QueryBranch {
 	}
 
 	/**
-	 * Get handler of the property, which is the branch's root. This is the last
-	 * property in the branch attachment chain.
+	 * Tell if the branch root property (the last property in the branch
+	 * attachment chain) is a collection (or should be treated as such).
 	 *
-	 * @return The property handler, or {@code null} for the root.
+	 * @return {@code true} if collection branch.
 	 */
-	ResourcePropertyHandler getNodePropertyHandler() {
+	boolean isCollection() {
 
-		return this.nodeProp;
+		if (this.nodeProp == null)
+			return false;
+
+		return (!this.nodeProp.isSingleValued()
+				|| (this.nodeProp
+						instanceof DependentAggregatePropertyHandler));
 	}
 
 	/**

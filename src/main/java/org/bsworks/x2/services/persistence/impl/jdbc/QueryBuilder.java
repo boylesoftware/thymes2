@@ -13,8 +13,8 @@ import java.util.TreeMap;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.bsworks.x2.Actor;
+import org.bsworks.x2.resource.DependentAggregatePropertyHandler;
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.IdPropertyHandler;
@@ -723,11 +723,18 @@ class QueryBuilder {
 				container.getRefProperties())
 			addRefProperty(ctx, propHandler);
 
-		// add dependent resource reference properties
+		// add dependent resource properties
 		if (prsrcHandler != null) {
+
+			// add dependent resource reference properties
 			for (final DependentRefPropertyHandler propHandler :
 					prsrcHandler.getDependentRefProperties())
 				addDependentRefProperty(ctx, propHandler);
+
+			// add dependent resource aggregate properties
+			for (final DependentAggregatePropertyHandler propHandler :
+					prsrcHandler.getDependentAggregateProperties())
+				addDependentAggregateProperty(ctx, propHandler);
 		}
 
 		// merge the select list
@@ -1632,7 +1639,6 @@ class QueryBuilder {
 
 			// add property to the list
 			ctx.singlesSelectList.append(propAnchorColExpr);
-
 		}
 
 		// create branch
@@ -1827,6 +1833,123 @@ class QueryBuilder {
 	}
 
 	/**
+	 * Add dependent resource aggregate property.
+	 *
+	 * @param ctx Query builder context.
+	 * @param propHandler Property handler.
+	 */
+	private static void addDependentAggregateProperty(
+			final QueryBuilderContext ctx,
+			final DependentAggregatePropertyHandler propHandler) {
+
+		// get property persistence
+		final ResourcePropertyPersistence propPersistence =
+			getPropertyPersistence(ctx, propHandler);
+		if (propPersistence == null)
+			return;
+
+		// construct property path
+		final String propPath = ctx.getPropertyPath(propHandler.getName());
+
+		// check if included in the fetch
+		if ((ctx.propsFetch == null) || !ctx.propsFetch.isIncluded(propPath))
+			return;
+
+		// get reference target
+		final Class<?> refTargetClass = propHandler.getReferredResourceClass();
+
+		// TODO: verify that other dependent resource properties that refer to
+		//       the same resource and are not aggregates are not included and
+		//       are not fetched.
+
+		// add the property
+		addBranch(ctx,
+				createDependentAggregatePropertyBranch(ctx, propHandler,
+						propPersistence, propPath, refTargetClass),
+				isSelected(ctx, propPath));
+	}
+
+	/**
+	 * Create dependent resource aggregate property branch.
+	 *
+	 * @param ctx Query builder context.
+	 * @param propHandler Property handler.
+	 * @param propPersistence Property persistence descriptor.
+	 * @param propPath Property path.
+	 * @param refTargetClass Reference target class.
+	 *
+	 * @return The branch.
+	 */
+	private static QueryBranch createDependentAggregatePropertyBranch(
+			final QueryBuilderContext ctx,
+			final DependentAggregatePropertyHandler propHandler,
+			final ResourcePropertyPersistence propPersistence,
+			final String propPath, final Class<?> refTargetClass) {
+
+		// get target resource handler
+		final PersistentResourceHandler<?> refTargetHandler =
+			ctx.resources.getPersistentResourceHandler(refTargetClass);
+
+		// column label prefix and property table alias
+		ctx.prepareNestedProperty(propHandler);
+
+		// property value expression
+		final String aggregationPropName =
+			propHandler.getAggregationPropertyName();
+		final String aggregationFieldName = (aggregationPropName == null ? null
+				: refTargetHandler.getProperties().get(aggregationPropName)
+					.getPersistence().getFieldName());
+		final String func;
+		switch (propHandler.getFunction()) {
+		case COUNT:
+			func = "COUNT(";
+			break;
+		case COUNT_DISTINCT:
+			func = "COUNT(DISTINCT ";
+			break;
+		case SUM:
+			func = "SUM(";
+			break;
+		case MAX:
+			func = "MAX(";
+			break;
+		case MIN:
+			func = "MIN(";
+			break;
+		default: // AVG
+			func = "AVG(";
+		}
+		final String propValueExpr = func
+				+ (aggregationFieldName == null ? "*" :
+					ctx.propTableAlias + "." + aggregationFieldName)
+				+ ")";
+
+		// add collection property stump
+		final String propTableName = propPersistence.getCollectionName();
+		final String propJoinCondition = ctx.propTableAlias + "."
+				+ propPersistence.getParentIdFieldName()
+				+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
+		final String propIdColName =
+			refTargetHandler.getIdProperty().getPersistence().getFieldName();
+		ctx.collectionProps.put(propPath,
+				new CollectionQueryProperty(propHandler,
+						propTableName, ctx.propTableAlias,
+						propJoinCondition, null,
+						ctx.propTableAlias + "." + propIdColName));
+
+		// create anchor column expression
+		final String propAnchorColExpr =
+			propValueExpr
+				+ " AS " + ctx.dialect.quoteColumnLabel(
+						ctx.colLabelPrefix + propHandler.getName());
+
+		// create property branch
+		return createBranch(ctx, propPath, propTableName, propIdColName, "",
+				propPersistence.isOptional(), propAnchorColExpr,
+				propJoinCondition);
+	}
+
+	/**
 	 * Get property persistence descriptor.
 	 *
 	 * @param ctx Query builder context.
@@ -1937,8 +2060,7 @@ class QueryBuilder {
 			return;
 
 		// check if collection and is not selected
-		final boolean collection =
-			!branch.getNodePropertyHandler().isSingleValued();
+		final boolean collection = branch.isCollection();
 		if (collection && !selected)
 			return;
 
@@ -1973,8 +2095,7 @@ class QueryBuilder {
 		final QueryBuilder branchQB = branch.getQueryBuilder();
 
 		// analyze the branch collection status
-		final boolean collection =
-			!branch.getNodePropertyHandler().isSingleValued();
+		final boolean collection = branch.isCollection();
 		final boolean hasCollections = branchQB.hasCollections();
 
 		// merge select list if selected
@@ -2059,9 +2180,8 @@ class QueryBuilder {
 		// get branch query builder
 		final QueryBuilder branchQB = branch.getQueryBuilder();
 
-		// analyze the branch collection status
-		final boolean collection =
-			!branch.getNodePropertyHandler().isSingleValued();
+		// get the branch collection status
+		final boolean collection = branch.isCollection();
 
 		// include branch's single joins
 		final String branchPropPath = branch.getNodePropertyPath();

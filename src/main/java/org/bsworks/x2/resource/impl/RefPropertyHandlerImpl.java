@@ -4,6 +4,7 @@ import java.beans.PropertyDescriptor;
 
 import org.bsworks.x2.resource.RefPropertyHandler;
 import org.bsworks.x2.resource.annotations.Property;
+import org.bsworks.x2.resource.impl.AccessChecker.TargetType;
 
 
 /**
@@ -46,7 +47,8 @@ class RefPropertyHandlerImpl
 			final String ctxPersistentFieldsPrefix) {
 		super(pd, valueHandler,
 				new AccessChecker(propAnno.accessRestrictions(),
-						propAnno.persistence().persistent(), false),
+						(propAnno.persistence().persistent() ?
+								TargetType.PERSISTENT : TargetType.TRANSIENT)),
 				(!propAnno.persistence().persistent() ? null :
 					new ResourcePropertyPersistenceImpl(propAnno, pd.getName(),
 							ctxPersistentFieldsPrefix)),

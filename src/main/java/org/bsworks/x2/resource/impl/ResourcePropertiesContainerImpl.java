@@ -35,6 +35,7 @@ import org.bsworks.x2.resource.RefPropertyHandler;
 import org.bsworks.x2.resource.ResourcePropertiesContainer;
 import org.bsworks.x2.resource.ResourcePropertyHandler;
 import org.bsworks.x2.resource.TypePropertyHandler;
+import org.bsworks.x2.resource.annotations.DependentAggregateProperty;
 import org.bsworks.x2.resource.annotations.DependentRefProperty;
 import org.bsworks.x2.resource.annotations.IdProperty;
 import org.bsworks.x2.resource.annotations.MetaProperty;
@@ -61,12 +62,13 @@ class ResourcePropertiesContainerImpl<O>
 	 */
 	private static final List<Class<? extends Annotation>> ANNOS;
 	static {
-		ANNOS = new ArrayList<>(5);
+		ANNOS = new ArrayList<>(6);
 		ANNOS.add(IdProperty.class);
 		ANNOS.add(MetaProperty.class);
 		ANNOS.add(TypeProperty.class);
 		ANNOS.add(Property.class);
 		ANNOS.add(DependentRefProperty.class);
+		ANNOS.add(DependentAggregateProperty.class);
 	}
 
 	/**

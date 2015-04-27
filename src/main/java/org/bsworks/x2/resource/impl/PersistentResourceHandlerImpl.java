@@ -12,6 +12,7 @@ import org.bsworks.x2.resource.MetaPropertyType;
 import org.bsworks.x2.resource.PersistentResourceHandler;
 import org.bsworks.x2.resource.ResourcePropertyAccess;
 import org.bsworks.x2.resource.annotations.PersistentResource;
+import org.bsworks.x2.resource.impl.AccessChecker.TargetType;
 import org.bsworks.x2.util.StringUtils;
 
 
@@ -43,10 +44,22 @@ class PersistentResourceHandlerImpl<R>
 	metaPropertyHandlers;
 
 	/**
+	 * All dependent resource property handlers.
+	 */
+	private final Collection<AbstractDependentResourcePropertyHandlerImpl>
+	dependentResourcePropertyHandlers;
+
+	/**
 	 * Dependent resource reference property handlers.
 	 */
 	private final Collection<DependentRefPropertyHandlerImpl>
 	dependentRefPropertyHandlers;
+
+	/**
+	 * Dependent resource aggregate property handlers.
+	 */
+	private final Collection<DependentAggregatePropertyHandlerImpl>
+	dependentAggregatePropertyHandlers;
 
 
 	/**
@@ -74,7 +87,8 @@ class PersistentResourceHandlerImpl<R>
 		this.persistentCollectionName =
 			this.props.getPersistentCollectionName();
 		this.accessChecker =
-			new AccessChecker(prsrcAnno.accessRestrictions(), true, false);
+			new AccessChecker(prsrcAnno.accessRestrictions(),
+					TargetType.PERSISTENT);
 
 		// check that we have record id property
 		if (this.getIdProperty() == null)
@@ -82,11 +96,15 @@ class PersistentResourceHandlerImpl<R>
 					+ prsrcClass.getName()
 					+ " does not contain record id property.");
 
-		// get record meta-properties and dependent resource references
+		// get record meta-properties and dependent resource properties
 		this.metaPropertyHandlers =
 			new HashMap<>(MetaPropertyType.values().length);
+		final ArrayList<AbstractDependentResourcePropertyHandlerImpl>
+		dependentResourcePropertyHandlers = new ArrayList<>();
 		final ArrayList<DependentRefPropertyHandlerImpl>
 		dependentRefPropertyHandlers = new ArrayList<>();
+		final ArrayList<DependentAggregatePropertyHandlerImpl>
+		dependentAggregatePropertyHandlers = new ArrayList<>();
 		for (final AbstractResourcePropertyHandlerImpl propHandler :
 				this.getProperties().values()) {
 			if (propHandler instanceof MetaPropertyHandlerImpl) {
@@ -100,13 +118,30 @@ class PersistentResourceHandlerImpl<R>
 							+ metaPropHandler.getType() + " meta-property.");
 			} else if (propHandler instanceof
 							DependentRefPropertyHandlerImpl) {
-				dependentRefPropertyHandlers.add(
-						(DependentRefPropertyHandlerImpl) propHandler);
+				final DependentRefPropertyHandlerImpl ph =
+					(DependentRefPropertyHandlerImpl) propHandler;
+				dependentResourcePropertyHandlers.add(ph);
+				dependentRefPropertyHandlers.add(ph);
+			} else if (propHandler instanceof
+							DependentAggregatePropertyHandlerImpl) {
+				final DependentAggregatePropertyHandlerImpl ph =
+					(DependentAggregatePropertyHandlerImpl) propHandler;
+				dependentResourcePropertyHandlers.add(ph);
+				dependentAggregatePropertyHandlers.add(ph);
 			}
 		}
+		dependentResourcePropertyHandlers.trimToSize();
+		this.dependentResourcePropertyHandlers =
+			Collections.unmodifiableCollection(
+					dependentResourcePropertyHandlers);
 		dependentRefPropertyHandlers.trimToSize();
 		this.dependentRefPropertyHandlers =
-			Collections.unmodifiableCollection(dependentRefPropertyHandlers);
+			Collections.unmodifiableCollection(
+					dependentRefPropertyHandlers);
+		dependentAggregatePropertyHandlers.trimToSize();
+		this.dependentAggregatePropertyHandlers =
+			Collections.unmodifiableCollection(
+					dependentAggregatePropertyHandlers);
 	}
 
 
@@ -152,9 +187,29 @@ class PersistentResourceHandlerImpl<R>
 	 * See overridden method.
 	 */
 	@Override
+	public Collection<AbstractDependentResourcePropertyHandlerImpl>
+	getDependentResourceProperties() {
+
+		return this.dependentResourcePropertyHandlers;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public Collection<DependentRefPropertyHandlerImpl>
 	getDependentRefProperties() {
 
 		return this.dependentRefPropertyHandlers;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public Collection<DependentAggregatePropertyHandlerImpl>
+	getDependentAggregateProperties() {
+
+		return this.dependentAggregatePropertyHandlers;
 	}
 }

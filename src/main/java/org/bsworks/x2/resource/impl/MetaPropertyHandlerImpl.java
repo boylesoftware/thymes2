@@ -8,6 +8,7 @@ import org.bsworks.x2.resource.MetaPropertyType;
 import org.bsworks.x2.resource.ResourcePropertyAccess;
 import org.bsworks.x2.resource.annotations.AccessRestriction;
 import org.bsworks.x2.resource.annotations.MetaProperty;
+import org.bsworks.x2.resource.impl.AccessChecker.TargetType;
 import org.bsworks.x2.util.StringUtils;
 
 
@@ -51,7 +52,8 @@ class MetaPropertyHandlerImpl
 			final String ctxPersistentFieldsPrefix) {
 		super(pd, valueHandler,
 				new AccessChecker((MetaPropertyHandlerImpl.class).getAnnotation(
-						AccessRestrictions.class).value(), true, false),
+						AccessRestrictions.class).value(),
+						TargetType.PERSISTENT),
 				new ResourcePropertyPersistenceImpl(
 						ctxPersistentFieldsPrefix
 							+ StringUtils.defaultIfEmpty(

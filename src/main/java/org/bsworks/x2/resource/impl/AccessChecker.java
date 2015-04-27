@@ -13,11 +13,38 @@ import org.bsworks.x2.resource.annotations.Special;
 
 
 /**
- * User to check resource access.
+ * Used to check resource access.
  *
  * @author Lev Himmelfarb
  */
 class AccessChecker {
+
+	/**
+	 * Access target type.
+	 */
+	enum TargetType {
+
+		/**
+		 * Something persistent.
+		 */
+		PERSISTENT,
+
+		/**
+		 * Something transient.
+		 */
+		TRANSIENT,
+
+		/**
+		 * Dependent resource reference.
+		 */
+		DEP_REF,
+
+		/**
+		 * Dependent resource aggregate.
+		 */
+		DEP_AGGREGATE
+	}
+
 
 	/**
 	 * Special value for public access.
@@ -69,58 +96,69 @@ class AccessChecker {
 	private final Set<String> deleteACL;
 
 	/**
-	 * Tells if the checker is for something persistent.
+	 * Checker target type.
 	 */
-	private final boolean persistent;
-
-	/**
-	 * Tells if the checked is for a dependent reference property.
-	 */
-	private final boolean depRef;
+	private final TargetType targetType;
 
 
 	/**
 	 * Create new checker.
 	 *
 	 * @param accessRestrictions Access restrictions.
-	 * @param persistent {@code true} if checker is for a persistent something.
-	 * @param depRef {@code true} if for a dependent reference property.
+	 * @param targetType Checker target type.
 	 */
 	AccessChecker(final AccessRestriction[] accessRestrictions,
-			final boolean persistent, final boolean depRef) {
+			final TargetType targetType) {
 
-		this.persistent = persistent;
-		this.depRef = depRef;
+		this.targetType = targetType;
 
+		// process specified restrictions and create ACLs
 		final Map<ResourcePropertyAccess, Set<String>> acls = new HashMap<>();
 		for (final AccessRestriction r : accessRestrictions) {
+
+			// test applicability of specified restrictions to the target
+			final ResourcePropertyAccess access = r.value();
 			final boolean allowedToSome = (r.allowTo().length > 0);
-			if (!persistent) {
-				switch (r.value()) {
+			if (allowedToSome) switch (targetType) {
+			case TRANSIENT:
+				switch (access) {
 				case LOAD:
 				case PERSIST:
 				case UPDATE:
 				case DELETE:
-					if (allowedToSome)
-						throw new IllegalArgumentException("Access type "
-								+ r.value()
-								+ " requires a persistent property.");
+					throw new IllegalArgumentException("Access type "
+							+ access + " requires a persistent property.");
 				default:
 				}
-			} else if (depRef) {
-				switch (r.value()) {
+				break;
+			case DEP_REF:
+				if (access == ResourcePropertyAccess.PERSIST)
+					throw new IllegalArgumentException("Dependent"
+							+ " references cannot be persisted.");
+				break;
+			case DEP_AGGREGATE:
+				switch (access) {
+				case SUBMIT:
 				case PERSIST:
-					if (allowedToSome)
-						throw new IllegalArgumentException("Dependent"
-								+ " references cannot be persisted.");
+				case UPDATE:
+				case DELETE:
+					throw new IllegalArgumentException("Access type "
+							+ access
+							+ " is invalid for an aggregate property.");
 				default:
 				}
+				break;
+			default: // PERSISTENT, all types of access are applicable
 			}
-			Set<String> roles = acls.get(r.value());
+
+			// test that access type is specified only once
+			Set<String> roles = acls.get(access);
 			if (roles != null)
 				throw new IllegalArgumentException(
-						"More than one roles list for " + r.value()
+						"More than one roles list for " + access
 						+ " access mode.");
+
+			// get the roles list
 			if ((r.allowTo().length == 1)
 					&& r.allowTo()[0].equals(Special.AUTHED_ONLY)) {
 				roles = AUTHED_ONLY;
@@ -134,9 +172,12 @@ class AccessChecker {
 					roles.add(role);
 				}
 			}
-			acls.put(r.value(), roles);
+
+			// save the roles for the access type
+			acls.put(access, roles);
 		}
 
+		// create ACLs
 		this.seeACL = getACL(acls, ResourcePropertyAccess.SEE);
 		this.submitACL = getACL(acls, ResourcePropertyAccess.SUBMIT);
 		this.loadACL = getACL(acls, ResourcePropertyAccess.LOAD);
@@ -185,23 +226,27 @@ class AccessChecker {
 			acl = this.seeACL;
 			break;
 		case SUBMIT:
+			if (this.targetType == TargetType.DEP_AGGREGATE)
+				return false;
 			acl = this.submitACL;
 			break;
 		case LOAD:
 			acl = this.loadACL;
 			break;
 		case PERSIST:
-			if (!this.persistent || this.depRef)
+			if (this.targetType != TargetType.PERSISTENT)
 				return false;
 			acl = this.persistACL;
 			break;
 		case UPDATE:
-			if (!this.persistent)
+			if ((this.targetType == TargetType.TRANSIENT)
+				|| (this.targetType == TargetType.DEP_AGGREGATE))
 				return false;
 			acl = this.updateACL;
 			break;
 		case DELETE:
-			if (!this.persistent)
+			if ((this.targetType == TargetType.TRANSIENT)
+				|| (this.targetType == TargetType.DEP_AGGREGATE))
 				return false;
 			acl = this.deleteACL;
 			break;

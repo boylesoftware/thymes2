@@ -11,13 +11,12 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.bsworks.x2.Actor;
 import org.bsworks.x2.EndpointCallContext;
 import org.bsworks.x2.EndpointCallErrorException;
 import org.bsworks.x2.EndpointCallHandler;
 import org.bsworks.x2.HttpMethod;
-import org.bsworks.x2.resource.DependentRefPropertyHandler;
+import org.bsworks.x2.resource.DependentResourcePropertyHandler;
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.IdPropertyHandler;
 import org.bsworks.x2.resource.InvalidResourceDataException;
@@ -203,13 +202,14 @@ public abstract class AbstractPersistentResourceEndpointCallHandler<R, E>
 	getDependentResourcesVersioningInfo(final EndpointCallContext ctx,
 			final PropertiesFetchSpec<R> propsFetch) {
 
-		if (this.prsrcHandler.getDependentRefProperties().isEmpty())
+		if (this.prsrcHandler.getDependentResourceProperties().isEmpty())
 			return null;
 
 		final Set<Class<?>> prsrcClasses = new HashSet<>();
-		for (final DependentRefPropertyHandler ph :
-				this.prsrcHandler.getDependentRefProperties()) {
-			if ((propsFetch == null) || propsFetch.isIncluded(ph.getName()))
+		for (final DependentResourcePropertyHandler ph :
+				this.prsrcHandler.getDependentResourceProperties()) {
+			if (((propsFetch != null) && propsFetch.isIncluded(ph.getName()))
+				|| ((propsFetch == null) && ph.isFetchedByDefault()))
 				prsrcClasses.add(ph.getReferredResourceClass());
 		}
 		if (prsrcClasses.isEmpty())

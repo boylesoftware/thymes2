@@ -6,6 +6,7 @@ import org.bsworks.x2.resource.ResourcePropertyAccess;
 import org.bsworks.x2.resource.TypePropertyHandler;
 import org.bsworks.x2.resource.annotations.AccessRestriction;
 import org.bsworks.x2.resource.annotations.TypeProperty;
+import org.bsworks.x2.resource.impl.AccessChecker.TargetType;
 import org.bsworks.x2.util.StringUtils;
 
 
@@ -49,7 +50,8 @@ class TypePropertyHandlerImpl
 				new AccessChecker(
 						(TypePropertyHandlerImpl.class).getAnnotation(
 								AccessRestrictions.class).value(),
-						propAnno.persistent(), false),
+						(propAnno.persistent() ?
+								TargetType.PERSISTENT : TargetType.TRANSIENT)),
 				(!propAnno.persistent() ? null :
 					new ResourcePropertyPersistenceImpl(
 							ctxPersistentFieldsPrefix
