@@ -166,6 +166,12 @@ class QueryBuilder {
 		final StringBuilder collectionsSelectList = new StringBuilder(512);
 
 		/**
+		 * Dependent persistent resource classes, for which aggregated
+		 * properties are included in the query.
+		 */
+		final Set<Class<?>> aggregatedDeps = new HashSet<>();
+
+		/**
 		 * Property paths that are included in the select list and need a
 		 * single-valued join.
 		 */
@@ -386,6 +392,11 @@ class QueryBuilder {
 	private final String selectList;
 
 	/**
+	 * Tells if the select list has aggregates.
+	 */
+	private final boolean hasAggregates;
+
+	/**
 	 * Property paths that are included in the select list and need a
 	 * single-valued join.
 	 */
@@ -434,6 +445,7 @@ class QueryBuilder {
 	 * @param rootTableAlias Alias of the root table.
 	 * @param rootIdColName Name of the record id column in the root table.
 	 * @param selectList Body of the "SELECT" clause for the properties.
+	 * @param hasAggregates {@code true} if the select list has aggregates.
 	 * @param selectSingleJoins Property paths that are included in the select
 	 * list and need a single-valued join.
 	 * @param allSingleJoins Join expressions for all single-valued properties.
@@ -451,6 +463,7 @@ class QueryBuilder {
 			final FilterSpec<?> filter, final OrderSpec<?> order,
 			final String rootTableName, final String rootTableAlias,
 			final String rootIdColName, final String selectList,
+			final boolean hasAggregates,
 			final Set<String> selectSingleJoins,
 			final SortedMap<String, String> allSingleJoins,
 			final String collectionJoins, final String orderByList,
@@ -467,6 +480,7 @@ class QueryBuilder {
 		this.rootTableAlias = rootTableAlias;
 		this.rootIdColName = rootIdColName;
 		this.selectList = selectList;
+		this.hasAggregates = hasAggregates;
 		this.selectSingleJoins = selectSingleJoins;
 		this.allSingleJoins = allSingleJoins;
 		this.collectionJoins = collectionJoins;
@@ -767,6 +781,7 @@ class QueryBuilder {
 				ctx.rootTableAlias,
 				ctx.rootIdColName,
 				selectList.toString(),
+				!ctx.aggregatedDeps.isEmpty(),
 				ctx.selectSingleJoins,
 				ctx.allSingleJoins,
 				ctx.collectionJoins.toString(),
@@ -820,6 +835,7 @@ class QueryBuilder {
 						ctx.propTableAlias,
 						propIdColName,
 						propValExpr,
+						false,
 						Collections.<String>emptySet(),
 						CollectionUtils.<String, String>emptySortedMap(),
 						"",
@@ -1862,11 +1878,53 @@ class QueryBuilder {
 		//       the same resource and are not aggregates are not included and
 		//       are not fetched.
 
-		// add the property
-		addBranch(ctx,
-				createDependentAggregatePropertyBranch(ctx, propHandler,
-						propPersistence, propPath, refTargetClass),
-				isSelected(ctx, propPath));
+		// check if this dependent resource is already aggregated
+		if (!ctx.aggregatedDeps.add(refTargetClass)) {
+			addAdditionalDependentAggregateProperty(ctx, propHandler,
+					refTargetClass);
+		} else { // add as a branch
+			addBranch(ctx,
+					createDependentAggregatePropertyBranch(ctx, propHandler,
+							propPersistence, propPath, refTargetClass),
+					isSelected(ctx, propPath));
+		}
+	}
+
+	/**
+	 * Add single-valued simple property.
+	 *
+	 * @param ctx Query builder context.
+	 * @param propHandler Property handler.
+	 * @param refTargetClass Reference target class.
+	 */
+	private static void addAdditionalDependentAggregateProperty(
+			final QueryBuilderContext ctx,
+			final DependentAggregatePropertyHandler propHandler,
+			final Class<?> refTargetClass) {
+
+		// get target resource handler
+		final PersistentResourceHandler<?> refTargetHandler =
+			ctx.resources.getPersistentResourceHandler(refTargetClass);
+
+		// property value expression
+		final String propValueExpr = getAggregatedPropertyValueExpression(ctx,
+				propHandler, refTargetHandler);
+
+		// add property to the single properties
+		final String propPath = ctx.getPropertyPath(propHandler.getName());
+		ctx.singlePropExprs.put(propPath,
+				new SingleValuedQueryProperty(propValueExpr,
+						propHandler.getValueHandler()
+							.getPersistentValueType()));
+
+		// check if adding to existing list
+		if (ctx.singlesSelectList.length() > 0)
+			ctx.singlesSelectList.append(", ");
+
+		// add property to the list
+		ctx.singlesSelectList.append(propValueExpr).append(" AS ")
+			.append(ctx.dialect.quoteColumnLabel(
+					ctx.colLabelPrefix + propHandler.getName()));
 	}
 
 	/**
@@ -1894,35 +1952,8 @@ class QueryBuilder {
 		ctx.prepareNestedProperty(propHandler);
 
 		// property value expression
-		final String aggregationPropName =
-			propHandler.getAggregationPropertyName();
-		final String aggregationFieldName = (aggregationPropName == null ? null
-				: refTargetHandler.getProperties().get(aggregationPropName)
-					.getPersistence().getFieldName());
-		final String func;
-		switch (propHandler.getFunction()) {
-		case COUNT:
-			func = "COUNT(";
-			break;
-		case COUNT_DISTINCT:
-			func = "COUNT(DISTINCT ";
-			break;
-		case SUM:
-			func = "SUM(";
-			break;
-		case MAX:
-			func = "MAX(";
-			break;
-		case MIN:
-			func = "MIN(";
-			break;
-		default: // AVG
-			func = "AVG(";
-		}
-		final String propValueExpr = func
-				+ (aggregationFieldName == null ? "*" :
-					ctx.propTableAlias + "." + aggregationFieldName)
-				+ ")";
+		final String propValueExpr = getAggregatedPropertyValueExpression(ctx,
+				propHandler, refTargetHandler);
 
 		// add collection property stump
 		final String propTableName = propPersistence.getCollectionName();
@@ -1947,6 +1978,52 @@ class QueryBuilder {
 		return createBranch(ctx, propPath, propTableName, propIdColName, "",
 				propPersistence.isOptional(), propAnchorColExpr,
 				propJoinCondition);
+	}
+
+	/**
+	 * Get aggregate property value expression.
+	 *
+	 * @param ctx Query builder context.
+	 * @param propHandler Property handler.
+	 * @param refTargetHandler Target resource handler.
+	 *
+	 * @return Property value expression.
+	 */
+	private static String getAggregatedPropertyValueExpression(
+			final QueryBuilderContext ctx,
+			final DependentAggregatePropertyHandler propHandler,
+			final PersistentResourceHandler<?> refTargetHandler) {
+
+		final String aggregationPropName =
+			propHandler.getAggregationPropertyName();
+		final String aggregationFieldName = (aggregationPropName != null ?
+				refTargetHandler.getProperties().get(aggregationPropName)
+					.getPersistence().getFieldName() :
+				refTargetHandler.getIdProperty()
+					.getPersistence().getFieldName());
+
+		final String func;
+		switch (propHandler.getFunction()) {
+		case COUNT:
+			func = "COUNT(";
+			break;
+		case COUNT_DISTINCT:
+			func = "COUNT(DISTINCT ";
+			break;
+		case SUM:
+			func = "SUM(";
+			break;
+		case MAX:
+			func = "MAX(";
+			break;
+		case MIN:
+			func = "MIN(";
+			break;
+		default: // AVG
+			func = "AVG(";
+		}
+
+		return (func + ctx.propTableAlias + "." + aggregationFieldName + ")");
 	}
 
 	/**
@@ -2256,6 +2333,7 @@ class QueryBuilder {
 						+ branch.getAnchorColumnExpression()
 						+ (branchQB.selectList.isEmpty() ? "" :
 								", " + branchQB.selectList),
+					!ctx.aggregatedDeps.isEmpty(),
 					rebranchedSelectSingleJoins,
 					rebranchedAllSingleJoins,
 					rebranchedCollectionJoins.toString(),
@@ -2476,6 +2554,11 @@ class QueryBuilder {
 		if (whereClause != null)
 			q.append(" WHERE ").append(whereClause.getBody());
 
+		// add "GROUP BY" clause
+		if (this.hasAggregates)
+			q.append(" GROUP BY ").append(this.rootTableAlias).append(".")
+				.append(this.rootIdColName);
+
 		// add the "ORDER BY" clause
 		if (orderByClause != null) {
 			q.append(" ORDER BY ").append(orderByClause.getBody());
@@ -2529,6 +2612,11 @@ class QueryBuilder {
 
 		// add collection joins
 		q.append(this.collectionJoins);
+
+		// add "GROUP BY" clause
+		if (this.hasAggregates)
+			q.append(" GROUP BY ").append(this.rootTableAlias).append(".")
+				.append(this.rootIdColName);
 
 		// add the "ORDER BY" clause
 		if (orderByClause != null) {

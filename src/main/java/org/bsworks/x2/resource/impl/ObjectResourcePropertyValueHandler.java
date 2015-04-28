@@ -178,9 +178,17 @@ class ObjectResourcePropertyValueHandler
 			if (!propHandler.isAllowed(access, actor))
 				continue;
 
+			// get property value
+			final Object propVal = propHandler.getValue(val);
+
+			// skip aggregate property if null
+			if ((propVal == null)
+					&& (propHandler
+							instanceof DependentAggregatePropertyHandlerImpl))
+				continue;
+
 			// write the property
 			out.addProperty(propHandler.getName());
-			final Object propVal = propHandler.getValue(val);
 			if (propVal == null)
 				out.writeNullValue();
 			else

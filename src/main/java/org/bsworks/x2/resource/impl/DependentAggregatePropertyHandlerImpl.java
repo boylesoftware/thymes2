@@ -111,7 +111,8 @@ class DependentAggregatePropertyHandlerImpl
 			case COUNT:
 			case COUNT_DISTINCT:
 				break;
-			default:
+			case MIN:
+			case MAX:
 				if (this.getValueHandler().getType()
 						!= aggPropHandler.getValueHandler().getType())
 					throw new IllegalArgumentException("Property "
@@ -120,6 +121,7 @@ class DependentAggregatePropertyHandlerImpl
 							+ " must have same type as property "
 							+ aggPropHandler.getName() + " of "
 							+ targetHandler.getResourceClass().getName() + ".");
+			default:
 			}
 		}
 
