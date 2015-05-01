@@ -4,6 +4,7 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.Set;
 
+import org.bsworks.x2.resource.AggregatePropertyHandler;
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
 import org.bsworks.x2.resource.ObjectPropertyHandler;
 import org.bsworks.x2.resource.OrderSpecElement;
@@ -61,6 +62,10 @@ class OrderSpecElementImpl
 		this.propChain = prsrcHandler.getPersistentPropertyChain(this.propPath);
 
 		final ResourcePropertyHandler lastProp = this.propChain.getLast();
+
+		if (lastProp instanceof AggregatePropertyHandler)
+			throw new IllegalArgumentException(
+					"Cannot order by aggregate property.");
 
 		for (final Iterator<? extends ResourcePropertyHandler> i =
 				this.propChain.iterator(); i.hasNext();) {

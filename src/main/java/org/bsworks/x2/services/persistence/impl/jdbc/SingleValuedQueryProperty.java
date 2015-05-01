@@ -54,4 +54,14 @@ class SingleValuedQueryProperty {
 
 		return this.valueType;
 	}
+
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public String toString() {
+
+		return this.valueType + " " + this.valueExpr;
+	}
 }

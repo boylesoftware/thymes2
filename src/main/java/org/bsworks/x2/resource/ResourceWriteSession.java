@@ -23,6 +23,16 @@ public interface ResourceWriteSession {
 	Actor getActor();
 
 	/**
+	 * Tell if the writer should drop null-valued properties and not attempt to
+	 * write them to the session. This flag is merely a suggestion to the user
+	 * of the session.
+	 *
+	 * @return {@code true} if the session suggests to the writer to skip
+	 * null-valued properties.
+	 */
+	boolean isNullDropped();
+
+	/**
 	 * Convert date object to the corresponding string representation.
 	 *
 	 * @param date The date object.

@@ -45,17 +45,6 @@ public interface PersistentResourceHandler<R>
 	MetaPropertyHandler getMetaProperty(MetaPropertyType type);
 
 	/**
-	 * Get handlers for all dependent persistent resource properties, which
-	 * includes all properties returned by the
-	 * {@link #getDependentRefProperties()} and
-	 * {@link #getDependentAggregateProperties()} methods combined.
-	 *
-	 * @return Unmodifiable collection of property handlers.
-	 */
-	Collection<? extends DependentResourcePropertyHandler>
-	getDependentResourceProperties();
-
-	/**
 	 * Get handlers for all dependent persistent resource reference properties.
 	 *
 	 * @return Unmodifiable collection of property handlers.
@@ -64,10 +53,9 @@ public interface PersistentResourceHandler<R>
 	getDependentRefProperties();
 
 	/**
-	 * Get handlers for all dependent persistent resource aggregate properties.
+	 * Get handlers for all aggregate properties.
 	 *
 	 * @return Unmodifiable collection of property handlers.
 	 */
-	Collection<? extends DependentAggregatePropertyHandler>
-	getDependentAggregateProperties();
+	Collection<? extends AggregatePropertyHandler> getAggregateProperties();
 }

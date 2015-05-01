@@ -3,6 +3,7 @@ package org.bsworks.x2.services.persistence.impl.jdbc;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -10,11 +11,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.regex.Matcher;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.bsworks.x2.Actor;
-import org.bsworks.x2.resource.DependentAggregatePropertyHandler;
+import org.bsworks.x2.resource.AggregatePropertyHandler;
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.IdPropertyHandler;
@@ -63,6 +65,11 @@ class QueryBuilder {
 		final QueryBuilderContext parentCtx;
 
 		/**
+		 * Top persistent resource handler being fetched.
+		 */
+		final PersistentResourceHandler<?> prsrcHandler;
+
+		/**
 		 * Application resources manager.
 		 */
 		final Resources resources;
@@ -85,12 +92,12 @@ class QueryBuilder {
 		/**
 		 * Properties fetch specification.
 		 */
-		final PropertiesFetchSpec<?> propsFetch;
+		private final PropertiesFetchSpec<?> propsFetch;
 
 		/**
 		 * References fetch specification.
 		 */
-		final RefsFetchSpec<?> refsFetch;
+		private final RefsFetchSpec<?> refsFetch;
 
 		/**
 		 * Filter specification.
@@ -133,6 +140,16 @@ class QueryBuilder {
 		final String parentJoinExpr;
 
 		/**
+		 * Parent join attachment expression.
+		 */
+		final String parentJoinAttachmentExpr;
+
+		/**
+		 * Attachment expressions of all branches merged to the context.
+		 */
+		final StringBuilder mergedJoinAttachmentExprs = new StringBuilder(128);
+
+		/**
 		 * Column labels prefix.
 		 */
 		final String colLabelPrefix;
@@ -158,18 +175,13 @@ class QueryBuilder {
 		/**
 		 * Select list for single-valued properties.
 		 */
-		final StringBuilder singlesSelectList = new StringBuilder(512);
+		private final StringBuilder singlesSelectList = new StringBuilder(512);
 
 		/**
 		 * Select list for collection properties.
 		 */
-		final StringBuilder collectionsSelectList = new StringBuilder(512);
-
-		/**
-		 * Dependent persistent resource classes, for which aggregated
-		 * properties are included in the query.
-		 */
-		final Set<Class<?>> aggregatedDeps = new HashSet<>();
+		private final StringBuilder collectionsSelectList =
+			new StringBuilder(512);
 
 		/**
 		 * Property paths that are included in the select list and need a
@@ -188,9 +200,14 @@ class QueryBuilder {
 		final StringBuilder collectionJoins = new StringBuilder(128);
 
 		/**
+		 * Group by list.
+		 */
+		private String groupByList = "";
+
+		/**
 		 * Order by list.
 		 */
-		final StringBuilder orderByList = new StringBuilder(64);
+		private final StringBuilder orderByList = new StringBuilder(64);
 
 		/**
 		 * Single-valued property descriptors by property paths.
@@ -229,6 +246,9 @@ class QueryBuilder {
 		 */
 		final List<ResourcePropertyHandler> propChain;
 
+
+		// polymorphic nested object support
+
 		/**
 		 * Polymorphic object value type column expression.
 		 */
@@ -245,46 +265,63 @@ class QueryBuilder {
 		final StringBuilder valueTypeTestJoins = new StringBuilder();
 
 
+		// aggregation support
+
 		/**
-		 * Create new context.
+		 * Context level in the aggregation branch.
+		 */
+		private int aggregationBranchLevel;
+
+		/**
+		 * Aggregated collection property path.
+		 */
+		private String aggregatedCollectionPropPath;
+
+		/**
+		 * Aggregated property handlers.
+		 */
+		private List<AggregatePropertyHandler> aggregatedPropHandlers;
+
+		/**
+		 * Properties fetch specification.
+		 */
+		private PropertiesFetchSpec<?> aggregationPropsFetch;
+
+		/**
+		 * References fetch specification.
+		 */
+		private RefsFetchSpec<?> aggregationRefsFetch;
+
+		/**
+		 * Aggregation value expressions by property names.
+		 */
+		private final Map<String, String> aggregationValueExprs;
+
+
+		/**
+		 * Create "seed" context, which a context for building a new branched
+		 * query system.
 		 *
-		 * @param parentCtx Parent context, or {@code null} for the seed.
 		 * @param resources Application resources manager.
 		 * @param dialect SQL dialect.
 		 * @param paramsFactory Query parameter value handlers factory.
 		 * @param actor Data consumer.
-		 * @param propsFetch Properties fetch specification.
-		 * @param refsFetch References fetch specification.
-		 * @param filter Filter specification.
-		 * @param order Order specification.
-		 * @param parentPropPath Parent property path.
-		 * @param parentPropChain Parent property chain.
-		 * @param rootTableName Query root table name.
-		 * @param rootTableAlias Query root table alias.
-		 * @param parentAnchorColExpr Parent anchor column expression.
-		 * @param parentJoinExpr Full parent join expression.
-		 * @param colLabelPrefix Column labels prefix.
-		 * @param rootIdColName Record id column name. May be parent record id
-		 * column name if the query root object does not have its own id. May be
-		 * {@code null} for the seed context.
-		 * @param rootIdColExpr Record id column expression. In contrast to
-		 * {@link #rootIdColName}, {@code null} if the query root object does
-		 * not have its own id.
-		 * @param forceOuter {@code true} if outer joins must be forced.
+		 * @param prsrcHandler Persistent resource handler.
+		 * @param propsFetch Properties fetch specification, or {@code null}.
+		 * @param refsFetch References fetch specification, or {@code null}.
+		 * @param filter Filter specification, or {@code null}.
+		 * @param order Order specification, or {@code null}.
 		 */
-		QueryBuilderContext(final QueryBuilderContext parentCtx,
-				final Resources resources, final SQLDialect dialect,
+		QueryBuilderContext(final Resources resources, final SQLDialect dialect,
 				final ParameterValuesFactoryImpl paramsFactory,
-				final Actor actor, final PropertiesFetchSpec<?> propsFetch,
+				final Actor actor,
+				final PersistentResourceHandler<?> prsrcHandler,
+				final PropertiesFetchSpec<?> propsFetch,
 				final RefsFetchSpec<?> refsFetch, final FilterSpec<?> filter,
-				final OrderSpec<?> order, final String parentPropPath,
-				final List<ResourcePropertyHandler> parentPropChain,
-				final String rootTableName, final String rootTableAlias,
-				final String parentAnchorColExpr, final String parentJoinExpr,
-				final String colLabelPrefix, final String rootIdColName,
-				final String rootIdColExpr, final boolean forceOuter) {
+				final OrderSpec<?> order) {
 
-			this.parentCtx = parentCtx;
+			this.parentCtx = null;
+			this.prsrcHandler = prsrcHandler;
 			this.resources = resources;
 			this.dialect = dialect;
 			this.paramsFactory = paramsFactory;
@@ -293,12 +330,68 @@ class QueryBuilder {
 			this.refsFetch = refsFetch;
 			this.filter = filter;
 			this.order = order;
+			this.parentPropPath = null;
+			this.parentPropChain =
+				Collections.<ResourcePropertyHandler>emptyList();
+			this.rootTableName = null;
+			this.rootTableAlias = null;
+			this.parentAnchorColExpr = null;
+			this.parentJoinExpr = null;
+			this.parentJoinAttachmentExpr = null;
+			this.colLabelPrefix = null;
+			this.rootIdColName = null;
+			this.rootIdColExpr = null;
+			this.forceOuter = false;
+
+			this.propChain = new ArrayList<>(1);
+
+			this.aggregationBranchLevel = -1;
+			this.aggregationValueExprs = new HashMap<>();
+		}
+
+		/**
+		 * Create child context.
+		 *
+		 * @param parentCtx Parent context.
+		 * @param parentPropPath Parent property path.
+		 * @param rootTableName Query root table name.
+		 * @param rootTableAlias Query root table alias.
+		 * @param parentAnchorColExpr Parent anchor column expression.
+		 * @param parentJoinExpr Full parent join expression.
+		 * @param parentJoinAttacmentExpr Parent join attachment expression.
+		 * @param colLabelPrefix Column labels prefix.
+		 * @param rootIdColName Record id column name. May be parent record id
+		 * column name if the query root object does not have its own id.
+		 * @param rootIdColExpr Record id column expression. In contrast to
+		 * {@link #rootIdColName}, {@code null} if the query root object does
+		 * not have its own id.
+		 * @param forceOuter {@code true} if outer joins must be forced.
+		 */
+		QueryBuilderContext(final QueryBuilderContext parentCtx,
+				final String parentPropPath, final String rootTableName,
+				final String rootTableAlias, final String parentAnchorColExpr,
+				final String parentJoinExpr,
+				final String parentJoinAttacmentExpr,
+				final String colLabelPrefix, final String rootIdColName,
+				final String rootIdColExpr, final boolean forceOuter) {
+
+			this.parentCtx = parentCtx;
+			this.prsrcHandler = parentCtx.prsrcHandler;
+			this.resources = parentCtx.resources;
+			this.dialect = parentCtx.dialect;
+			this.paramsFactory = parentCtx.paramsFactory;
+			this.actor = parentCtx.actor;
+			this.propsFetch = parentCtx.propsFetch;
+			this.refsFetch = parentCtx.refsFetch;
+			this.filter = parentCtx.filter;
+			this.order = parentCtx.order;
 			this.parentPropPath = parentPropPath;
-			this.parentPropChain = parentPropChain;
+			this.parentPropChain = parentCtx.propChain;
 			this.rootTableName = rootTableName;
 			this.rootTableAlias = rootTableAlias;
 			this.parentAnchorColExpr = parentAnchorColExpr;
 			this.parentJoinExpr = parentJoinExpr;
+			this.parentJoinAttachmentExpr = parentJoinAttacmentExpr;
 			this.colLabelPrefix = colLabelPrefix;
 			this.rootIdColName = rootIdColName;
 			this.rootIdColExpr = rootIdColExpr;
@@ -307,8 +400,164 @@ class QueryBuilder {
 			this.propChain =
 				new ArrayList<>(this.parentPropChain.size() + 1);
 			this.propChain.addAll(this.parentPropChain);
+
+			this.aggregationBranchLevel =
+				(parentCtx.aggregationBranchLevel < 0 ? -1 :
+					parentCtx.aggregationBranchLevel + 1);
+			this.aggregatedCollectionPropPath =
+				parentCtx.aggregatedCollectionPropPath;
+			this.aggregationPropsFetch = parentCtx.aggregationPropsFetch;
+			this.aggregationRefsFetch = parentCtx.aggregationRefsFetch;
+			this.aggregationValueExprs = parentCtx.aggregationValueExprs;
 		}
 
+
+		/**
+		 * Add single-valued property column expression to the select list.
+		 *
+		 * @param propName Property name.
+		 * @param valExpr Value expression.
+		 */
+		void appendSelectList(final String propName, final String valExpr) {
+
+			if (this.aggregationBranchLevel > 0) {
+
+				if (this.parentPropPath.equals(
+						this.aggregatedCollectionPropPath))
+					this.aggregationValueExprs.put(propName, valExpr);
+
+				return;
+			}
+
+			this.appendSelectList(
+					valExpr + " AS " + this.dialect.quoteColumnLabel(
+							this.colLabelPrefix + propName),
+					false);
+		}
+
+		/**
+		 * Add column expression to the select list.
+		 *
+		 * @param colExpr Column expression to add.
+		 * @param collection {@code true} to add to collection properties select
+		 * list, {@code false} to add to single-valued properties select list.
+		 */
+		void appendSelectList(final String colExpr, final boolean collection) {
+
+			if (this.aggregationBranchLevel > 0)
+				return;
+
+			final StringBuilder selectList =
+				(collection ? this.collectionsSelectList :
+					this.singlesSelectList);
+
+			if (selectList.length() > 0)
+				selectList.append(", ");
+			selectList.append(colExpr);
+		}
+
+		/**
+		 * Create group by list.
+		 *
+		 * @return Group by list.
+		 */
+		String createGroupByList() {
+
+			final List<String> colExprs = new ArrayList<>();
+			for (QueryBuilderContext c = this; c != null; c = c.parentCtx) {
+				if (c.rootIdColExpr != null)
+					colExprs.add(c.rootTableAlias + "." + c.rootIdColName);
+			}
+			final StringBuilder groupByList = new StringBuilder(64);
+			for (int i = colExprs.size() - 1; i >= 0; i--) {
+				if (groupByList.length() > 0)
+					groupByList.append(", ");
+				groupByList.append(colExprs.get(i));
+			}
+
+			return groupByList.toString();
+		}
+
+		/**
+		 * Set the group by list.
+		 *
+		 * @param groupByList Group by list to set.
+		 */
+		void setGroupByList(final String groupByList) {
+
+			this.groupByList = groupByList;
+		}
+
+		/**
+		 * Add column expression to the order by list end.
+		 *
+		 * @param colExpr Column expression to add.
+		 */
+		void appendOrderByList(final String colExpr) {
+
+			if (this.aggregationBranchLevel >= 0)
+				return;
+
+			if (this.orderByList.length() > 0)
+				this.orderByList.append(", ");
+			this.orderByList.append(colExpr);
+		}
+
+		/**
+		 * Add column expression to the order by list front.
+		 *
+		 * @param colExpr Column expression to add.
+		 */
+		void prependOrderByList(final String colExpr) {
+
+			if (this.aggregationBranchLevel >= 0)
+				return;
+
+			if (this.orderByList.length() > 0)
+				this.orderByList.insert(0, colExpr + ", ");
+			else
+				this.orderByList.append(colExpr);
+		}
+
+		/**
+		 * Build and return complete select list of the query.
+		 *
+		 * @return The select list, may be empty.
+		 */
+		String getSelectList() {
+
+			final StringBuilder selectList = new StringBuilder(512);
+
+			selectList.append(this.singlesSelectList);
+
+			if (this.collectionsSelectList.length() > 0) {
+				if (selectList.length() > 0)
+					selectList.append(", ");
+				selectList.append(this.collectionsSelectList);
+			}
+
+			return selectList.toString();
+		}
+
+		/**
+		 * Build and return group by list of the query.
+		 *
+		 * @return The group by list, may be empty.
+		 */
+		String getGroupByList() {
+
+			return this.groupByList.toString();
+		}
+
+		/**
+		 * Build and return order by list of the query.
+		 *
+		 * @return The order by list, may be empty.
+		 */
+		String getOrderByList() {
+
+			return this.orderByList.toString();
+		}
 
 		/**
 		 * Prepare context for a nested property.
@@ -342,6 +591,175 @@ class QueryBuilder {
 					|| this.parentPropPath.isEmpty());
 
 			return (noParent ? "" : this.parentPropPath + ".") + propName;
+		}
+
+		/**
+		 * Tell if the specified reference property is requested to be fetched.
+		 *
+		 * @param propPath Reference property path.
+		 *
+		 * @return {@code true} if requested to be fetched.
+		 */
+		boolean isFetchRequested(final String propPath) {
+
+			final RefsFetchSpec<?> refsFetch =
+				(this.aggregationBranchLevel < 0 ? this.refsFetch :
+					this.aggregationRefsFetch);
+
+			return ((refsFetch != null)
+					&& refsFetch.isFetchRequested(propPath));
+		}
+
+		/**
+		 * Tell if the specified property needs to be selected.
+		 *
+		 * @param propPath Property path.
+		 * @param fetchedByDefault {@code true} if selected by default when
+		 * explicit properties fetch is not specified.
+		 *
+		 * @return {@code true} if selected.
+		 */
+		boolean isSelected(final String propPath,
+				final boolean fetchedByDefault) {
+
+			final PropertiesFetchSpec<?> propsFetch =
+				(this.aggregationBranchLevel < 0 ? this.propsFetch :
+					this.aggregationPropsFetch);
+
+			return (((propsFetch != null)
+						&& propsFetch.isIncluded(propPath))
+					|| ((propsFetch == null) && fetchedByDefault));
+		}
+
+		/**
+		 * Enter aggregation mode.
+		 *
+		 * @param aggregatedCollectionPropPath Aggregated collection property
+		 * path.
+		 * @param aggregatedPropHandlers Aggregated property handlers.
+		 */
+		void setAggregationMode(
+				final String aggregatedCollectionPropPath,
+				final List<AggregatePropertyHandler> aggregatedPropHandlers) {
+
+			this.aggregationBranchLevel = 0;
+
+			this.aggregatedPropHandlers = aggregatedPropHandlers;
+
+			// create complete aggregated collection property path
+			final String propPathsPrefix =
+				(this.parentPropPath.isEmpty() ? "" :
+					this.parentPropPath + ".");
+			this.aggregatedCollectionPropPath =
+				propPathsPrefix + aggregatedCollectionPropPath;
+
+			// create aggregation properties and references fetches
+			this.aggregationPropsFetch =
+				this.resources.getPropertiesFetchSpec(
+						this.prsrcHandler.getResourceClass());
+			this.aggregationRefsFetch =
+				this.resources.getRefsFetchSpec(
+						this.prsrcHandler.getResourceClass());
+			for (final AggregatePropertyHandler ph : aggregatedPropHandlers) {
+
+				// add aggregated value properties to the fetch
+				for (final String propName : ph.getUsedValuePropertyNames())
+					this.aggregationPropsFetch.include(
+							this.aggregatedCollectionPropPath + "." + propName);
+
+				// add intermediate references to the fetch
+				final String refPath = ph.getLastIntermediateRefPath();
+				if (refPath != null)
+					this.aggregationRefsFetch.add(propPathsPrefix + refPath);
+			}
+		}
+
+		/**
+		 * Clear aggregation mode.
+		 */
+		void clearAggregationMode() {
+
+			this.aggregationBranchLevel = -1;
+
+			this.aggregatedCollectionPropPath = null;
+			this.aggregatedPropHandlers = null;
+			this.aggregationPropsFetch = null;
+			this.aggregationRefsFetch = null;
+
+			this.aggregationValueExprs.clear();
+		}
+
+		/**
+		 * Tell if the context is a root context of the aggregation branch being
+		 * built.
+		 *
+		 * @return {@code true} if aggregation branch root context.
+		 */
+		boolean isAggregationModeRoot() {
+
+			return (this.aggregationBranchLevel == 0);
+		}
+
+		/**
+		 * Build and get select list for the aggregate columns. Assumed to be
+		 * called on the zero-level aggregation mode context.
+		 *
+		 * @return Aggregates select list.
+		 */
+		String getAggregatesSelectList() {
+
+			// build select list
+			final StringBuffer selectList = new StringBuffer(64);
+			for (final AggregatePropertyHandler ph :
+					this.aggregatedPropHandlers) {
+				if (selectList.length() > 0)
+					selectList.append(", ");
+				final String ending;
+				switch (ph.getFunction()) {
+				case COUNT:
+					selectList.append("COUNT(");
+					ending = ")";
+					break;
+				case COUNT_DISTINCT:
+					selectList.append("COUNT(DISTINCT ");
+					ending = ")";
+					break;
+				case SUM:
+					selectList.append("COALESCE(SUM(");
+					ending = "), 0)";
+					break;
+				case AVG:
+					selectList.append("COALESCE(AVG(");
+					ending = "), 0)";
+					break;
+				case MAX:
+					selectList.append("MAX(");
+					ending = ")";
+					break;
+				case MIN:
+					selectList.append("MIN(");
+					ending = ")";
+					break;
+				default: // may not happen
+					throw new AssertionError("Invalid aggregation function.");
+				}
+				final Matcher m = ph.getValuePropertiesMatcher();
+				if (m != null) {
+					while (m.find())
+						m.appendReplacement(selectList,
+								this.aggregationValueExprs.get(m.group()));
+					m.appendTail(selectList);
+				} else {
+					selectList.append(this.aggregationValueExprs.get(
+							ph.getAggregatedCollectionHandler().getIdProperty()
+								.getName()));
+				}
+				selectList.append(ending).append(" AS ")
+					.append(this.dialect.quoteColumnLabel(
+							this.colLabelPrefix + ph.getName()));
+			}
+
+			return selectList.toString();
 		}
 	}
 
@@ -392,11 +810,6 @@ class QueryBuilder {
 	private final String selectList;
 
 	/**
-	 * Tells if the select list has aggregates.
-	 */
-	private final boolean hasAggregates;
-
-	/**
 	 * Property paths that are included in the select list and need a
 	 * single-valued join.
 	 */
@@ -411,6 +824,11 @@ class QueryBuilder {
 	 * Tail of the body of the "FROM" clause containing the collection joins.
 	 */
 	private final String collectionJoins;
+
+	/**
+	 * Body of the "GROUP BY" clause.
+	 */
+	private final String groupByList;
 
 	/**
 	 * Body of the "ORDER BY" clause containing collection parent ids.
@@ -445,12 +863,12 @@ class QueryBuilder {
 	 * @param rootTableAlias Alias of the root table.
 	 * @param rootIdColName Name of the record id column in the root table.
 	 * @param selectList Body of the "SELECT" clause for the properties.
-	 * @param hasAggregates {@code true} if the select list has aggregates.
 	 * @param selectSingleJoins Property paths that are included in the select
 	 * list and need a single-valued join.
 	 * @param allSingleJoins Join expressions for all single-valued properties.
 	 * @param collectionJoins Tail of the body of the "FROM" clause containing
 	 * the collection joins.
+	 * @param groupByList Body of the "GROUP BY" clause.
 	 * @param orderByList Body of the "ORDER BY" clause containing collection
 	 * parent ids.
 	 * @param singlePropExprs Single-valued property SQL value expressions by
@@ -463,10 +881,10 @@ class QueryBuilder {
 			final FilterSpec<?> filter, final OrderSpec<?> order,
 			final String rootTableName, final String rootTableAlias,
 			final String rootIdColName, final String selectList,
-			final boolean hasAggregates,
 			final Set<String> selectSingleJoins,
 			final SortedMap<String, String> allSingleJoins,
-			final String collectionJoins, final String orderByList,
+			final String collectionJoins, final String groupByList,
+			final String orderByList,
 			final Map<String, SingleValuedQueryProperty> singlePropExprs,
 			final Map<String, CollectionQueryProperty> collectionProps,
 			final Collection<QueryBranch> branches) {
@@ -480,10 +898,10 @@ class QueryBuilder {
 		this.rootTableAlias = rootTableAlias;
 		this.rootIdColName = rootIdColName;
 		this.selectList = selectList;
-		this.hasAggregates = hasAggregates;
 		this.selectSingleJoins = selectSingleJoins;
 		this.allSingleJoins = allSingleJoins;
 		this.collectionJoins = collectionJoins;
+		this.groupByList = groupByList;
 		this.orderByList = orderByList;
 		this.singlePropExprs = singlePropExprs;
 		this.collectionProps = collectionProps;
@@ -514,15 +932,28 @@ class QueryBuilder {
 			final RefsFetchSpec<?> refsFetch, final FilterSpec<?> filter,
 			final OrderSpec<?> order) {
 
-		final QueryBuilderContext seedCtx = new QueryBuilderContext(null,
-				resources, dialect, paramsFactory, actor, propsFetch, refsFetch,
-				filter, order, null,
-				Collections.<ResourcePropertyHandler>emptyList(), null, null,
-				null, null, null, null, null, false);
-
-		final QueryBranch b = createBranch(seedCtx, "", false, null, null, null,
-				null, null, "",
-				prsrcHandler, prsrcHandler.getPersistentCollectionName(), "t",
+		final QueryBranch b = createBranch(
+				new QueryBuilderContext(
+						resources,
+						dialect,
+						paramsFactory,
+						actor,
+						prsrcHandler,
+						propsFetch,
+						refsFetch,
+						filter,
+						order),
+				"",
+				false,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"",
+				prsrcHandler,
+				prsrcHandler.getPersistentCollectionName(),
+				"t",
 				prsrcHandler.getIdProperty().getPersistence().getFieldName());
 
 		final Log log = LogFactory.getLog(QueryBuilder.class);
@@ -665,18 +1096,25 @@ class QueryBuilder {
 			joinExpr = "";
 		}
 
+		// create join attachment expression
+		final String joinAttachmentExpr;
+		if (!joinExpr.isEmpty() && (container.getIdProperty() != null)) {
+			joinAttachmentExpr = tableAlias + "." + idColName;
+		} else {
+			joinAttachmentExpr = "";
+		}
+
+		// get id column value expression
+		final String idColValExpr = (idPropHandler == null ? null :
+			tableAlias + "." + idPropHandler.getPersistence().getFieldName());
+
 		// create query builder context
 		final QueryBuilderContext ctx = new QueryBuilderContext(parentCtx,
-				parentCtx.resources, parentCtx.dialect, parentCtx.paramsFactory,
-				parentCtx.actor, parentCtx.propsFetch, parentCtx.refsFetch,
-				parentCtx.filter, parentCtx.order, parentPropPath,
-				parentCtx.propChain, tableName, tableAlias, anchorColExpr,
-				joinExpr, colLabelPrefix, idColName,
+				parentPropPath, tableName, tableAlias, anchorColExpr,
+				joinExpr, joinAttachmentExpr, colLabelPrefix, idColName,
 				(idPropHandler == null ? null :
-					tableAlias + "."
-						+ idPropHandler.getPersistence().getFieldName()
-						+ " AS " + parentCtx.dialect.quoteColumnLabel(
-								colLabelPrefix + idPropHandler.getName())),
+					idColValExpr + " AS " + parentCtx.dialect.quoteColumnLabel(
+							colLabelPrefix + idPropHandler.getName())),
 				forceOuter);
 
 		// determine if polymorphic object
@@ -687,7 +1125,7 @@ class QueryBuilder {
 
 		// add record id to the select list and the properties
 		if ((idPropHandler != null) && !polymorphic) {
-			ctx.singlesSelectList.append(ctx.rootIdColExpr);
+			ctx.appendSelectList(idPropHandler.getName(), idColValExpr);
 			ctx.singlePropExprs.put(
 					ctx.getPropertyPath(idPropHandler.getName()),
 					new SingleValuedQueryProperty(
@@ -711,9 +1149,9 @@ class QueryBuilder {
 					continue;
 				final String metaValExpr = ctx.rootTableAlias + "."
 						+ metaHandler.getPersistence().getFieldName();
-				ctx.singlesSelectList.append(", ").append(metaValExpr)
-					.append(" AS ").append(ctx.dialect.quoteColumnLabel(
-							colLabelPrefix + metaHandler.getName()));
+				ctx.appendSelectList(
+						metaValExpr + " AS " + ctx.dialect.quoteColumnLabel(
+								colLabelPrefix + metaHandler.getName()), false);
 				ctx.singlePropExprs.put(
 						ctx.getPropertyPath(metaHandler.getName()),
 						new SingleValuedQueryProperty(metaValExpr,
@@ -737,7 +1175,7 @@ class QueryBuilder {
 				container.getRefProperties())
 			addRefProperty(ctx, propHandler);
 
-		// add dependent resource properties
+		// add properties specific to persistent resources
 		if (prsrcHandler != null) {
 
 			// add dependent resource reference properties
@@ -745,30 +1183,38 @@ class QueryBuilder {
 					prsrcHandler.getDependentRefProperties())
 				addDependentRefProperty(ctx, propHandler);
 
-			// add dependent resource aggregate properties
-			for (final DependentAggregatePropertyHandler propHandler :
-					prsrcHandler.getDependentAggregateProperties())
-				addDependentAggregateProperty(ctx, propHandler);
-		}
+			// collect all requested aggregate properties and group them
+			final Map<String, List<AggregatePropertyHandler>>
+			aggregatePropHandlers = new HashMap<>();
+			for (final AggregatePropertyHandler propHandler :
+					prsrcHandler.getAggregateProperties()) {
+				final String propPath =
+					ctx.getPropertyPath(propHandler.getName());
+				if (ctx.isSelected(propPath, false)) {
+					List<AggregatePropertyHandler> phList =
+						aggregatePropHandlers.get(
+							propHandler.getAggregatedCollectionPropertyPath());
+					if (phList == null) {
+						phList = new ArrayList<>();
+						aggregatePropHandlers.put(
+							propHandler.getAggregatedCollectionPropertyPath(),
+							phList);
+					}
+					phList.add(propHandler);
+				}
+			}
 
-		// merge the select list
-		final StringBuilder selectList = new StringBuilder(512);
-		selectList.append(ctx.singlesSelectList);
-		if (ctx.collectionsSelectList.length() > 0) {
-			if (selectList.length() > 0)
-				selectList.append(", ");
-			selectList.append(ctx.collectionsSelectList);
+			// add aggregate properties if any
+			for (final Map.Entry<String, List<AggregatePropertyHandler>> entry :
+					aggregatePropHandlers.entrySet())
+				addAggregateProperties(ctx, prsrcHandler, entry.getKey(),
+						entry.getValue());
 		}
 
 		// order by record id if has collections
-		if (ctx.collectionJoins.length() > 0) {
-			if (ctx.orderByList.length() > 0)
-				ctx.orderByList.insert(0,
-						ctx.rootTableAlias + "." + ctx.rootIdColName + ", ");
-			else
-				ctx.orderByList.append(ctx.rootTableAlias).append(".")
-					.append(ctx.rootIdColName);
-		}
+		if (ctx.collectionJoins.length() > 0)
+			ctx.prependOrderByList(
+					ctx.rootTableAlias + "." + ctx.rootIdColName);
 
 		// create the branch object
 		final QueryBuilder resQB = new QueryBuilder(
@@ -780,17 +1226,18 @@ class QueryBuilder {
 				ctx.rootTableName,
 				ctx.rootTableAlias,
 				ctx.rootIdColName,
-				selectList.toString(),
-				!ctx.aggregatedDeps.isEmpty(),
+				ctx.getSelectList(),
 				ctx.selectSingleJoins,
 				ctx.allSingleJoins,
 				ctx.collectionJoins.toString(),
-				ctx.orderByList.toString(),
+				ctx.getGroupByList(),
+				ctx.getOrderByList(),
 				ctx.singlePropExprs,
 				ctx.collectionProps,
 				ctx.branches);
-		final QueryBranch resBranch = new QueryBranch(resQB, anchorColExpr,
-				joinExpr, parentPropPath, parentCtx.propChain);
+		final QueryBranch resBranch = new QueryBranch(resQB,
+				ctx.parentAnchorColExpr, joinExpr, joinAttachmentExpr,
+				parentPropPath, parentCtx.propChain);
 
 		// return the resulting branch
 		return resBranch;
@@ -809,6 +1256,7 @@ class QueryBuilder {
 	 * @param propAnchorColExpr Anchor column expression for the property in the
 	 * parent.
 	 * @param propJoinCondition Property table join condition.
+	 * @param propAttachmentExpr Property table join attachment expression.
 	 *
 	 * @return The branch.
 	 */
@@ -816,7 +1264,7 @@ class QueryBuilder {
 			final String propPath, final String propTableName,
 			final String propIdColName, final String propValExpr,
 			final boolean optional, final String propAnchorColExpr,
-			final String propJoinCondition) {
+			final String propJoinCondition, final String propAttachmentExpr) {
 
 		final String propJoinExpr =
 				(optional || ctx.forceOuter ?
@@ -835,9 +1283,9 @@ class QueryBuilder {
 						ctx.propTableAlias,
 						propIdColName,
 						propValExpr,
-						false,
 						Collections.<String>emptySet(),
 						CollectionUtils.<String, String>emptySortedMap(),
+						"",
 						"",
 						"",
 						Collections.<String, SingleValuedQueryProperty>
@@ -846,6 +1294,7 @@ class QueryBuilder {
 						Collections.<QueryBranch>emptyList()),
 				propAnchorColExpr,
 				propJoinExpr,
+				propAttachmentExpr,
 				propPath,
 				ctx.propChain);
 	}
@@ -871,8 +1320,8 @@ class QueryBuilder {
 		else // collection
 			addBranch(ctx, createCollectionSimplePropertyBranch(ctx,
 					propHandler, propPersistence),
-					isSelected(ctx,
-							ctx.getPropertyPath(propHandler.getName())));
+					ctx.isSelected(ctx.getPropertyPath(propHandler.getName()),
+							true));
 	}
 
 	/**
@@ -898,17 +1347,11 @@ class QueryBuilder {
 							.getPersistentValueType()));
 
 		// check if selected
-		if (!isSelected(ctx, propPath))
+		if (!ctx.isSelected(propPath, true))
 			return;
 
-		// check if adding to existing list
-		if (ctx.singlesSelectList.length() > 0)
-			ctx.singlesSelectList.append(", ");
-
-		// add property to the list
-		ctx.singlesSelectList.append(propValExpr).append(" AS ")
-			.append(ctx.dialect.quoteColumnLabel(
-					ctx.colLabelPrefix + propHandler.getName()));
+		// add property to the select list
+		ctx.appendSelectList(propHandler.getName(), propValExpr);
 	}
 
 	/**
@@ -944,8 +1387,9 @@ class QueryBuilder {
 
 		// add collection property stump
 		final String propPath = ctx.getPropertyPath(propHandler.getName());
-		final String propJoinCondition = ctx.propTableAlias + "."
-				+ propPersistence.getParentIdFieldName()
+		final String propAttachmentExpr =
+			ctx.propTableAlias + "." + propPersistence.getParentIdFieldName();
+		final String propJoinCondition = propAttachmentExpr
 				+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
 		ctx.collectionProps.put(propPath,
 				new CollectionQueryProperty(propHandler, propTableName,
@@ -964,7 +1408,7 @@ class QueryBuilder {
 				propValueExpr + " AS " + ctx.dialect.quoteColumnLabel(
 						ctx.propColLabelPrefix + "_value"),
 				propPersistence.isOptional(),
-				propAnchorColExpr, propJoinCondition);
+				propAnchorColExpr, propJoinCondition, propAttachmentExpr);
 	}
 
 	/**
@@ -1000,15 +1444,15 @@ class QueryBuilder {
 		if (propTableName == null)
 			addBranch(ctx, createEmbeddedObjectPropertyBranch(ctx,
 					propHandler, propPersistence, propPath),
-					isSelected(ctx, propPath));
+					ctx.isSelected(propPath, true));
 		else if (propHandler.isSingleValued()) // single-valued
 			addBranch(ctx, createSingleObjectPropertyBranch(ctx,
 					propHandler, propPersistence, propPath, propTableName),
-					isSelected(ctx, propPath));
+					ctx.isSelected(propPath, true));
 		else // not embedded collection
 			addBranch(ctx, createCollectionObjectPropertyBranch(ctx,
 					propHandler, propPersistence, propPath, propTableName),
-					isSelected(ctx, propPath));
+					ctx.isSelected(propPath, true));
 
 		// add polymorphic type property
 		if (polymorphic && propHandler.isSingleValued()) {
@@ -1127,7 +1571,7 @@ class QueryBuilder {
 		// create join condition
 		final String propJoinCondition =
 			ctx.propTableAlias + "." + propPersistence.getParentIdFieldName()
-				+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
+			+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
 
 		// create anchor column expression
 		final String propAnchorColExpr;
@@ -1211,7 +1655,7 @@ class QueryBuilder {
 		// add collection property stump
 		final String propJoinCondition =
 			ctx.propTableAlias + "." + propPersistence.getParentIdFieldName()
-				+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
+			+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
 		ctx.collectionProps.put(propPath,
 				new CollectionQueryProperty(propHandler, propTableName,
 						ctx.propTableAlias, propJoinCondition, propKeyExpr,
@@ -1267,18 +1711,17 @@ class QueryBuilder {
 		final Class<?> refTargetClass = propHandler.getReferredResourceClass();
 
 		// check if fetch requested
-		if ((ctx.refsFetch != null)
-				&& ctx.refsFetch.isFetchRequested(propPath)) {
+		if (ctx.isFetchRequested(propPath)) {
 
 			// single of collection?
 			if (propHandler.isSingleValued())
 				addBranch(ctx, createSingleFetchedRefPropertyBranch(ctx,
 						propHandler, propPersistence, propPath,
-						refTargetClass), isSelected(ctx, propPath));
+						refTargetClass), ctx.isSelected(propPath, true));
 			else // collection
 				addBranch(ctx, createCollectionFetchedRefPropertyBranch(ctx,
 						propHandler, propPersistence, propPath,
-						refTargetClass), isSelected(ctx, propPath));
+						refTargetClass), ctx.isSelected(propPath, true));
 
 		} else { // no fetch requested
 
@@ -1289,7 +1732,7 @@ class QueryBuilder {
 			else // collection
 				addBranch(ctx, createCollectionRefPropertyBranch(ctx,
 						propHandler, propPersistence, refTargetClass),
-						isSelected(ctx, propPath));
+						ctx.isSelected(propPath, true));
 		}
 	}
 
@@ -1326,23 +1769,14 @@ class QueryBuilder {
 						propHandler.getValueHandler()
 							.getPersistentValueType()));
 
-		// create anchor column expression
-		final String propAnchorColExpr =
+		// create column value expression
+		final String propColValExpr =
 			ctx.dialect.nullableConcat(refTargetClass.getSimpleName() + "#",
-					propValExpr)
-				+ " AS " + ctx.dialect.quoteColumnLabel(
-						ctx.colLabelPrefix + propHandler.getName());
+					propValExpr);
 
 		// add to select list if selected
-		if (isSelected(ctx, propPath)) {
-
-			// check if adding to existing list
-			if (ctx.singlesSelectList.length() > 0)
-				ctx.singlesSelectList.append(", ");
-
-			// add property to the list
-			ctx.singlesSelectList.append(propAnchorColExpr);
-		}
+		if (ctx.isSelected(propPath, true))
+			ctx.appendSelectList(propHandler.getName(), propColValExpr);
 
 		// check if used
 		if (!isUsed(ctx, propPath))
@@ -1353,12 +1787,13 @@ class QueryBuilder {
 			refTargetHandler.getIdProperty().getPersistence().getFieldName();
 		final String propJoinCondition =
 			ctx.propTableAlias + "." + propIdColName
-				+ " = " + ctx.rootTableAlias + "."
-					+ propPersistence.getFieldName();
+			+ " = " + ctx.rootTableAlias + "." + propPersistence.getFieldName();
 
 		// create property branch
 		addBranch(ctx, createBranch(ctx, propPath, propPersistence.isOptional(),
-				propAnchorColExpr, propJoinCondition, null, null, null,
+				propColValExpr + " AS " + ctx.dialect.quoteColumnLabel(
+						ctx.colLabelPrefix + propHandler.getName()),
+				propJoinCondition, null, null, null,
 				ctx.propColLabelPrefix, refTargetHandler, propTableName,
 				ctx.propTableAlias, propIdColName), false);
 	}
@@ -1397,9 +1832,11 @@ class QueryBuilder {
 
 		// add collection property stump
 		final String propPath = ctx.getPropertyPath(propHandler.getName());
-		final String propJoinCondition = ctx.propTableAlias + "."
-				+ propPersistence.getParentIdFieldName()
-				+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
+		final String propAttachmentExpr =
+			ctx.propTableAlias + "." + propPersistence.getParentIdFieldName();
+		final String propJoinCondition =
+			propAttachmentExpr
+			+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
 		ctx.collectionProps.put(propPath,
 				new CollectionQueryProperty(propHandler, propTableName,
 						ctx.propTableAlias, propJoinCondition, propKeyExpr,
@@ -1418,7 +1855,7 @@ class QueryBuilder {
 					+ " AS " + ctx.dialect.quoteColumnLabel(
 							ctx.propColLabelPrefix + "_value"),
 				propPersistence.isOptional(),
-				propAnchorColExpr, propJoinCondition);
+				propAnchorColExpr, propJoinCondition, propAttachmentExpr);
 	}
 
 	/**
@@ -1468,8 +1905,7 @@ class QueryBuilder {
 			refTargetHandler.getIdProperty().getPersistence().getFieldName();
 		final String propJoinCondition =
 			ctx.propTableAlias + "." + propIdColName
-				+ " = " + ctx.rootTableAlias + "."
-					+ propPersistence.getFieldName();
+			+ " = " + ctx.rootTableAlias + "." + propPersistence.getFieldName();
 
 		// create property branch
 		return createBranch(ctx, propPath, propPersistence.isOptional(),
@@ -1519,9 +1955,9 @@ class QueryBuilder {
 				propHandler, propPersistence, linkTableAlias);
 
 		// add collection property stump
-		final String linkJoinCondition = linkTableAlias + "."
-				+ propPersistence.getParentIdFieldName() + " = "
-				+ ctx.rootTableAlias + "." + ctx.rootIdColName;
+		final String linkJoinCondition =
+			linkTableAlias + "." + propPersistence.getParentIdFieldName()
+			+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
 		ctx.collectionProps.put(propPath,
 				new CollectionQueryProperty(propHandler, linkTableName,
 						linkTableAlias, linkJoinCondition, propKeyExpr,
@@ -1540,8 +1976,9 @@ class QueryBuilder {
 		// create join expression
 		final String propIdColName =
 			refTargetHandler.getIdProperty().getPersistence().getFieldName();
-		final String propJoinCondition = ctx.propTableAlias + "."
-				+ propIdColName + " = " + propValueExpr;
+		final String propJoinCondition =
+			ctx.propTableAlias + "." + propIdColName
+			+ " = " + propValueExpr;
 
 		// create property branch
 		return createBranch(ctx, propPath, propPersistence.isOptional(),
@@ -1571,19 +2008,20 @@ class QueryBuilder {
 		final Class<?> refTargetClass = propHandler.getReferredResourceClass();
 
 		// check if fetch requested
-		if ((ctx.refsFetch != null)
-				&& ctx.refsFetch.isFetchRequested(propPath)) {
+		if (ctx.isFetchRequested(propPath)) {
 
 			// single of collection?
 			if (propHandler.isSingleValued())
 				addBranch(ctx, createSingleFetchedDependentRefPropertyBranch(
 						ctx, propHandler, propPersistence, propPath,
-						refTargetClass), isSelected(ctx, propPath));
+						refTargetClass), ctx.isSelected(propPath,
+								propHandler.isFetchedByDefault()));
 			else // collection
 				addBranch(ctx,
 						createCollectionFetchedDependentRefPropertyBranch(ctx,
 								propHandler, propPersistence, propPath,
-								refTargetClass), isSelected(ctx, propPath));
+								refTargetClass), ctx.isSelected(propPath,
+										propHandler.isFetchedByDefault()));
 
 		} else { // no fetch requested
 
@@ -1594,7 +2032,8 @@ class QueryBuilder {
 			else // collection
 				addBranch(ctx, createCollectionDependentRefPropertyBranch(ctx,
 						propHandler, propPersistence, propPath,
-						refTargetClass), isSelected(ctx, propPath));
+						refTargetClass), ctx.isSelected(propPath,
+								propHandler.isFetchedByDefault()));
 		}
 	}
 
@@ -1631,35 +2070,31 @@ class QueryBuilder {
 						propHandler.getValueHandler()
 							.getPersistentValueType()));
 
-		// create anchor column expression
-		final String propAnchorColExpr =
+		// create column value expression
+		final String propColValExpr =
 			ctx.dialect.nullableConcat(refTargetClass.getSimpleName() + "#",
-					propValExpr)
-				+ " AS " + ctx.dialect.quoteColumnLabel(
-						ctx.colLabelPrefix + propHandler.getName());
+				propValExpr);
 
 		// create join expression
 		final String propJoinCondition =
 			ctx.propTableAlias + "." + propPersistence.getParentIdFieldName()
-				+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
+			+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
 
 		// add to select list if selected
-		if (isSelected(ctx, propPath)) {
+		if (ctx.isSelected(propPath, propHandler.isFetchedByDefault())) {
 
 			// add the join (will be created by the branch)
 			ctx.selectSingleJoins.add(propPath);
 
-			// check if adding to existing list
-			if (ctx.singlesSelectList.length() > 0)
-				ctx.singlesSelectList.append(", ");
-
-			// add property to the list
-			ctx.singlesSelectList.append(propAnchorColExpr);
+			// add property to the select list
+			ctx.appendSelectList(propHandler.getName(), propColValExpr);
 		}
 
 		// create branch
 		final QueryBranch branch = createBranch(ctx, propPath,
-				propPersistence.isOptional(), propAnchorColExpr,
+				propPersistence.isOptional(),
+				propColValExpr + " AS " + ctx.dialect.quoteColumnLabel(
+						ctx.colLabelPrefix + propHandler.getName()),
 				propJoinCondition, null, null, null, ctx.propColLabelPrefix,
 				refTargetHandler, propPersistence.getCollectionName(),
 				ctx.propTableAlias, propIdColName);
@@ -1711,8 +2146,9 @@ class QueryBuilder {
 
 		// add collection property stump
 		final String propTableName = propPersistence.getCollectionName();
-		final String propJoinCondition = ctx.propTableAlias + "."
-				+ propPersistence.getParentIdFieldName()
+		final String propAttachmentExpr =
+			ctx.propTableAlias + "." + propPersistence.getParentIdFieldName();
+		final String propJoinCondition = propAttachmentExpr
 				+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
 		ctx.collectionProps.put(propPath,
 				new CollectionQueryProperty(propHandler,
@@ -1732,7 +2168,7 @@ class QueryBuilder {
 					+ " AS " + ctx.dialect.quoteColumnLabel(
 							ctx.propColLabelPrefix + "_value"),
 				propPersistence.isOptional(),
-				propAnchorColExpr, propJoinCondition);
+				propAnchorColExpr, propJoinCondition, propAttachmentExpr);
 	}
 
 	/**
@@ -1781,7 +2217,7 @@ class QueryBuilder {
 		// create join expression
 		final String propJoinCondition =
 			ctx.propTableAlias + "." + propPersistence.getParentIdFieldName()
-				+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
+			+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
 
 		// create property branch
 		final String propTableName = propPersistence.getCollectionName();
@@ -1823,9 +2259,9 @@ class QueryBuilder {
 
 		// add collection property stump
 		final String propTableName = propPersistence.getCollectionName();
-		final String propJoinCondition = ctx.propTableAlias + "."
-				+ propPersistence.getParentIdFieldName()
-				+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
+		final String propJoinCondition =
+			ctx.propTableAlias + "." + propPersistence.getParentIdFieldName()
+			+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
 		ctx.collectionProps.put(propPath,
 				new CollectionQueryProperty(propHandler, propTableName,
 						ctx.propTableAlias, propJoinCondition, null,
@@ -1849,181 +2285,46 @@ class QueryBuilder {
 	}
 
 	/**
-	 * Add dependent resource aggregate property.
+	 * Add aggregate properties that use same aggregation collection.
 	 *
 	 * @param ctx Query builder context.
-	 * @param propHandler Property handler.
+	 * @param prsrcHandler Handler of the persistent resource containing the
+	 * aggregates.
+	 * @param collectionPropPath Aggregation collection property path.
+	 * @param propHandlers Aggregate property handlers.
 	 */
-	private static void addDependentAggregateProperty(
+	private static void addAggregateProperties(
 			final QueryBuilderContext ctx,
-			final DependentAggregatePropertyHandler propHandler) {
+			final PersistentResourceHandler<?> prsrcHandler,
+			final String collectionPropPath,
+			final List<AggregatePropertyHandler> propHandlers) {
 
-		// get property persistence
-		final ResourcePropertyPersistence propPersistence =
-			getPropertyPersistence(ctx, propHandler);
-		if (propPersistence == null)
-			return;
+		// switch context into the aggregation mode
+		ctx.setAggregationMode(collectionPropPath, propHandlers);
 
-		// construct property path
-		final String propPath = ctx.getPropertyPath(propHandler.getName());
+		// get aggregated collection property chain
+		final Deque<? extends ResourcePropertyHandler> collectionPropChain =
+			prsrcHandler.getPersistentPropertyChain(collectionPropPath);
 
-		// check if included in the fetch
-		if ((ctx.propsFetch == null) || !ctx.propsFetch.isIncluded(propPath))
-			return;
+		// get branch root property handler
 
-		// get reference target
-		final Class<?> refTargetClass = propHandler.getReferredResourceClass();
+		// create branch depending on the root property kind
+		final ResourcePropertyHandler rootPropHandler =
+			collectionPropChain.getFirst();
+		if (rootPropHandler instanceof ObjectPropertyHandler)
+			addObjectProperty(ctx, (ObjectPropertyHandler) rootPropHandler);
+		else if (rootPropHandler instanceof RefPropertyHandler)
+			addRefProperty(ctx, (RefPropertyHandler) rootPropHandler);
+		else if (rootPropHandler instanceof DependentRefPropertyHandler)
+			addDependentRefProperty(ctx,
+					(DependentRefPropertyHandler) rootPropHandler);
+		else // cannot happen
+			throw new AssertionError("Unexpected aggregate property collection"
+					+ " chain root property type "
+					+ rootPropHandler.getClass().getName() + ".");
 
-		// TODO: verify that other dependent resource properties that refer to
-		//       the same resource and are not aggregates are not included and
-		//       are not fetched.
-
-		// check if this dependent resource is already aggregated
-		if (!ctx.aggregatedDeps.add(refTargetClass)) {
-			addAdditionalDependentAggregateProperty(ctx, propHandler,
-					refTargetClass);
-		} else { // add as a branch
-			addBranch(ctx,
-					createDependentAggregatePropertyBranch(ctx, propHandler,
-							propPersistence, propPath, refTargetClass),
-					isSelected(ctx, propPath));
-		}
-	}
-
-	/**
-	 * Add single-valued simple property.
-	 *
-	 * @param ctx Query builder context.
-	 * @param propHandler Property handler.
-	 * @param refTargetClass Reference target class.
-	 */
-	private static void addAdditionalDependentAggregateProperty(
-			final QueryBuilderContext ctx,
-			final DependentAggregatePropertyHandler propHandler,
-			final Class<?> refTargetClass) {
-
-		// get target resource handler
-		final PersistentResourceHandler<?> refTargetHandler =
-			ctx.resources.getPersistentResourceHandler(refTargetClass);
-
-		// property value expression
-		final String propValueExpr = getAggregatedPropertyValueExpression(ctx,
-				propHandler, refTargetHandler);
-
-		// add property to the single properties
-		final String propPath = ctx.getPropertyPath(propHandler.getName());
-		ctx.singlePropExprs.put(propPath,
-				new SingleValuedQueryProperty(propValueExpr,
-						propHandler.getValueHandler()
-							.getPersistentValueType()));
-
-		// check if adding to existing list
-		if (ctx.singlesSelectList.length() > 0)
-			ctx.singlesSelectList.append(", ");
-
-		// add property to the list
-		ctx.singlesSelectList.append(propValueExpr).append(" AS ")
-			.append(ctx.dialect.quoteColumnLabel(
-					ctx.colLabelPrefix + propHandler.getName()));
-	}
-
-	/**
-	 * Create dependent resource aggregate property branch.
-	 *
-	 * @param ctx Query builder context.
-	 * @param propHandler Property handler.
-	 * @param propPersistence Property persistence descriptor.
-	 * @param propPath Property path.
-	 * @param refTargetClass Reference target class.
-	 *
-	 * @return The branch.
-	 */
-	private static QueryBranch createDependentAggregatePropertyBranch(
-			final QueryBuilderContext ctx,
-			final DependentAggregatePropertyHandler propHandler,
-			final ResourcePropertyPersistence propPersistence,
-			final String propPath, final Class<?> refTargetClass) {
-
-		// get target resource handler
-		final PersistentResourceHandler<?> refTargetHandler =
-			ctx.resources.getPersistentResourceHandler(refTargetClass);
-
-		// column label prefix and property table alias
-		ctx.prepareNestedProperty(propHandler);
-
-		// property value expression
-		final String propValueExpr = getAggregatedPropertyValueExpression(ctx,
-				propHandler, refTargetHandler);
-
-		// add collection property stump
-		final String propTableName = propPersistence.getCollectionName();
-		final String propJoinCondition = ctx.propTableAlias + "."
-				+ propPersistence.getParentIdFieldName()
-				+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
-		final String propIdColName =
-			refTargetHandler.getIdProperty().getPersistence().getFieldName();
-		ctx.collectionProps.put(propPath,
-				new CollectionQueryProperty(propHandler,
-						propTableName, ctx.propTableAlias,
-						propJoinCondition, null,
-						ctx.propTableAlias + "." + propIdColName));
-
-		// create anchor column expression
-		final String propAnchorColExpr =
-			propValueExpr
-				+ " AS " + ctx.dialect.quoteColumnLabel(
-						ctx.colLabelPrefix + propHandler.getName());
-
-		// create property branch
-		return createBranch(ctx, propPath, propTableName, propIdColName, "",
-				propPersistence.isOptional(), propAnchorColExpr,
-				propJoinCondition);
-	}
-
-	/**
-	 * Get aggregate property value expression.
-	 *
-	 * @param ctx Query builder context.
-	 * @param propHandler Property handler.
-	 * @param refTargetHandler Target resource handler.
-	 *
-	 * @return Property value expression.
-	 */
-	private static String getAggregatedPropertyValueExpression(
-			final QueryBuilderContext ctx,
-			final DependentAggregatePropertyHandler propHandler,
-			final PersistentResourceHandler<?> refTargetHandler) {
-
-		final String aggregationPropName =
-			propHandler.getAggregationPropertyName();
-		final String aggregationFieldName = (aggregationPropName != null ?
-				refTargetHandler.getProperties().get(aggregationPropName)
-					.getPersistence().getFieldName() :
-				refTargetHandler.getIdProperty()
-					.getPersistence().getFieldName());
-
-		final String func;
-		switch (propHandler.getFunction()) {
-		case COUNT:
-			func = "COUNT(";
-			break;
-		case COUNT_DISTINCT:
-			func = "COUNT(DISTINCT ";
-			break;
-		case SUM:
-			func = "SUM(";
-			break;
-		case MAX:
-			func = "MAX(";
-			break;
-		case MIN:
-			func = "MIN(";
-			break;
-		default: // AVG
-			func = "AVG(";
-		}
-
-		return (func + ctx.propTableAlias + "." + aggregationFieldName + ")");
+		// restore normal context mode
+		ctx.clearAggregationMode();
 	}
 
 	/**
@@ -2085,21 +2386,6 @@ class QueryBuilder {
 	}
 
 	/**
-	 * Tell if the specified property needs to be selected.
-	 *
-	 * @param ctx Builder context.
-	 * @param propPath Property path.
-	 *
-	 * @return {@code true} if selected.
-	 */
-	private static boolean isSelected(final QueryBuilderContext ctx,
-			final String propPath) {
-
-		return ((ctx.propsFetch == null)
-				|| ctx.propsFetch.isIncluded(propPath));
-	}
-
-	/**
 	 * Tell if the specified property is used by the filter or the order
 	 * specification.
 	 *
@@ -2136,8 +2422,11 @@ class QueryBuilder {
 		if (!selected && !used)
 			return;
 
+		// check if adding aggregation branch
+		final boolean aggregation = ctx.isAggregationModeRoot();
+
 		// check if collection and is not selected
-		final boolean collection = branch.isCollection();
+		final boolean collection = (aggregation || branch.isCollection());
 		if (collection && !selected)
 			return;
 
@@ -2145,16 +2434,16 @@ class QueryBuilder {
 		if (!collection) {
 			final QueryBuilder branchQB = branch.getQueryBuilder();
 			if (!branchQB.hasCollections())
-				mergeBranch(ctx, branch, selected);
+				mergeBranch(ctx, branch, collection, selected);
 			else if (ctx.collectionJoins.length() > 0)
-				attachBranch(ctx, branch, selected);
+				attachBranch(ctx, branch, collection, selected);
 			else
-				mergeBranch(ctx, branch, selected);
+				mergeBranch(ctx, branch, collection, selected);
 		} else { // selected collection
 			if (ctx.collectionJoins.length() > 0)
-				attachBranch(ctx, branch, selected);
+				attachBranch(ctx, branch, collection, selected);
 			else
-				mergeBranch(ctx, branch, selected);
+				mergeBranch(ctx, branch, collection, selected);
 		}
 	}
 
@@ -2163,33 +2452,34 @@ class QueryBuilder {
 	 *
 	 * @param ctx The context, to which to merge the branch.
 	 * @param branch The branch.
+	 * @param collection {@code true} if merging in collection mode.
 	 * @param selected {@code true} if branch property is selected.
 	 */
 	private static void mergeBranch(final QueryBuilderContext ctx,
-			final QueryBranch branch, final boolean selected) {
+			final QueryBranch branch, final boolean collection,
+			final boolean selected) {
 
 		// get branch query builder
 		final QueryBuilder branchQB = branch.getQueryBuilder();
 
-		// analyze the branch collection status
-		final boolean collection = branch.isCollection();
+		// check if branch has collections
 		final boolean hasCollections = branchQB.hasCollections();
 
 		// merge select list if selected
 		if (selected) {
 
-			// determine to which select list to add the branch
-			final StringBuilder selectList = (collection || hasCollections ?
-					ctx.collectionsSelectList : ctx.singlesSelectList);
-
 			// add anchor column
-			if (selectList.length() > 0)
-				selectList.append(", ");
-			selectList.append(branch.getAnchorColumnExpression());
+			final String anchorColExpr = (ctx.isAggregationModeRoot() ?
+					ctx.getAggregatesSelectList() :
+					branch.getAnchorColumnExpression());
+			if (!anchorColExpr.isEmpty())
+				ctx.appendSelectList(anchorColExpr,
+						collection || hasCollections);
 
 			// add branch select list
 			if (!branchQB.selectList.isEmpty())
-				selectList.append(", ").append(branchQB.selectList);
+				ctx.appendSelectList(branchQB.selectList,
+						collection || hasCollections);
 		}
 
 		// merge branch joins
@@ -2224,20 +2514,37 @@ class QueryBuilder {
 			}
 		}
 
+		// merge join attachments
+		if ((selected || !collection) && !ctx.isAggregationModeRoot()) {
+			final String branchJoinAttachmentExpr =
+				branch.getJoinAttachmentExpression();
+			if (!branchJoinAttachmentExpr.isEmpty()) {
+				if (ctx.mergedJoinAttachmentExprs.length() > 0)
+					ctx.mergedJoinAttachmentExprs.append(", ");
+				ctx.mergedJoinAttachmentExprs.append(branchJoinAttachmentExpr);
+			}
+		}
+
 		// merge properties
 		if (!collection) {
 			ctx.singlePropExprs.putAll(branchQB.singlePropExprs);
 			ctx.collectionProps.putAll(branchQB.collectionProps);
 		}
 
-		// merge order by list
-		if (selected) {
-			if (!branchQB.orderByList.isEmpty()) {
-				if (ctx.orderByList.length() > 0)
-					ctx.orderByList.append(", ");
-				ctx.orderByList.append(branchQB.orderByList);
-			}
+		// merge or add group by list
+		if (ctx.isAggregationModeRoot()) {
+			final StringBuilder groupByList = new StringBuilder(64);
+			groupByList.append(ctx.createGroupByList());
+			if (ctx.mergedJoinAttachmentExprs.length() > 0)
+				groupByList.append(", ").append(ctx.mergedJoinAttachmentExprs);
+			ctx.setGroupByList(groupByList.toString());
+		} else {
+			ctx.setGroupByList(branchQB.groupByList);
 		}
+
+		// merge order by list
+		if (selected && !branchQB.orderByList.isEmpty())
+			ctx.appendOrderByList(branchQB.orderByList);
 
 		// add branches
 		for (final QueryBranch subBranch : branchQB.branches)
@@ -2249,16 +2556,15 @@ class QueryBuilder {
 	 *
 	 * @param ctx The context, to which to merge the branch.
 	 * @param branch The branch.
+	 * @param collection {@code true} if merging in collection mode.
 	 * @param selected {@code true} if branch property is selected.
 	 */
 	private static void attachBranch(final QueryBuilderContext ctx,
-			final QueryBranch branch, final boolean selected) {
+			final QueryBranch branch, final boolean collection,
+			final boolean selected) {
 
 		// get branch query builder
 		final QueryBuilder branchQB = branch.getQueryBuilder();
-
-		// get the branch collection status
-		final boolean collection = branch.isCollection();
 
 		// include branch's single joins
 		final String branchPropPath = branch.getNodePropertyPath();
@@ -2330,13 +2636,16 @@ class QueryBuilder {
 					ctx.rootTableAlias,
 					ctx.rootIdColName,
 					(ctx.rootIdColExpr == null ? "" : ctx.rootIdColExpr + ", ")
-						+ branch.getAnchorColumnExpression()
+						+ (ctx.isAggregationModeRoot() ?
+								ctx.getAggregatesSelectList() :
+								branch.getAnchorColumnExpression())
 						+ (branchQB.selectList.isEmpty() ? "" :
 								", " + branchQB.selectList),
-					!ctx.aggregatedDeps.isEmpty(),
 					rebranchedSelectSingleJoins,
 					rebranchedAllSingleJoins,
 					rebranchedCollectionJoins.toString(),
+					(!ctx.isAggregationModeRoot() ? branchQB.groupByList :
+						ctx.createGroupByList()),
 					rebranchedOrderByList.toString(),
 					Collections.<String, SingleValuedQueryProperty>emptyMap(),
 					Collections.<String, CollectionQueryProperty>emptyMap(),
@@ -2347,13 +2656,14 @@ class QueryBuilder {
 					rebranchedQB,
 					ctx.parentAnchorColExpr,
 					ctx.parentJoinExpr,
+					ctx.parentJoinAttachmentExpr,
 					branchPropPath,
 					branch.getAttachmentChain()));
 		}
 
 		// attach branch branches
 		for (final QueryBranch b : branchQB.branches)
-			attachBranch(ctx, b, selected);
+			attachBranch(ctx, b, b.isCollection(), selected);
 	}
 
 
@@ -2555,9 +2865,8 @@ class QueryBuilder {
 			q.append(" WHERE ").append(whereClause.getBody());
 
 		// add "GROUP BY" clause
-		if (this.hasAggregates)
-			q.append(" GROUP BY ").append(this.rootTableAlias).append(".")
-				.append(this.rootIdColName);
+		if (!this.groupByList.isEmpty())
+			q.append(" GROUP BY ").append(this.groupByList);
 
 		// add the "ORDER BY" clause
 		if (orderByClause != null) {
@@ -2614,9 +2923,8 @@ class QueryBuilder {
 		q.append(this.collectionJoins);
 
 		// add "GROUP BY" clause
-		if (this.hasAggregates)
-			q.append(" GROUP BY ").append(this.rootTableAlias).append(".")
-				.append(this.rootIdColName);
+		if (!this.groupByList.isEmpty())
+			q.append(" GROUP BY ").append(this.groupByList);
 
 		// add the "ORDER BY" clause
 		if (orderByClause != null) {

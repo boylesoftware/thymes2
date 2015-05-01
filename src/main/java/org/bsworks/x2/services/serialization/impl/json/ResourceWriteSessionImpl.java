@@ -34,6 +34,11 @@ class ResourceWriteSessionImpl
 	private final Actor actor;
 
 	/**
+	 * Tells if null-valued properties should be dropped.
+	 */
+	private final boolean dropNulls;
+
+	/**
 	 * Formatter for {@link Date} fields.
 	 */
 	private final DateFormat df;
@@ -50,13 +55,16 @@ class ResourceWriteSessionImpl
 	 *
 	 * @param gen JSON generator.
 	 * @param actor The consuming actor, or {@code null}.
+	 * @param dropNulls {@code true} to suggest the session user to drop
+	 * null-valued properties.
 	 * @param df Formatter for {@link Date} fields.
 	 */
 	ResourceWriteSessionImpl(final JsonGenerator gen, final Actor actor,
-			final DateFormat df) {
+			final boolean dropNulls, final DateFormat df) {
 
 		this.gen = gen;
 		this.actor = actor;
+		this.dropNulls = dropNulls;
 		this.df = df;
 	}
 
@@ -68,6 +76,15 @@ class ResourceWriteSessionImpl
 	public Actor getActor() {
 
 		return this.actor;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public boolean isNullDropped() {
+
+		return this.dropNulls;
 	}
 
 	/* (non-Javadoc)

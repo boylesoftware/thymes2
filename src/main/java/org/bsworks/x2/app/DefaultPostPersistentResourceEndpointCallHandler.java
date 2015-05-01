@@ -99,7 +99,7 @@ public class DefaultPostPersistentResourceEndpointCallHandler<R>
 
 		// get referred dependent resource collections versions
 		final PersistentResourceVersionInfo colsVerInfo =
-			this.getDependentResourcesVersioningInfo(ctx, null);
+			this.getDependentResourcesVersioningInfo(ctx);
 
 		// return the record in the response
 		return new CreatedResponse(requestEntity,

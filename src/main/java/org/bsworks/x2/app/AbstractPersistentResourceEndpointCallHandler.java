@@ -16,7 +16,7 @@ import org.bsworks.x2.EndpointCallContext;
 import org.bsworks.x2.EndpointCallErrorException;
 import org.bsworks.x2.EndpointCallHandler;
 import org.bsworks.x2.HttpMethod;
-import org.bsworks.x2.resource.DependentResourcePropertyHandler;
+import org.bsworks.x2.resource.DependentRefPropertyHandler;
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.IdPropertyHandler;
 import org.bsworks.x2.resource.InvalidResourceDataException;
@@ -192,24 +192,20 @@ public abstract class AbstractPersistentResourceEndpointCallHandler<R, E>
 	 * collections referred by the handler's persistent resource.
 	 *
 	 * @param ctx Call context.
-	 * @param propsFetch Properties fetch specification, or {@code null} if
-	 * none.
 	 *
 	 * @return Versioning information, or {@code null} if no dependent resource
 	 * reference properties included.
 	 */
 	protected final PersistentResourceVersionInfo
-	getDependentResourcesVersioningInfo(final EndpointCallContext ctx,
-			final PropertiesFetchSpec<R> propsFetch) {
+	getDependentResourcesVersioningInfo(final EndpointCallContext ctx) {
 
-		if (this.prsrcHandler.getDependentResourceProperties().isEmpty())
+		if (this.prsrcHandler.getDependentRefProperties().isEmpty())
 			return null;
 
 		final Set<Class<?>> prsrcClasses = new HashSet<>();
-		for (final DependentResourcePropertyHandler ph :
-				this.prsrcHandler.getDependentResourceProperties()) {
-			if (((propsFetch != null) && propsFetch.isIncluded(ph.getName()))
-				|| ((propsFetch == null) && ph.isFetchedByDefault()))
+		for (final DependentRefPropertyHandler ph :
+				this.prsrcHandler.getDependentRefProperties()) {
+			if (ph.isFetchedByDefault())
 				prsrcClasses.add(ph.getReferredResourceClass());
 		}
 		if (prsrcClasses.isEmpty())

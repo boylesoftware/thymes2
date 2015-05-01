@@ -4,7 +4,7 @@ import java.beans.PropertyDescriptor;
 import java.lang.annotation.Annotation;
 import java.util.Set;
 
-import org.bsworks.x2.resource.annotations.DependentAggregateProperty;
+import org.bsworks.x2.resource.annotations.AggregateProperty;
 import org.bsworks.x2.resource.annotations.DependentRefProperty;
 import org.bsworks.x2.resource.annotations.IdProperty;
 import org.bsworks.x2.resource.annotations.MetaProperty;
@@ -87,11 +87,10 @@ final class ResourcePropertyHandlerFactory {
 						containerClass, pd, (DependentRefProperty) propAnno,
 						valueHandler,
 						(RefResourcePropertyValueHandler) leafValueHandler);
-		} else if (propAnno instanceof DependentAggregateProperty) {
+		} else if (propAnno instanceof AggregateProperty) {
 			if (leafValueHandler instanceof SimpleResourcePropertyValueHandler)
-				return new DependentAggregatePropertyHandlerImpl(prsrcClasses,
-						containerClass, pd,
-						(DependentAggregateProperty) propAnno, valueHandler,
+				return new AggregatePropertyHandlerImpl(containerClass, pd,
+						(AggregateProperty) propAnno, valueHandler,
 						(SimpleResourcePropertyValueHandler) leafValueHandler);
 		} else if (propAnno instanceof Property) {
 			if (leafValueHandler instanceof ObjectResourcePropertyValueHandler)

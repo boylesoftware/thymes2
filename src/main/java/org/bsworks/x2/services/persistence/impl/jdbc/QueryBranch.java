@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.bsworks.x2.resource.DependentAggregatePropertyHandler;
 import org.bsworks.x2.resource.ResourcePropertyHandler;
 
 
@@ -31,6 +30,11 @@ class QueryBranch {
 	private final String joinExpr;
 
 	/**
+	 * Join attachment expression.
+	 */
+	private final String joinAttachmentExpr;
+
+	/**
 	 * Node property path.
 	 */
 	private final String propPath;
@@ -54,18 +58,23 @@ class QueryBranch {
 	 * root.
 	 * @param joinExpr Join expression, empty for embedded property branch, or
 	 * {@code null} for the root.
+	 * @param joinAttachmentExpr Attachment expression in the join expression,
+	 * which is the value expression for the column in the joined table that is
+	 * used to attach it to the parent table.
 	 * @param propPath Branch property path, or empty string if root branch.
 	 * @param attachmentChain Attachment chain with the last element being the
 	 * handler of the property that is the branch root, or empty list if the
 	 * branch of the top-level resource's branch.
 	 */
 	QueryBranch(final QueryBuilder qb, final String anchorColExpr,
-			final String joinExpr, final String propPath,
+			final String joinExpr, final String joinAttachmentExpr,
+			final String propPath,
 			final List<ResourcePropertyHandler> attachmentChain) {
 
 		this.qb = qb;
 		this.anchorColExpr = anchorColExpr;
 		this.joinExpr = joinExpr;
+		this.joinAttachmentExpr = joinAttachmentExpr;
 		this.propPath = propPath;
 		final int chainLen = attachmentChain.size();
 		this.nodeProp = (chainLen == 0 ? null :
@@ -107,6 +116,19 @@ class QueryBranch {
 	}
 
 	/**
+	 * Get attachment expression in the join expression. The attachment
+	 * expression is the column expression used in the join expression for
+	 * attaching the joined table to the parent table.
+	 *
+	 * @return Attachment expression, or empty string or {@code null} similarly
+	 * to what's returned by {@link #getJoinExpression()}.
+	 */
+	String getJoinAttachmentExpression() {
+
+		return this.joinAttachmentExpr;
+	}
+
+	/**
 	 * Get branch property path.
 	 *
 	 * @return Property path, or empty string if root branch.
@@ -118,7 +140,7 @@ class QueryBranch {
 
 	/**
 	 * Tell if the branch root property (the last property in the branch
-	 * attachment chain) is a collection (or should be treated as such).
+	 * attachment chain) is a collection.
 	 *
 	 * @return {@code true} if collection branch.
 	 */
@@ -127,9 +149,7 @@ class QueryBranch {
 		if (this.nodeProp == null)
 			return false;
 
-		return (!this.nodeProp.isSingleValued()
-				|| (this.nodeProp
-						instanceof DependentAggregatePropertyHandler));
+		return !this.nodeProp.isSingleValued();
 	}
 
 	/**

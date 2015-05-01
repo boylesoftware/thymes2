@@ -105,7 +105,7 @@ class JsonResourceSerializationService
 			try (final JsonGenerator gen = Json.createGenerator(outWriter)) {
 				rsrcHandler.getResourceValueHandler().writeValue(
 						ResourcePropertyAccess.SEE, rsrc,
-						new ResourceWriteSessionImpl(gen, actor, df));
+						new ResourceWriteSessionImpl(gen, actor, true, df));
 			}
 		}
 	}

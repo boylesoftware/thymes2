@@ -102,14 +102,20 @@ public class ResourcesImpl
 			this.persistentResources = Collections.emptyMap();
 		}
 
-		// setup dependent resource properties persistence
+		// complete setup of persistent resource properties
 		for (final PersistentResourceHandlerImpl<?> prsrcHandler :
 				this.persistentResources.values()) {
-			for (final AbstractDependentResourcePropertyHandlerImpl ph :
-					prsrcHandler.getDependentResourceProperties()) {
-				ph.setPersistence(this.persistentResources.get(
-						ph.getReferredResourceClass().getSimpleName()));
-			}
+
+			// dependent resource references
+			for (final DependentRefPropertyHandlerImpl ph :
+					prsrcHandler.getDependentRefProperties())
+				ph.completeInitialization(this.persistentResources);
+
+			// aggregate properties
+			for (final AggregatePropertyHandlerImpl ph :
+					prsrcHandler.getAggregateProperties())
+				ph.completeInitialization(prsrcHandler,
+						this.persistentResources);
 		}
 	}
 

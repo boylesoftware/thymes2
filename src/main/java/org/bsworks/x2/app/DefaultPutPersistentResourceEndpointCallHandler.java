@@ -117,7 +117,7 @@ public class DefaultPutPersistentResourceEndpointCallHandler<R>
 
 		// get referred dependent resource collections versions
 		final PersistentResourceVersionInfo colsVerInfo =
-			this.getDependentResourcesVersioningInfo(ctx, null);
+			this.getDependentResourcesVersioningInfo(ctx);
 
 		// load existing record
 		final R rec = this.endpointHandler.get(ctx, recId,
@@ -192,7 +192,7 @@ public class DefaultPutPersistentResourceEndpointCallHandler<R>
 
 		// re-get dependent resource collections versioning info
 		final PersistentResourceVersionInfo newColsVerInfo =
-				this.getDependentResourcesVersioningInfo(ctx, null);
+				this.getDependentResourcesVersioningInfo(ctx);
 
 		// done
 		return new NoContentResponse(

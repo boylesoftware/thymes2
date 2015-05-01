@@ -47,6 +47,23 @@ public @interface DependentRefProperty {
 	AccessRestriction[] accessRestrictions() default {};
 
 	/**
+	 * If {@code true}, which is the default, the dependent resource references
+	 * are fetched by default when the resource is loaded from the persistent
+	 * storage. If {@code false}, the dependent resource property is fetched
+	 * only if explicitly requested by the properties fetch specification.
+	 *
+	 * <p>Since the dependent resource record references are not stored together
+	 * with the referring resource, fetching them may require additional work in
+	 * the persistent storage (for example, a join if the storage is an RDBMS).
+	 * Unless the references are needed, to improve performance it often makes
+	 * sense to set this attribute to {@code false}.
+	 *
+	 * @return {@code true} to fetch property value by default, {@code false} to
+	 * require explicit fetch request.
+	 */
+	boolean fetchedByDefault() default true;
+
+	/**
 	 * If {@code true}, which is the default, the referred dependent resource
 	 * records, if any, are deleted from the persistent storage when an existing
 	 * resource is being updated and in the incoming update data the property is

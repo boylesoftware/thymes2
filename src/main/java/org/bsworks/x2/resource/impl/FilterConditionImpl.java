@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
+import org.bsworks.x2.resource.AggregatePropertyHandler;
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
 import org.bsworks.x2.resource.FilterCondition;
 import org.bsworks.x2.resource.FilterConditionOperandType;
@@ -117,6 +118,11 @@ class FilterConditionImpl
 		// get handler of the property at the end of the chain
 		final AbstractResourcePropertyHandlerImpl propHandler =
 			(AbstractResourcePropertyHandlerImpl) this.propChain.getLast();
+
+		// cannot use aggregates in filters
+		if (propHandler instanceof AggregatePropertyHandler)
+			throw new IllegalArgumentException(
+					"Cannot use aggregate properties in filters.");
 
 		// get property value handlers (top and leaf)
 		final AbstractResourcePropertyValueHandlerImpl propTopValueHandler =

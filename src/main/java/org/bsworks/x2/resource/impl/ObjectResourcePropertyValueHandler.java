@@ -181,10 +181,8 @@ class ObjectResourcePropertyValueHandler
 			// get property value
 			final Object propVal = propHandler.getValue(val);
 
-			// skip aggregate property if null
-			if ((propVal == null)
-					&& (propHandler
-							instanceof DependentAggregatePropertyHandlerImpl))
+			// skip property if null
+			if ((propVal == null) && out.isNullDropped())
 				continue;
 
 			// write the property

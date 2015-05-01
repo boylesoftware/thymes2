@@ -44,22 +44,16 @@ class PersistentResourceHandlerImpl<R>
 	metaPropertyHandlers;
 
 	/**
-	 * All dependent resource property handlers.
-	 */
-	private final Collection<AbstractDependentResourcePropertyHandlerImpl>
-	dependentResourcePropertyHandlers;
-
-	/**
 	 * Dependent resource reference property handlers.
 	 */
 	private final Collection<DependentRefPropertyHandlerImpl>
 	dependentRefPropertyHandlers;
 
 	/**
-	 * Dependent resource aggregate property handlers.
+	 * Aggregate property handlers.
 	 */
-	private final Collection<DependentAggregatePropertyHandlerImpl>
-	dependentAggregatePropertyHandlers;
+	private final Collection<AggregatePropertyHandlerImpl>
+	aggregatePropertyHandlers;
 
 
 	/**
@@ -96,15 +90,13 @@ class PersistentResourceHandlerImpl<R>
 					+ prsrcClass.getName()
 					+ " does not contain record id property.");
 
-		// get record meta-properties and dependent resource properties
+		// get meta-properties, aggregate and dependent resource properties
 		this.metaPropertyHandlers =
 			new HashMap<>(MetaPropertyType.values().length);
-		final ArrayList<AbstractDependentResourcePropertyHandlerImpl>
-		dependentResourcePropertyHandlers = new ArrayList<>();
 		final ArrayList<DependentRefPropertyHandlerImpl>
 		dependentRefPropertyHandlers = new ArrayList<>();
-		final ArrayList<DependentAggregatePropertyHandlerImpl>
-		dependentAggregatePropertyHandlers = new ArrayList<>();
+		final ArrayList<AggregatePropertyHandlerImpl>
+		aggregatePropertyHandlers = new ArrayList<>();
 		for (final AbstractResourcePropertyHandlerImpl propHandler :
 				this.getProperties().values()) {
 			if (propHandler instanceof MetaPropertyHandlerImpl) {
@@ -120,28 +112,19 @@ class PersistentResourceHandlerImpl<R>
 							DependentRefPropertyHandlerImpl) {
 				final DependentRefPropertyHandlerImpl ph =
 					(DependentRefPropertyHandlerImpl) propHandler;
-				dependentResourcePropertyHandlers.add(ph);
 				dependentRefPropertyHandlers.add(ph);
-			} else if (propHandler instanceof
-							DependentAggregatePropertyHandlerImpl) {
-				final DependentAggregatePropertyHandlerImpl ph =
-					(DependentAggregatePropertyHandlerImpl) propHandler;
-				dependentResourcePropertyHandlers.add(ph);
-				dependentAggregatePropertyHandlers.add(ph);
+			} else if (propHandler instanceof AggregatePropertyHandlerImpl) {
+				final AggregatePropertyHandlerImpl ph =
+					(AggregatePropertyHandlerImpl) propHandler;
+				aggregatePropertyHandlers.add(ph);
 			}
 		}
-		dependentResourcePropertyHandlers.trimToSize();
-		this.dependentResourcePropertyHandlers =
-			Collections.unmodifiableCollection(
-					dependentResourcePropertyHandlers);
 		dependentRefPropertyHandlers.trimToSize();
 		this.dependentRefPropertyHandlers =
-			Collections.unmodifiableCollection(
-					dependentRefPropertyHandlers);
-		dependentAggregatePropertyHandlers.trimToSize();
-		this.dependentAggregatePropertyHandlers =
-			Collections.unmodifiableCollection(
-					dependentAggregatePropertyHandlers);
+			Collections.unmodifiableCollection(dependentRefPropertyHandlers);
+		aggregatePropertyHandlers.trimToSize();
+		this.aggregatePropertyHandlers =
+			Collections.unmodifiableCollection(aggregatePropertyHandlers);
 	}
 
 
@@ -187,16 +170,6 @@ class PersistentResourceHandlerImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public Collection<AbstractDependentResourcePropertyHandlerImpl>
-	getDependentResourceProperties() {
-
-		return this.dependentResourcePropertyHandlers;
-	}
-
-	/* (non-Javadoc)
-	 * See overridden method.
-	 */
-	@Override
 	public Collection<DependentRefPropertyHandlerImpl>
 	getDependentRefProperties() {
 
@@ -207,9 +180,8 @@ class PersistentResourceHandlerImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public Collection<DependentAggregatePropertyHandlerImpl>
-	getDependentAggregateProperties() {
+	public Collection<AggregatePropertyHandlerImpl> getAggregateProperties() {
 
-		return this.dependentAggregatePropertyHandlers;
+		return this.aggregatePropertyHandlers;
 	}
 }

@@ -9,11 +9,13 @@ import javax.servlet.http.HttpServletResponse;
 import org.bsworks.x2.EndpointCallContext;
 import org.bsworks.x2.EndpointCallErrorException;
 import org.bsworks.x2.EndpointCallResponse;
-import org.bsworks.x2.resource.DependentResourcePropertyHandler;
+import org.bsworks.x2.resource.AggregatePropertyHandler;
+import org.bsworks.x2.resource.DependentRefPropertyHandler;
 import org.bsworks.x2.resource.FilterConditionType;
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.OrderSpec;
 import org.bsworks.x2.resource.OrderType;
+import org.bsworks.x2.resource.PersistentResourceHandler;
 import org.bsworks.x2.resource.PropertiesFetchSpec;
 import org.bsworks.x2.resource.RangeResult;
 import org.bsworks.x2.resource.RangeSpec;
@@ -171,7 +173,8 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 */
 	private static final Pattern FILTER_COND_PATTERN = Pattern.compile(
 			// 1. property path(s)
-			"([a-z]\\w*(?:\\.[a-z]\\w*)*(?:,[a-z]\\w*(?:\\.[a-z]\\w*)*)*)"
+			"([a-z]\\w*(?:\\.[a-z]\\w*)*(?:/id|/key)?"
+				+ "(?:,[a-z]\\w*(?:\\.[a-z]\\w*)*(?:/id|/key)?)*)"
 			+ "(?:"
 				+ "(!)?"     // 2. operation negation
 				+ "(?:"
@@ -283,8 +286,14 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			this.endpointHandler.getRecordFilter(ctx, recId);
 
 		// get referred dependent resource collections versions
-		final PersistentResourceVersionInfo colsVerInfo =
-			this.getDependentResourcesVersioningInfo(ctx, propsFetch);
+		final Set<Class<?>> prsrcClasses = new HashSet<>();
+		this.addReferredResources(ctx, propsFetch, null, prsrcClasses);
+		final PersistentResourceVersionInfo colsVerInfo = ctx
+				.getRuntimeContext()
+				.getPersistentResourceVersioningService()
+				.getCollectionsVersionInfo(
+						ctx.getPersistenceTransaction(),
+						prsrcClasses);
 
 		// get record versioning meta-properties
 		final R recVerInfo =
@@ -339,10 +348,9 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			this.endpointHandler.getRecordFilter(ctx, recId);
 
 		// get referred dependent and fetched resource collections versions
-		final PersistentResourceVersionInfo colsVerInfo;
 		final Set<Class<?>> prsrcClasses = new HashSet<>();
-		this.addDependentResources(ctx, propsFetch, refsFetch, prsrcClasses);
-		colsVerInfo = ctx
+		this.addReferredResources(ctx, propsFetch, refsFetch, prsrcClasses);
+		final PersistentResourceVersionInfo colsVerInfo = ctx
 				.getRuntimeContext()
 				.getPersistentResourceVersioningService()
 				.getCollectionsVersionInfo(
@@ -408,7 +416,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 		// get all involved resource collections versions
 		final Set<Class<?>> prsrcClasses = new HashSet<>();
 		prsrcClasses.add(this.prsrcClass);
-		this.addDependentResources(ctx, propsFetch, refsFetch, prsrcClasses);
+		this.addReferredResources(ctx, propsFetch, refsFetch, prsrcClasses);
 		if (filter != null)
 			prsrcClasses.addAll(filter.getParticipatingPersistentResources());
 		if (order != null)
@@ -451,7 +459,8 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 
 	/**
 	 * Add all dependent resource classes, fetched reference classes and their
-	 * dependent resource classes to the specified set.
+	 * dependent resource classes and all resource classes used for calculation
+	 * of requested aggregate properties to the specified set.
 	 *
 	 * @param ctx Call context.
 	 * @param propsFetch Properties fetch specification, or {@code null} if
@@ -461,44 +470,64 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 * @param prsrcClasses Set of persistent resource classes, to which to add
 	 * the resource classes.
 	 */
-	private void addDependentResources(final EndpointCallContext ctx,
+	private void addReferredResources(final EndpointCallContext ctx,
 			final PropertiesFetchSpec<R> propsFetch,
 			final RefsFetchSpec<R> refsFetch,
 			final Set<Class<?>> prsrcClasses) {
 
-		for (final DependentResourcePropertyHandler ph :
-				this.prsrcHandler.getDependentResourceProperties()) {
-
-			if (((propsFetch != null) && !propsFetch.isIncluded(ph.getName()))
-				|| ((propsFetch == null) && !ph.isFetchedByDefault()))
-				continue;
-
-			prsrcClasses.add(ph.getReferredResourceClass());
+		// add requested dependent resources
+		for (final DependentRefPropertyHandler ph :
+				this.prsrcHandler.getDependentRefProperties()) {
+			if (((propsFetch != null) && propsFetch.isIncluded(ph.getName()))
+				|| ((propsFetch == null) && ph.isFetchedByDefault()))
+				prsrcClasses.add(ph.getReferredResourceClass());
 		}
 
+		// add requested aggregate properties
+		for (final AggregatePropertyHandler ph :
+				this.prsrcHandler.getAggregateProperties()) {
+			if ((propsFetch != null) && propsFetch.isIncluded(ph.getName()))
+				prsrcClasses.addAll(ph.getUsedPersistentResourceClasses());
+		}
+
+		// done if no references are requested to be fetched
 		if (refsFetch == null)
 			return;
 
+		// add fetched references
 		final Resources resources = ctx.getRuntimeContext().getResources();
 		for (final Map.Entry<String, Class<?>> entry :
 				refsFetch.getFetchedRefProperties().entrySet()) {
 			final String refPropPath = entry.getKey();
 
+			// skip if explicitly excluded by the properties fetch specification
 			if ((propsFetch != null) && !propsFetch.isIncluded(refPropPath))
 				continue;
 
+			// get referred resource class
 			final Class<?> refTargetClass = entry.getValue();
 
-			if (prsrcClasses.add(refTargetClass)) {
-				for (final DependentResourcePropertyHandler ph :
-						resources.getPersistentResourceHandler(refTargetClass)
-							.getDependentResourceProperties()) {
-					if (((propsFetch != null) && !propsFetch.isIncluded(
-							refPropPath + "." + ph.getName()))
-						|| ((propsFetch == null) && !ph.isFetchedByDefault()))
-						continue;
+			// skip if already processed
+			if (!prsrcClasses.add(refTargetClass))
+				continue;
+
+			// add requested dependent resources of the referred resource
+			final PersistentResourceHandler<?> refPrsrcHandler =
+				resources.getPersistentResourceHandler(refTargetClass);
+			for (final DependentRefPropertyHandler ph :
+					refPrsrcHandler.getDependentRefProperties()) {
+				if (((propsFetch != null) && propsFetch.isIncluded(
+						refPropPath + "." + ph.getName()))
+					|| ((propsFetch == null) && ph.isFetchedByDefault()))
 					prsrcClasses.add(ph.getReferredResourceClass());
-				}
+			}
+
+			// add requested aggregate properties of the referred resource
+			for (final AggregatePropertyHandler ph :
+					refPrsrcHandler.getAggregateProperties()) {
+				if ((propsFetch != null) && propsFetch.isIncluded(
+						refPropPath + "." + ph.getName()))
+					prsrcClasses.addAll(ph.getUsedPersistentResourceClasses());
 			}
 		}
 	}
@@ -537,7 +566,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			if (includePropsFetchParam != null) {
 				for (final String propPath : includePropsFetchParam.split(","))
 					propsFetch.include(propPath);
-			} else { // excludePropsFetchParam may not be null
+			} else if (excludePropsFetchParam != null) { // redundant
 				propsFetch.includeByDefault();
 				for (final String propPath : excludePropsFetchParam.split(","))
 					propsFetch.exclude(propPath);

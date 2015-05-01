@@ -103,7 +103,7 @@ public class DefaultDeletePersistentResourceEndpointCallHandler<R>
 
 			// get referred dependent resource collections versions
 			final PersistentResourceVersionInfo colsVerInfo =
-				this.getDependentResourcesVersioningInfo(ctx, null);
+				this.getDependentResourcesVersioningInfo(ctx);
 
 			// get record versioning meta-properties
 			final R recVerInfo =

@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
+import org.bsworks.x2.resource.AggregatePropertyHandler;
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
 import org.bsworks.x2.resource.ObjectPropertyHandler;
 import org.bsworks.x2.resource.Ref;
@@ -35,7 +35,7 @@ import org.bsworks.x2.resource.RefPropertyHandler;
 import org.bsworks.x2.resource.ResourcePropertiesContainer;
 import org.bsworks.x2.resource.ResourcePropertyHandler;
 import org.bsworks.x2.resource.TypePropertyHandler;
-import org.bsworks.x2.resource.annotations.DependentAggregateProperty;
+import org.bsworks.x2.resource.annotations.AggregateProperty;
 import org.bsworks.x2.resource.annotations.DependentRefProperty;
 import org.bsworks.x2.resource.annotations.IdProperty;
 import org.bsworks.x2.resource.annotations.MetaProperty;
@@ -68,7 +68,7 @@ class ResourcePropertiesContainerImpl<O>
 		ANNOS.add(TypeProperty.class);
 		ANNOS.add(Property.class);
 		ANNOS.add(DependentRefProperty.class);
-		ANNOS.add(DependentAggregateProperty.class);
+		ANNOS.add(AggregateProperty.class);
 	}
 
 	/**
@@ -794,7 +794,9 @@ class ResourcePropertiesContainerImpl<O>
 							&& ((ObjectPropertyHandler) curContainer)
 								.isConcreteType())
 					|| (!typeProp
-							&& (lastPropHandler.getPersistence() == null)))
+							&& (lastPropHandler.getPersistence() == null)
+							&& !(lastPropHandler
+									instanceof AggregatePropertyHandler)))
 				throw new IllegalArgumentException(
 						"Invalid resource property path " + propPath + ": "
 							+ ResourcesImpl.chainToPath(res, null)

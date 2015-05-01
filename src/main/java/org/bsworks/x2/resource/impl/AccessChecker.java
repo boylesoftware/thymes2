@@ -40,9 +40,9 @@ class AccessChecker {
 		DEP_REF,
 
 		/**
-		 * Dependent resource aggregate.
+		 * Aggregate property.
 		 */
-		DEP_AGGREGATE
+		AGGREGATE
 	}
 
 
@@ -136,17 +136,11 @@ class AccessChecker {
 					throw new IllegalArgumentException("Dependent"
 							+ " references cannot be persisted.");
 				break;
-			case DEP_AGGREGATE:
-				switch (access) {
-				case SUBMIT:
-				case PERSIST:
-				case UPDATE:
-				case DELETE:
+			case AGGREGATE:
+				if (access != ResourcePropertyAccess.SEE)
 					throw new IllegalArgumentException("Access type "
 							+ access
 							+ " is invalid for an aggregate property.");
-				default:
-				}
 				break;
 			default: // PERSISTENT, all types of access are applicable
 			}
@@ -226,7 +220,7 @@ class AccessChecker {
 			acl = this.seeACL;
 			break;
 		case SUBMIT:
-			if (this.targetType == TargetType.DEP_AGGREGATE)
+			if (this.targetType == TargetType.AGGREGATE)
 				return false;
 			acl = this.submitACL;
 			break;
@@ -240,13 +234,13 @@ class AccessChecker {
 			break;
 		case UPDATE:
 			if ((this.targetType == TargetType.TRANSIENT)
-				|| (this.targetType == TargetType.DEP_AGGREGATE))
+				|| (this.targetType == TargetType.AGGREGATE))
 				return false;
 			acl = this.updateACL;
 			break;
 		case DELETE:
 			if ((this.targetType == TargetType.TRANSIENT)
-				|| (this.targetType == TargetType.DEP_AGGREGATE))
+				|| (this.targetType == TargetType.AGGREGATE))
 				return false;
 			acl = this.deleteACL;
 			break;
