@@ -39,24 +39,45 @@ public enum FilterConditionType {
 	GE,
 
 	/**
-	 * Matching a regular expression. Case-insensitive.
+	 * Contains substring matching a regular expression. Case-insensitive.
 	 */
 	MATCH,
 
 	/**
-	 * Not matching a regular expression. Case-insensitive.
+	 * Does not contain substring matching a regular expression.
+	 * Case-insensitive.
 	 */
 	NOT_MATCH,
 
 	/**
-	 * Matching a regular expression. Case-sensitive.
+	 * Contains substring matching a regular expression. Case-sensitive.
 	 */
 	MATCH_CS,
 
 	/**
-	 * Not matching a regular expression. Case-sensitive.
+	 * Does not contain substring matching a regular expression. Case-sensitive.
 	 */
 	NOT_MATCH_CS,
+
+	/**
+	 * Contains substring. Case-insensitive.
+	 */
+	SUBSTRING,
+
+	/**
+	 * Does not contain substring. Case-insensitive.
+	 */
+	NOT_SUBSTRING,
+
+	/**
+	 * Contains substring. Case-sensitive.
+	 */
+	SUBSTRING_CS,
+
+	/**
+	 * Does not contain substring. Case-sensitive.
+	 */
+	NOT_SUBSTRING_CS,
 
 	/**
 	 * Starts with a prefix. Case-insensitive.

@@ -64,20 +64,53 @@ class PostgreSQLDialect
 	 * See overridden method.
 	 */
 	@Override
-	public String prefixMatch(final String valExpr, final String prefixExpr,
-			final boolean negate, final boolean caseSensitive) {
+	public String substringMatch(final String valExpr,
+			final String substringExpr, final boolean negate,
+			final boolean caseSensitive) {
+
+		final String patternExpr =
+			"REGEXP_REPLACE(" + substringExpr
+			+ ", '([%_\\\\])', '\\\\\\1', 'g')";
 
 		final String resExpr;
 		if (negate) {
 			if (caseSensitive)
-				resExpr = valExpr + " NOT LIKE " + prefixExpr + " || '%'";
+				resExpr =
+					valExpr + " NOT LIKE '%' || " + patternExpr + " || '%'";
 			else
-				resExpr = valExpr + " NOT ILIKE " + prefixExpr + " || '%'";
+				resExpr =
+					valExpr + " NOT ILIKE '%' || " + patternExpr + " || '%'";
 		} else {
 			if (caseSensitive)
-				resExpr = valExpr + " LIKE " + prefixExpr + " || '%'";
+				resExpr = valExpr + " LIKE '%' || " + patternExpr + " || '%'";
 			else
-				resExpr = valExpr + " ILIKE " + prefixExpr + " || '%'";
+				resExpr = valExpr + " ILIKE '%' || " + patternExpr + " || '%'";
+		}
+
+		return resExpr;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public String prefixMatch(final String valExpr, final String prefixExpr,
+			final boolean negate, final boolean caseSensitive) {
+
+		final String patternExpr =
+			"REGEXP_REPLACE(" + prefixExpr + ", '([%_\\\\])', '\\\\\\1', 'g')";
+
+		final String resExpr;
+		if (negate) {
+			if (caseSensitive)
+				resExpr = valExpr + " NOT LIKE " + patternExpr + " || '%'";
+			else
+				resExpr = valExpr + " NOT ILIKE " + patternExpr + " || '%'";
+		} else {
+			if (caseSensitive)
+				resExpr = valExpr + " LIKE " + patternExpr + " || '%'";
+			else
+				resExpr = valExpr + " ILIKE " + patternExpr + " || '%'";
 		}
 
 		return resExpr;

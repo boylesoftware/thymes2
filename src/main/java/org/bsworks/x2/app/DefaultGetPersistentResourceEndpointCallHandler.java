@@ -57,7 +57,9 @@ import org.bsworks.x2.util.StringUtils;
  * <dt>:</dt><dd>Equals.</dd>
  * <dt>{@literal <}</dt><dd>Less than or equal.</dd>
  * <dt>{@literal >}</dt><dd>Greater than or equal.</dd>
- * <dt>~</dt><dd>Matches case-insensitive regular expression.</dd>
+ * <dt>~</dt><dd>Contains substring that matches case-insensitive regular
+ * expression.</dd>
+ * <dt>*</dt><dd>Contains case-insensitive substring.</dd>
  * <dt>^</dt><dd>Starts with case-insensitive prefix.</dd>
  * <dt>|</dt><dd>Equals to any of the values from the provided pipe-separated
  * list.</dd>
@@ -182,8 +184,9 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 					+ "|<(.+)"   // 4. range high limit (equal or less)
 					+ "|>(.+)"   // 5. range low limit (equal or greater)
 					+ "|~(.+)"   // 6. pattern
-					+ "|\\^(.+)" // 7. prefix
-					+ "|\\|(.+)" // 8. alternatives
+					+ "|\\*(.+)" // 7. substring
+					+ "|\\^(.+)" // 8. prefix
+					+ "|\\|(.+)" // 9. alternatives
 				+ ")?"
 			+ ")", Pattern.CASE_INSENSITIVE);
 
@@ -288,12 +291,16 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 		// get referred dependent resource collections versions
 		final Set<Class<?>> prsrcClasses = new HashSet<>();
 		this.addReferredResources(ctx, propsFetch, null, prsrcClasses);
-		final PersistentResourceVersionInfo colsVerInfo = ctx
+		final PersistentResourceVersionInfo colsVerInfo;
+		if (!prsrcClasses.isEmpty())
+			colsVerInfo = ctx
 				.getRuntimeContext()
 				.getPersistentResourceVersioningService()
 				.getCollectionsVersionInfo(
 						ctx.getPersistenceTransaction(),
 						prsrcClasses);
+		else
+			colsVerInfo = null;
 
 		// get record versioning meta-properties
 		final R recVerInfo =
@@ -655,24 +662,28 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 
 			final FilterConditionType condType;
 			final List<String> operandsList;
-			if (m.group(3) != null) {
+			int g = 2;
+			if (m.group(++g) != null) {
 				condType = FilterConditionType.EQ;
-				operandsList = Collections.singletonList(m.group(3));
-			} else if (m.group(4) != null) {
+				operandsList = Collections.singletonList(m.group(g));
+			} else if (m.group(++g) != null) {
 				condType = FilterConditionType.LE;
-				operandsList = Collections.singletonList(m.group(4));
-			} else if (m.group(5) != null) {
+				operandsList = Collections.singletonList(m.group(g));
+			} else if (m.group(++g) != null) {
 				condType = FilterConditionType.GE;
-				operandsList = Collections.singletonList(m.group(5));
-			} else if (m.group(6) != null) {
+				operandsList = Collections.singletonList(m.group(g));
+			} else if (m.group(++g) != null) {
 				condType = FilterConditionType.MATCH;
-				operandsList = Collections.singletonList(m.group(6));
-			} else if (m.group(7) != null) {
+				operandsList = Collections.singletonList(m.group(g));
+			} else if (m.group(++g) != null) {
+				condType = FilterConditionType.SUBSTRING;
+				operandsList = Collections.singletonList(m.group(g));
+			} else if (m.group(++g) != null) {
 				condType = FilterConditionType.PREFIX;
-				operandsList = Collections.singletonList(m.group(7));
-			} else if (m.group(8) != null) {
+				operandsList = Collections.singletonList(m.group(g));
+			} else if (m.group(++g) != null) {
 				condType = FilterConditionType.EQ;
-				operandsList = Arrays.asList(m.group(8).split("\\|"));
+				operandsList = Arrays.asList(m.group(g).split("\\|"));
 			} else {
 				condType = FilterConditionType.NOT_EMPTY;
 				operandsList = Collections.emptyList();

@@ -151,6 +151,58 @@ class WhereClause {
 	};
 
 	/**
+	 * "Substring" expression factory.
+	 */
+	private static final BinaryExprFactory EXPR_SUBSTRING =
+		new BinaryExprFactory() {
+		@Override
+		public String make(final SQLDialect dialect, final String op1,
+				final String op2) {
+
+			return dialect.substringMatch(op1, op2, false, false);
+		}
+	};
+
+	/**
+	 * "Not substring" expression factory.
+	 */
+	private static final BinaryExprFactory EXPR_NOT_SUBSTRING =
+		new BinaryExprFactory() {
+		@Override
+		public String make(final SQLDialect dialect, final String op1,
+				final String op2) {
+
+			return dialect.substringMatch(op1, op2, true, false);
+		}
+	};
+
+	/**
+	 * Case-sensitive "substring" expression factory.
+	 */
+	private static final BinaryExprFactory EXPR_SUBSTRING_CS =
+		new BinaryExprFactory() {
+		@Override
+		public String make(final SQLDialect dialect, final String op1,
+				final String op2) {
+
+			return dialect.substringMatch(op1, op2, false, true);
+		}
+	};
+
+	/**
+	 * Case-sensitive "not substring" expression factory.
+	 */
+	private static final BinaryExprFactory EXPR_NOT_SUBSTRING_CS =
+		new BinaryExprFactory() {
+		@Override
+		public String make(final SQLDialect dialect, final String op1,
+				final String op2) {
+
+			return dialect.substringMatch(op1, op2, true, true);
+		}
+	};
+
+	/**
 	 * "Prefix" expression factory.
 	 */
 	private static final BinaryExprFactory EXPR_PREFIX =
@@ -727,6 +779,32 @@ class WhereClause {
 			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
 					dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_NOT_MATCH_CS : EXPR_MATCH_CS),
+					operands, valueExpr, valueType, params);
+			break;
+		case SUBSTRING:
+			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
+					dialect, paramsFactory,
+					(!cond.isNegated() ? EXPR_SUBSTRING : EXPR_NOT_SUBSTRING),
+					operands, valueExpr, valueType, params);
+			break;
+		case NOT_SUBSTRING:
+			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
+					dialect, paramsFactory,
+					(!cond.isNegated() ? EXPR_NOT_SUBSTRING : EXPR_SUBSTRING),
+					operands, valueExpr, valueType, params);
+			break;
+		case SUBSTRING_CS:
+			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
+					dialect, paramsFactory,
+					(!cond.isNegated() ? EXPR_SUBSTRING_CS :
+						EXPR_NOT_SUBSTRING_CS),
+					operands, valueExpr, valueType, params);
+			break;
+		case NOT_SUBSTRING_CS:
+			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
+					dialect, paramsFactory,
+					(!cond.isNegated() ? EXPR_NOT_SUBSTRING_CS :
+						EXPR_SUBSTRING_CS),
 					operands, valueExpr, valueType, params);
 			break;
 		case PREFIX:

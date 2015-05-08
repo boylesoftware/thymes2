@@ -49,8 +49,8 @@ public interface SQLDialect {
 	String nullableConcat(String stringLiteral, String selectExpr);
 
 	/**
-	 * Create Boolean expression that tests a value against a regular
-	 * expression.
+	 * Create Boolean expression that tests if a value contains a substring that
+	 * matches a regular expression.
 	 *
 	 * @param valExpr SQL expression for the value to test.
 	 * @param reExpr SQL expression for the regular expression.
@@ -62,6 +62,19 @@ public interface SQLDialect {
 	 */
 	String regularExpressionMatch(String valExpr, String reExpr,
 			boolean negate, boolean caseSensitive);
+
+	/**
+	 * Create Boolean expression that tests a value contains a substring.
+	 *
+	 * @param valExpr SQL expression for the value to test.
+	 * @param substringExpr SQL expression for the substring value.
+	 * @param negate {@code true} to test if does not contain the substring.
+	 * @param caseSensitive {@code true} if case sensitive.
+	 *
+	 * @return SQL expression that evaluates to a Boolean.
+	 */
+	String substringMatch(String valExpr, String substringExpr, boolean negate,
+			boolean caseSensitive);
 
 	/**
 	 * Create Boolean expression that tests a value starts with a prefix.

@@ -33,11 +33,15 @@ class FilterConditionImpl
 	 */
 	private static final Set<FilterConditionType> STRING_OP_ONLY;
 	static {
-		STRING_OP_ONLY = new HashSet<>(8);
+		STRING_OP_ONLY = new HashSet<>(12);
 		STRING_OP_ONLY.add(FilterConditionType.MATCH);
 		STRING_OP_ONLY.add(FilterConditionType.NOT_MATCH);
 		STRING_OP_ONLY.add(FilterConditionType.MATCH_CS);
 		STRING_OP_ONLY.add(FilterConditionType.NOT_MATCH_CS);
+		STRING_OP_ONLY.add(FilterConditionType.SUBSTRING);
+		STRING_OP_ONLY.add(FilterConditionType.NOT_SUBSTRING);
+		STRING_OP_ONLY.add(FilterConditionType.SUBSTRING_CS);
+		STRING_OP_ONLY.add(FilterConditionType.NOT_SUBSTRING_CS);
 		STRING_OP_ONLY.add(FilterConditionType.PREFIX);
 		STRING_OP_ONLY.add(FilterConditionType.NOT_PREFIX);
 		STRING_OP_ONLY.add(FilterConditionType.PREFIX_CS);

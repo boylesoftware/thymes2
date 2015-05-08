@@ -49,17 +49,49 @@ class MySQLDialect
 		if (negate) {
 			if (caseSensitive)
 				resExpr = valExpr + " COLLATE utf8_bin"
-					+ " NOT REGEXP CONCAT('^', " + reExpr + ", '$')";
+					+ " NOT REGEXP " + reExpr;
 			else
 				resExpr = valExpr + " COLLATE utf8_general_ci"
-					+ " NOT REGEXP CONCAT('^', " + reExpr + ", '$')";
+					+ " NOT REGEXP " + reExpr;
 		} else {
 			if (caseSensitive)
 				resExpr = valExpr + " COLLATE utf8_bin"
-					+ " REGEXP CONCAT('^', " + reExpr + ", '$')";
+					+ " REGEXP " + reExpr;
 			else
 				resExpr = valExpr + " COLLATE utf8_general_ci"
-					+ " REGEXP CONCAT('^', " + reExpr + ", '$')";
+					+ " REGEXP " + reExpr;
+		}
+
+		return resExpr;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public String substringMatch(final String valExpr,
+			final String substringExpr, final boolean negate,
+			final boolean caseSensitive) {
+
+		final String patternExpr =
+			"CONCAT('%', REPLACE(REPLACE(REPLACE(" + substringExpr
+			+ ", '\\\\', '\\\\\\\\'), '%', '\\%'), '_', '\\_'), '%')";
+
+		final String resExpr;
+		if (negate) {
+			if (caseSensitive)
+				resExpr = valExpr + " COLLATE utf8_bin"
+						+ " NOT LIKE " + patternExpr;
+			else
+				resExpr = valExpr + " COLLATE utf8_general_ci"
+						+ " NOT LIKE " + patternExpr;
+		} else {
+			if (caseSensitive)
+				resExpr = valExpr + " COLLATE utf8_bin"
+						+ " LIKE " + patternExpr;
+			else
+				resExpr = valExpr + " COLLATE utf8_general_ci"
+						+ " LIKE " + patternExpr;
 		}
 
 		return resExpr;
@@ -72,21 +104,25 @@ class MySQLDialect
 	public String prefixMatch(final String valExpr, final String prefixExpr,
 			final boolean negate, final boolean caseSensitive) {
 
+		final String patternExpr =
+			"CONCAT(REPLACE(REPLACE(REPLACE(" + prefixExpr
+			+ ", '\\\\', '\\\\\\\\'), '%', '\\%'), '_', '\\_'), '%')";
+
 		final String resExpr;
 		if (negate) {
 			if (caseSensitive)
 				resExpr = valExpr + " COLLATE utf8_bin"
-						+ " NOT LIKE CONCAT(" + prefixExpr + ", '%')";
+						+ " NOT LIKE " + patternExpr;
 			else
 				resExpr = valExpr + " COLLATE utf8_general_ci"
-						+ " NOT LIKE CONCAT(" + prefixExpr + ", '%')";
+						+ " NOT LIKE " + patternExpr;
 		} else {
 			if (caseSensitive)
 				resExpr = valExpr + " COLLATE utf8_bin"
-						+ " LIKE CONCAT(" + prefixExpr + ", '%')";
+						+ " LIKE " + patternExpr;
 			else
 				resExpr = valExpr + " COLLATE utf8_general_ci"
-						+ " LIKE CONCAT(" + prefixExpr + ", '%')";
+						+ " LIKE " + patternExpr;
 		}
 
 		return resExpr;
