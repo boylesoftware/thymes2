@@ -14,6 +14,7 @@ import org.bsworks.x2.resource.IdHandling;
 import org.bsworks.x2.resource.ResourcePropertyAccess;
 import org.bsworks.x2.responses.CreatedResponse;
 import org.bsworks.x2.responses.NoContentResponse;
+import org.bsworks.x2.responses.OKResponse;
 import org.bsworks.x2.services.versioning.PersistentResourceVersionInfo;
 
 
@@ -24,9 +25,13 @@ import org.bsworks.x2.services.versioning.PersistentResourceVersionInfo;
  * to update the identified persistent resource record with the provided data.
  * If the identified record does not exist, the handler sends HTTP error 404
  * (Not Found) back to the client. If the record id is not in the URL, the
- * handler sends HTTP error 405 (Method Not Allowed) back to the client. If
- * persistent resource record was successfully updated, HTTP 204 (No Content)
- * response is sent back.
+ * handler sends HTTP error 405 (Method Not Allowed) back to the client.
+ *
+ * <p>If persistent resource record was successfully updated, HTTP 200 (OK)
+ * response is sent back with the updated record as the response entity. If the
+ * updated record is not needed by the caller, to save on the network traffic
+ * a {@value #NOCONTENT_PARAM} request parameter can be added, in which case
+ * HTTP 204 (No Content) response is sent back.
  *
  * <p>The handler also verifies that the record id in the submitted data matches
  * the record id specified in the URL. If it does not match, an HTTP error 400
@@ -44,6 +49,14 @@ import org.bsworks.x2.services.versioning.PersistentResourceVersionInfo;
  */
 public class DefaultPutPersistentResourceEndpointCallHandler<R>
 	extends AbstractPersistentResourceEndpointCallHandler<R, R> {
+
+	/**
+	 * Name of request parameter, which, if "true", makes the handler send back
+	 * HTTP 204 (No Content) response upon successful record update instead of
+	 * default HTTP 200 (OK) response.
+	 */
+	public static final String NOCONTENT_PARAM = "nocontent";
+
 
 	/**
 	 * Create new handler.
@@ -194,8 +207,15 @@ public class DefaultPutPersistentResourceEndpointCallHandler<R>
 		final PersistentResourceVersionInfo newColsVerInfo =
 				this.getDependentResourcesVersioningInfo(ctx);
 
-		// done
-		return new NoContentResponse(
+		// see if no content response is requested
+		if (Boolean.parseBoolean(ctx.getRequestParam(NOCONTENT_PARAM)))
+			return new NoContentResponse(
+					this.getResourceETag(ctx, rec, newColsVerInfo),
+					this.getResourceLastModificationTimestamp(rec,
+							newColsVerInfo));
+
+		// return response with the updated record
+		return new OKResponse(rec,
 				this.getResourceETag(ctx, rec, newColsVerInfo),
 				this.getResourceLastModificationTimestamp(rec, newColsVerInfo));
 	}

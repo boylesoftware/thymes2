@@ -71,7 +71,8 @@ public class OKResponse
 
 	/**
 	 * Default implementation sets "ETag" and "Last-Modification" HTTP response
-	 * headers depending on the values given to the response constructor.
+	 * headers depending on the values given to the response constructor. It
+	 * also sets "Cache-Control: no-cache" header.
 	 */
 	@Override
 	public void prepareHttpResponse(final EndpointCallContext ctx,
@@ -83,5 +84,7 @@ public class OKResponse
 		if (this.lastModificationTimestamp != null)
 			httpResponse.setDateHeader("Last-Modified",
 					this.lastModificationTimestamp.getTime());
+
+		httpResponse.setHeader("Cache-Control", "no-cache");
 	}
 }
