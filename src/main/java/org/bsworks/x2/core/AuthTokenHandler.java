@@ -232,9 +232,12 @@ class AuthTokenHandler {
 			return null;
 		}
 		final long now = System.currentTimeMillis();
-		if ((tokenTS < (now - this.authTokenTTL)) || (tokenTS > now)) {
+		final long tokenAge = now - tokenTS;
+		if ((tokenAge > this.authTokenTTL) || (tokenAge < 0)) {
 			if (debug)
-				this.log.debug("token timestamp out of range");
+				this.log.debug("token timestamp out of range: token=" + tokenTS
+						+ ", now=" + now + ", tokenTTL=" + this.authTokenTTL
+						+ ", tokenAge=" + tokenAge);
 			return null;
 		}
 
@@ -284,6 +287,8 @@ class AuthTokenHandler {
 	void addAuthInfo(final HttpServletResponse httpResponse,
 			final Actor actor) {
 
+		final boolean debug = this.log.isDebugEnabled();
+
 		// assemble first part of the token
 		final byte[] actorIdBytes = actor.getActorId().getBytes(UTF8);
 		final String opaque = actor.getOpaque();
@@ -323,7 +328,10 @@ class AuthTokenHandler {
 		final byte[] credentials = actor.getCredentials();
 		clearBuf = ByteBuffer.allocate(
 				8 + 2 + opaqueBytes.length + credentials.length);
-		clearBuf.putLong(System.currentTimeMillis());
+		final long now = System.currentTimeMillis();
+		if (debug)
+			this.log.debug("issuing token timestamp " + now);
+		clearBuf.putLong(now);
 		clearBuf.putShort((short) opaqueBytes.length);
 		if (opaqueBytes.length > 0)
 			clearBuf.put(opaqueBytes);
