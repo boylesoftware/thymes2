@@ -21,12 +21,12 @@ import javax.validation.ConstraintViolation;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.bsworks.x2.Actor;
 import org.bsworks.x2.EndpointCallErrorException;
 import org.bsworks.x2.EndpointCallHandler;
 import org.bsworks.x2.EndpointCallResponse;
 import org.bsworks.x2.HttpMethod;
+import org.bsworks.x2.RequestEntityValidationErrors;
 import org.bsworks.x2.resource.InvalidResourceDataException;
 import org.bsworks.x2.services.monitor.ApplicationErrorContext;
 import org.bsworks.x2.services.monitor.ApplicationErrorContextProperty;
