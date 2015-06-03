@@ -3,6 +3,7 @@ package org.bsworks.x2.resource.impl;
 import java.beans.PropertyDescriptor;
 
 import org.bsworks.x2.resource.SimplePropertyHandler;
+import org.bsworks.x2.resource.annotations.PersistentResource;
 import org.bsworks.x2.resource.annotations.Property;
 import org.bsworks.x2.resource.impl.AccessChecker.TargetType;
 
@@ -36,14 +37,21 @@ class SimplePropertyHandlerImpl
 			final AbstractResourcePropertyValueHandlerImpl valueHandler,
 			final String ctxPersistentCollectionName,
 			final String ctxPersistentFieldsPrefix) {
-		super(pd, valueHandler,
+		super(containerClass, pd, valueHandler,
 				new AccessChecker(propAnno.accessRestrictions(),
 						(propAnno.persistence().persistent() ?
 								TargetType.PERSISTENT : TargetType.TRANSIENT)),
 				(!propAnno.persistence().persistent() ? null :
 					new ResourcePropertyPersistenceImpl(propAnno, pd.getName(),
 							ctxPersistentFieldsPrefix)),
-				propAnno.updateIfNull());
+				propAnno.updateIfNull(), propAnno.fetchedByDefault());
+
+		// check that owning persistent resource is not specified
+		if (propAnno.ownedBy() != PersistentResource.class)
+			throw new IllegalArgumentException("Property "
+					+ pd.getName() + " of " + containerClass.getName()
+					+ " is not a nested object and may not have owner"
+					+ " persietent resource attribute.");
 
 		// cannot be persistent if dynamic
 		final ResourcePropertyPersistenceImpl persistenceDesc =

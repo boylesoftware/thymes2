@@ -50,7 +50,7 @@ class MetaPropertyHandlerImpl
 			final AbstractResourcePropertyValueHandlerImpl valueHandler,
 			final SimpleResourcePropertyValueHandler leafValueHandler,
 			final String ctxPersistentFieldsPrefix) {
-		super(pd, valueHandler,
+		super(containerClass, pd, valueHandler,
 				new AccessChecker((MetaPropertyHandlerImpl.class).getAnnotation(
 						AccessRestrictions.class).value(),
 						TargetType.PERSISTENT),
@@ -59,7 +59,7 @@ class MetaPropertyHandlerImpl
 							+ StringUtils.defaultIfEmpty(
 									propAnno.persistentField(), pd.getName()),
 						null, null, null, false),
-				false);
+				false, true);
 
 		// container class must be a persistent resource
 		if (!prsrcClasses.contains(containerClass))

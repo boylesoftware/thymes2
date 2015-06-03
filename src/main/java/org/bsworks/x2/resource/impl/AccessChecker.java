@@ -40,6 +40,12 @@ class AccessChecker {
 		DEP_REF,
 
 		/**
+		 * Borrowed property (nested object owned by another persistent
+		 * resource).
+		 */
+		BORROWED,
+
+		/**
 		 * Aggregate property.
 		 */
 		AGGREGATE
@@ -136,6 +142,12 @@ class AccessChecker {
 					throw new IllegalArgumentException("Dependent"
 							+ " references cannot be persisted.");
 				break;
+			case BORROWED:
+				if (access != ResourcePropertyAccess.SEE)
+					throw new IllegalArgumentException("Access type "
+							+ access + " is invalid for a property owned by"
+							+ " another persistent resource.");
+				break;
 			case AGGREGATE:
 				if (access != ResourcePropertyAccess.SEE)
 					throw new IllegalArgumentException("Access type "
@@ -220,7 +232,8 @@ class AccessChecker {
 			acl = this.seeACL;
 			break;
 		case SUBMIT:
-			if (this.targetType == TargetType.AGGREGATE)
+			if ((this.targetType == TargetType.AGGREGATE)
+				|| (this.targetType == TargetType.BORROWED))
 				return false;
 			acl = this.submitACL;
 			break;
@@ -234,13 +247,15 @@ class AccessChecker {
 			break;
 		case UPDATE:
 			if ((this.targetType == TargetType.TRANSIENT)
-				|| (this.targetType == TargetType.AGGREGATE))
+				|| (this.targetType == TargetType.AGGREGATE)
+				|| (this.targetType == TargetType.BORROWED))
 				return false;
 			acl = this.updateACL;
 			break;
 		case DELETE:
 			if ((this.targetType == TargetType.TRANSIENT)
-				|| (this.targetType == TargetType.AGGREGATE))
+				|| (this.targetType == TargetType.AGGREGATE)
+				|| (this.targetType == TargetType.BORROWED))
 				return false;
 			acl = this.deleteACL;
 			break;

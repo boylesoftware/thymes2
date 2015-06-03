@@ -160,6 +160,8 @@ class ResourcePropertiesContainerImpl<O>
 	 *
 	 * @param resources Reference to the resources manager.
 	 * @param prsrcClasses All persistent resource classes.
+	 * @param prsrcClass Containing persistent resource class, or {@code null}
+	 * if not part of a persistent resource.
 	 * @param containerClass The container class.
 	 * @param propName Property name if container is a nested object property,
 	 * or {@code null} if it is a resource.
@@ -183,8 +185,8 @@ class ResourcePropertiesContainerImpl<O>
 	 * container class.
 	 */
 	ResourcePropertiesContainerImpl(final ResourcesImpl resources,
-			final Set<Class<?>> prsrcClasses, final Class<O> containerClass,
-			final String propName,
+			final Set<Class<?>> prsrcClasses, final Class<?> prsrcClass,
+			final Class<O> containerClass, final String propName,
 			final String concreteTypeName,
 			final String persistentCollectionName,
 			final String parentIdPersistentFieldName,
@@ -263,16 +265,16 @@ class ResourcePropertiesContainerImpl<O>
 
 			// create value handler
 			final AbstractResourcePropertyValueHandlerImpl valueHandler =
-				createValueHandler(resources, prsrcClasses, this.containerClass,
-						pd, propAnno, 0, false, valueJavaType,
-						this.persistentCollectionName);
+				createValueHandler(resources, prsrcClasses, prsrcClass,
+						this.containerClass, pd, propAnno, 0, false,
+						valueJavaType, this.persistentCollectionName);
 
 			// create property handler
 			final AbstractResourcePropertyHandlerImpl propHandler =
 				ResourcePropertyHandlerFactory.createHandler(prsrcClasses,
-						this.containerClass, pd, propAnno, valueHandler,
-						this.persistentCollectionName, persistentFieldsPrefix,
-						parentPersistentFieldsPrefix);
+						prsrcClass, this.containerClass, pd, propAnno,
+						valueHandler, this.persistentCollectionName,
+						persistentFieldsPrefix, parentPersistentFieldsPrefix);
 
 			// validate persistent map reference key
 			if (propHandler.getPersistence() != null) {
@@ -333,6 +335,7 @@ class ResourcePropertiesContainerImpl<O>
 	 *
 	 * @param resources Reference to the resources manager.
 	 * @param prsrcClasses All persistent resource classes.
+	 * @param prsrcClass Containing persistent resource class, or {@code null}.
 	 * @param containerClass Class that contains the property.
 	 * @param pd Java bean property descriptor.
 	 * @param propAnno Resource property annotation.
@@ -349,9 +352,10 @@ class ResourcePropertiesContainerImpl<O>
 	 */
 	private static AbstractResourcePropertyValueHandlerImpl createValueHandler(
 			final ResourcesImpl resources, final Set<Class<?>> prsrcClasses,
-			final Class<?> containerClass, final PropertyDescriptor pd,
-			final Annotation propAnno, final int collectionLevel,
-			final boolean map, final Type valueJavaType,
+			final Class<?> prsrcClass, final Class<?> containerClass,
+			final PropertyDescriptor pd, final Annotation propAnno,
+			final int collectionLevel, final boolean map,
+			final Type valueJavaType,
 			final String ctxPersistentCollectionName) {
 
 		// check if dynamic value
@@ -412,7 +416,7 @@ class ResourcePropertiesContainerImpl<O>
 						+ pd.getName() + " of " + containerClass.getName()
 						+ " has invalid resource property annotation.");
 			return createObjectValueHandler(resources, prsrcClasses,
-					containerClass, (Class<?>) valueJavaType, pd,
+					prsrcClass, containerClass, (Class<?>) valueJavaType, pd,
 					(Property) propAnno, collectionLevel, map,
 					ctxPersistentCollectionName);
 		case REF:
@@ -448,7 +452,8 @@ class ResourcePropertiesContainerImpl<O>
 					refTargetClass, wildcardRef);
 		case LIST:
 			elValueHandler = createValueHandler(resources, prsrcClasses,
-					containerClass, pd, propAnno, collectionLevel + 1, false,
+					prsrcClass, containerClass, pd, propAnno,
+					collectionLevel + 1, false,
 					((ParameterizedType) valueJavaType)
 						.getActualTypeArguments()[0],
 					ctxPersistentCollectionName);
@@ -456,7 +461,8 @@ class ResourcePropertiesContainerImpl<O>
 					elValueHandler.getCollectionDegree() + 1);
 		case SET:
 			elValueHandler = createValueHandler(resources, prsrcClasses,
-					containerClass, pd, propAnno, collectionLevel + 1, false,
+					prsrcClass, containerClass, pd, propAnno,
+					collectionLevel + 1, false,
 					((ParameterizedType) valueJavaType)
 						.getActualTypeArguments()[0],
 					ctxPersistentCollectionName);
@@ -467,8 +473,8 @@ class ResourcePropertiesContainerImpl<O>
 				((ParameterizedType) valueJavaType).getActualTypeArguments()[0];
 			final AbstractResourcePropertyValueHandlerImpl keyValueHandler =
 					createValueHandler(resources, prsrcClasses,
-							containerClass, pd, propAnno, collectionLevel + 1,
-							false, keyJavaType, null);
+							prsrcClass, containerClass, pd, propAnno,
+							collectionLevel + 1, false, keyJavaType, null);
 			if (!(keyValueHandler instanceof
 					CanBeMapKeyResourcePropertyValueHandler))
 				throw new IllegalArgumentException("Property " + pd.getName()
@@ -476,7 +482,8 @@ class ResourcePropertiesContainerImpl<O>
 						+ " uses unsupported map key type " + keyJavaType
 						+ ".");
 			elValueHandler = createValueHandler(resources, prsrcClasses,
-					containerClass, pd, propAnno, collectionLevel + 1, true,
+					prsrcClass, containerClass, pd, propAnno,
+					collectionLevel + 1, true,
 					((ParameterizedType) valueJavaType)
 						.getActualTypeArguments()[1],
 					ctxPersistentCollectionName);
@@ -566,6 +573,7 @@ class ResourcePropertiesContainerImpl<O>
 	 *
 	 * @param resources Reference to the resources manager.
 	 * @param prsrcClasses All persistent resource classes.
+	 * @param prsrcClass Containing persistent resource class, or {@code null}.
 	 * @param containerClass Class that contains the nested object property.
 	 * @param objClass The object class, for which to create a handler.
 	 * @param pd Java bean property descriptor.
@@ -582,10 +590,10 @@ class ResourcePropertiesContainerImpl<O>
 	 */
 	private static ObjectResourcePropertyValueHandler createObjectValueHandler(
 			final ResourcesImpl resources, final Set<Class<?>> prsrcClasses,
-			final Class<?> containerClass, final Class<?> objClass,
-			final PropertyDescriptor pd, final Property propAnno,
-			final int collectionLevel, final boolean map,
-			final String ctxPersistentCollectionName) {
+			final Class<?> prsrcClass, final Class<?> containerClass,
+			final Class<?> objClass, final PropertyDescriptor pd,
+			final Property propAnno, final int collectionLevel,
+			final boolean map, final String ctxPersistentCollectionName) {
 
 		// check if existing resource
 		final AbstractResourceHandlerImpl<?> existingRsrcHandler =
@@ -618,9 +626,9 @@ class ResourcePropertiesContainerImpl<O>
 		// get object properties
 		final ResourcePropertiesContainerImpl<?> props =
 			new ResourcePropertiesContainerImpl<>(resources, prsrcClasses,
-					objClass, pd.getName(), null, persistentCollectionName,
-					parentIdPersistentFieldName, persistentFieldsPrefix,
-					persistentFieldsPrefix);
+					prsrcClass, objClass, pd.getName(), null,
+					persistentCollectionName, parentIdPersistentFieldName,
+					persistentFieldsPrefix, persistentFieldsPrefix);
 
 		// check that we have an id if needed
 		final boolean needsId = ((persistentCollectionName != null)
@@ -665,7 +673,7 @@ class ResourcePropertiesContainerImpl<O>
 					typeAnno.name(), vObjClass.getSimpleName());
 			final ResourcePropertiesContainerImpl<?> vProps =
 				new ResourcePropertiesContainerImpl<>(resources, prsrcClasses,
-						vObjClass, pd.getName(), typeName,
+						prsrcClass, vObjClass, pd.getName(), typeName,
 						vPersistentCollectionName, vParentIdPersistentFieldName,
 						vPersistentFieldsPrefix, persistentFieldsPrefix);
 			valueTypes.put(typeName, vProps);

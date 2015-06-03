@@ -10,6 +10,22 @@ public interface ObjectPropertyHandler
 	extends ResourcePropertyHandler, ResourcePropertiesContainer {
 
 	/**
+	 * Get class of the persistent resource that owns the nested object records,
+	 * if property is part of a persistent resource.
+	 *
+	 * @return Owning persistent resource class, or {@code null} if not part of
+	 * a persistent resource.
+	 */
+	Class<?> getOwningPersistentResourceClass();
+
+	/**
+	 * Tells if nested object property is owned by another persistent resource.
+	 *
+	 * @return {@code true} if borrowed.
+	 */
+	boolean isBorrowed();
+
+	/**
 	 * Get object value class.
 	 *
 	 * <p>For a polymorphic object property, get the common superclass. For a

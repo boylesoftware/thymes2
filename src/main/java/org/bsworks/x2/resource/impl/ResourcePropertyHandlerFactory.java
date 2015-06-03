@@ -29,6 +29,8 @@ final class ResourcePropertyHandlerFactory {
 	 * Create resource property handler.
 	 *
 	 * @param prsrcClasses All persistent resource classes.
+	 * @param prsrcClass Containing persistent resource class, or {@code null}
+	 * if part of a persistent resource.
 	 * @param containerClass Class that contains the property.
 	 * @param pd Java bean property descriptor.
 	 * @param propAnno Resource property annotation.
@@ -52,8 +54,9 @@ final class ResourcePropertyHandlerFactory {
 	 * property definition.
 	 */
 	static AbstractResourcePropertyHandlerImpl createHandler(
-			final Set<Class<?>> prsrcClasses, final Class<?> containerClass,
-			final PropertyDescriptor pd, final Annotation propAnno,
+			final Set<Class<?>> prsrcClasses, final Class<?> prsrcClass,
+			final Class<?> containerClass, final PropertyDescriptor pd,
+			final Annotation propAnno,
 			final AbstractResourcePropertyValueHandlerImpl valueHandler,
 			final String ctxPersistentCollectionName,
 			final String ctxPersistentFieldsPrefix,
@@ -94,8 +97,8 @@ final class ResourcePropertyHandlerFactory {
 						(SimpleResourcePropertyValueHandler) leafValueHandler);
 		} else if (propAnno instanceof Property) {
 			if (leafValueHandler instanceof ObjectResourcePropertyValueHandler)
-				return new ObjectPropertyHandlerImpl(containerClass, pd,
-						(Property) propAnno, valueHandler,
+				return new ObjectPropertyHandlerImpl(prsrcClasses, prsrcClass,
+						containerClass, pd, (Property) propAnno, valueHandler,
 						(ObjectResourcePropertyValueHandler) leafValueHandler,
 						ctxPersistentCollectionName, ctxPersistentFieldsPrefix);
 			else if (leafValueHandler

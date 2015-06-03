@@ -26,12 +26,4 @@ public interface DependentRefPropertyHandler
 	 * resource that contains the handled property and not a wildcard.
 	 */
 	String getReverseRefPropertyName();
-
-	/**
-	 * Tell if the property is fetched from the persistent storage by default.
-	 * If not, the property is fetched only if explicitly requested.
-	 *
-	 * @return {@code true} if fetched by default.
-	 */
-	boolean isFetchedByDefault();
 }

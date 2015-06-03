@@ -28,7 +28,7 @@ class TransientResourceHandlerImpl<R>
 	TransientResourceHandlerImpl(final ResourcesImpl resources,
 			final Set<Class<?>> prsrcClasses, final Class<R> rsrcClass) {
 		super(new ResourcePropertiesContainerImpl<>(resources, prsrcClasses,
-						rsrcClass, null, null, null, null, null, null));
+						null, rsrcClass, null, null, null, null, null, null));
 	}
 
 

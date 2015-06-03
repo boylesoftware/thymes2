@@ -120,8 +120,7 @@ public interface PersistentResourceEndpointHandler<R> {
 		throws EndpointCallErrorException;
 
 	/**
-	 * Get existing persistent resource record by record id. The method also
-	 * places a shared lock on the returned record.
+	 * Get existing persistent resource record by record id.
 	 *
 	 * @param ctx Endpoint call context.
 	 * @param recId Record id.
@@ -129,6 +128,8 @@ public interface PersistentResourceEndpointHandler<R> {
 	 * {@link #getRecordFilter(EndpointCallContext, Object)} method.
 	 * @param propsFetch Record properties fetch specification, or {@code null}
 	 * for all properties.
+	 * @param lock If {@code true}, the method also places a shared lock on the
+	 * returned record.
 	 *
 	 * @return The record, or {@code null} if does not exists.
 	 *
@@ -136,7 +137,7 @@ public interface PersistentResourceEndpointHandler<R> {
 	 * client.
 	 */
 	R get(EndpointCallContext ctx, Object recId, FilterSpec<R> recFilter,
-			PropertiesFetchSpec<R> propsFetch)
+			PropertiesFetchSpec<R> propsFetch, boolean lock)
 		throws EndpointCallErrorException;
 
 	/**

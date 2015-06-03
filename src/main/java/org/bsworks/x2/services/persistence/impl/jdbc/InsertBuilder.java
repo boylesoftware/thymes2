@@ -635,7 +635,7 @@ class InsertBuilder {
 		for (final ObjectPropertyHandler propHandler :
 				objHandler.getObjectProperties()) {
 
-			// check it persistent and is allowed to persist
+			// check if persistent and is allowed to persist
 			if (!propHandler.isAllowed(ResourcePropertyAccess.PERSIST, actor))
 				continue;
 
@@ -709,13 +709,17 @@ class InsertBuilder {
 
 				} else if (propVal instanceof Map) { // should always be
 
+					final ResourcePropertyValueHandler keyHandler =
+						propHandler.getKeyValueHandler();
+					final boolean refKey = keyHandler.isRef();
 					for (final Map.Entry<?, ?> entry :
 							((Map<?, ?>) propVal).entrySet()) {
 						propCtx.reset(entry.getValue());
+						final Object key = (refKey ?
+								((Ref<?>) entry.getKey()).getId() :
+								entry.getKey());
 						propCtx.addMapKey(paramsFactory.getParameterValue(
-								propHandler.getKeyValueHandler()
-									.getPersistentValueType(),
-								entry.getKey()));
+								keyHandler.getPersistentValueType(), key));
 						addObjectProperties(resources, paramsFactory, actor,
 								propCtx, propHandler, entry.getValue(),
 								ctxCache, maxTableNestingLevel);

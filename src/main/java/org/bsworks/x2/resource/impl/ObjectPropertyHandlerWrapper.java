@@ -146,6 +146,15 @@ abstract class ObjectPropertyHandlerWrapper
 	 * See overridden method.
 	 */
 	@Override
+	public boolean isFetchedByDefault() {
+
+		return this.propHandler.isFetchedByDefault();
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public Deque<? extends ResourcePropertyHandler> getPersistentPropertyChain(
 			final String propPath) {
 
@@ -195,6 +204,24 @@ abstract class ObjectPropertyHandlerWrapper
 	public Collection<? extends RefPropertyHandler> getRefProperties() {
 
 		return this.propHandler.getRefProperties();
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public Class<?> getOwningPersistentResourceClass() {
+
+		return this.propHandler.getOwningPersistentResourceClass();
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public boolean isBorrowed() {
+
+		return this.propHandler.isBorrowed();
 	}
 
 	/* (non-Javadoc)

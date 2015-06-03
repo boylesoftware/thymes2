@@ -13,6 +13,7 @@ import org.bsworks.x2.resource.AggregatePropertyHandler;
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
 import org.bsworks.x2.resource.FilterConditionType;
 import org.bsworks.x2.resource.FilterSpec;
+import org.bsworks.x2.resource.ObjectPropertyHandler;
 import org.bsworks.x2.resource.OrderSpec;
 import org.bsworks.x2.resource.OrderType;
 import org.bsworks.x2.resource.PersistentResourceHandler;
@@ -325,7 +326,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 
 		// get the full record
 		final R rec =
-			this.endpointHandler.get(ctx, recId, recFilter, propsFetch);
+			this.endpointHandler.get(ctx, recId, recFilter, propsFetch, false);
 
 		// return the record in the response
 		return new OKResponse(rec, eTag, lastModTS);
@@ -466,7 +467,8 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 
 	/**
 	 * Add all dependent resource classes, fetched reference classes and their
-	 * dependent resource classes and all resource classes used for calculation
+	 * dependent resource classes, other persistent resources that own requested
+	 * nested object properties and all resource classes used for calculation
 	 * of requested aggregate properties to the specified set.
 	 *
 	 * @param ctx Call context.
@@ -488,6 +490,16 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			if (((propsFetch != null) && propsFetch.isIncluded(ph.getName()))
 				|| ((propsFetch == null) && ph.isFetchedByDefault()))
 				prsrcClasses.add(ph.getReferredResourceClass());
+		}
+
+		// add resources owning nested object properties
+		for (final ObjectPropertyHandler ph :
+				this.prsrcHandler.getObjectProperties()) {
+			if (((propsFetch != null) && propsFetch.isIncluded(ph.getName()))
+				|| ((propsFetch == null) && ph.isFetchedByDefault())) {
+				if (ph.isBorrowed())
+					prsrcClasses.add(ph.getOwningPersistentResourceClass());
+			}
 		}
 
 		// add requested aggregate properties

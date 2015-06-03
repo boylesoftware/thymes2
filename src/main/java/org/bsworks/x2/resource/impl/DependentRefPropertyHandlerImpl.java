@@ -40,11 +40,6 @@ class DependentRefPropertyHandlerImpl
 	private final boolean optional;
 
 	/**
-	 * Tells if fetched by default.
-	 */
-	private final boolean fetchedByDefault;
-
-	/**
 	 * Persistence descriptor.
 	 */
 	private ResourcePropertyPersistenceImpl persistence;
@@ -67,10 +62,10 @@ class DependentRefPropertyHandlerImpl
 			final DependentRefProperty propAnno,
 			final AbstractResourcePropertyValueHandlerImpl valueHandler,
 			final RefResourcePropertyValueHandler leafValueHandler) {
-		super(pd, valueHandler,
+		super(containerClass, pd, valueHandler,
 				new AccessChecker(propAnno.accessRestrictions(),
 						TargetType.DEP_REF),
-				null, propAnno.updateIfNull());
+				null, propAnno.updateIfNull(), propAnno.fetchedByDefault());
 
 		// container class must be a persistent resource
 		if (!prsrcClasses.contains(containerClass))
@@ -102,7 +97,6 @@ class DependentRefPropertyHandlerImpl
 		this.referredResourceClass = leafValueHandler.getRefTargetClass();
 		this.reverseRefPropertyName = propAnno.reverseRefProperty();
 		this.optional = propAnno.optional();
-		this.fetchedByDefault = propAnno.fetchedByDefault();
 	}
 
 
@@ -177,14 +171,5 @@ class DependentRefPropertyHandlerImpl
 	public String getReverseRefPropertyName() {
 
 		return this.reverseRefPropertyName;
-	}
-
-	/* (non-Javadoc)
-	 * See overridden method.
-	 */
-	@Override
-	public boolean isFetchedByDefault() {
-
-		return this.fetchedByDefault;
 	}
 }

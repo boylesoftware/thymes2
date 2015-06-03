@@ -58,10 +58,16 @@ abstract class AbstractResourcePropertyHandlerImpl
 	 */
 	private final boolean updateIfNull;
 
+	/**
+	 * Tells if fetched by default.
+	 */
+	private final boolean fetchedByDefault;
+
 
 	/**
 	 * Create new handler.
 	 *
+	 * @param containerClass Class that contains the property.
 	 * @param pd Java bean property descriptor.
 	 * @param valueHandler Property value handler.
 	 * @param accessChecker Property access checker.
@@ -69,12 +75,16 @@ abstract class AbstractResourcePropertyHandlerImpl
 	 * not persistent.
 	 * @param updateIfNull {@code true} if the property needs to be set to
 	 * {@code null} if it is {@code null} in the incoming data.
+	 * @param fetchedByDefault {@code true} if the property needs to be fetched
+	 * from persistent storage by default, {@code false} if needs to be fetched
+	 * only if explicitly requested by the properties fetch specification.
 	 */
-	protected AbstractResourcePropertyHandlerImpl(final PropertyDescriptor pd,
+	protected AbstractResourcePropertyHandlerImpl(final Class<?> containerClass,
+			final PropertyDescriptor pd,
 			final AbstractResourcePropertyValueHandlerImpl valueHandler,
 			final AccessChecker accessChecker,
 			final ResourcePropertyPersistenceImpl persistence,
-			final boolean updateIfNull) {
+			final boolean updateIfNull, final boolean fetchedByDefault) {
 
 		this.name = pd.getName();
 		this.accessChecker = accessChecker;
@@ -83,6 +93,7 @@ abstract class AbstractResourcePropertyHandlerImpl
 		this.valueHandler = valueHandler;
 		this.persistence = persistence;
 		this.updateIfNull = updateIfNull;
+		this.fetchedByDefault = fetchedByDefault;
 
 		if (valueHandler instanceof MapResourcePropertyValueHandler)
 			this.keyValueHandler =
@@ -90,6 +101,15 @@ abstract class AbstractResourcePropertyHandlerImpl
 					.getKeyValueHandler();
 		else
 			this.keyValueHandler = null;
+
+		if (!this.fetchedByDefault
+			&& (valueHandler instanceof SimpleResourcePropertyValueHandler)
+			&& ((SimpleResourcePropertyValueHandler) valueHandler)
+				.isPrimitive())
+			throw new IllegalArgumentException("Property " + pd.getName()
+					+ " of " + containerClass.getName()
+					+ " is not fetched by default and therefore may not be"
+					+ " primitive.");
 	}
 
 
@@ -207,6 +227,15 @@ abstract class AbstractResourcePropertyHandlerImpl
 	public boolean updateIfNull() {
 
 		return this.updateIfNull;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public boolean isFetchedByDefault() {
+
+		return this.fetchedByDefault;
 	}
 
 

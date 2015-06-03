@@ -54,7 +54,7 @@ class IdPropertyHandlerImpl
 			final CanBeIdResourcePropertyValueHandler leafValueHandler,
 			final String ctxPersistentCollectionName,
 			final String ctxPersistentFieldsPrefix) {
-		super(pd, valueHandler,
+		super(containerClass, pd, valueHandler,
 				new AccessChecker((IdPropertyHandlerImpl.class).getAnnotation(
 						AccessRestrictions.class).value(),
 						TargetType.PERSISTENT),
@@ -63,7 +63,7 @@ class IdPropertyHandlerImpl
 							+ StringUtils.defaultIfEmpty(
 									propAnno.persistentField(), pd.getName()),
 						null, null, null, false),
-				false);
+				false, true);
 
 		// container class must be persistent
 		if (ctxPersistentCollectionName == null)

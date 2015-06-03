@@ -132,9 +132,9 @@ public class DefaultPutPersistentResourceEndpointCallHandler<R>
 		final PersistentResourceVersionInfo colsVerInfo =
 			this.getDependentResourcesVersioningInfo(ctx);
 
-		// load existing record
+		// load and lock existing record
 		final R rec = this.endpointHandler.get(ctx, recId,
-				this.endpointHandler.getRecordFilter(ctx, recId), null);
+				this.endpointHandler.getRecordFilter(ctx, recId), null, true);
 
 		// check conditional request conditions
 		this.processConditionalRequest(ctx,

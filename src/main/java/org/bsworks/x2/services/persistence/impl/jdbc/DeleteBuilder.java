@@ -314,6 +314,10 @@ class DeleteBuilder {
 				if (propTableName == null)
 					continue;
 
+				if ((propHandler instanceof ObjectPropertyHandler)
+						&& ((ObjectPropertyHandler) propHandler).isBorrowed())
+					continue;
+
 				if (joinedTablesBufLen > 0)
 					joinedTablesBuf.append(", ");
 				joinedTablesBuf.append(objTableName).append(" AS ")

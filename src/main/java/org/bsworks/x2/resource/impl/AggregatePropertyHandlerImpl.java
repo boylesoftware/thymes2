@@ -108,10 +108,10 @@ class AggregatePropertyHandlerImpl
 			final PropertyDescriptor pd, final AggregateProperty propAnno,
 			final AbstractResourcePropertyValueHandlerImpl valueHandler,
 			final SimpleResourcePropertyValueHandler leafValueHandler) {
-		super(pd, valueHandler,
+		super(containerClass, pd, valueHandler,
 				new AccessChecker(propAnno.accessRestrictions(),
 						TargetType.AGGREGATE),
-				null, false);
+				null, false, false);
 
 		// must be single-valued
 		if (valueHandler.getCollectionDegree() > 0)
@@ -181,6 +181,11 @@ class AggregatePropertyHandlerImpl
 						((DependentRefPropertyHandler) ph)
 							.getReferredResourceClass());
 				this.lastIntermediateRefPath = curPropPath.toString();
+			} else if (ph instanceof ObjectPropertyHandler) {
+				if (((ObjectPropertyHandler) ph).isBorrowed())
+					this.usedPersistentResourceClasses.add(
+							((ObjectPropertyHandler) ph)
+								.getOwningPersistentResourceClass());
 			}
 		}
 

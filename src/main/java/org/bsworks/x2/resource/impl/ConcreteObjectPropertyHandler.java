@@ -109,6 +109,15 @@ class ConcreteObjectPropertyHandler
 	}
 
 	/**
+	 * Returns {@code true}.
+	 */
+	@Override
+	public boolean isFetchedByDefault() {
+
+		return true;
+	}
+
+	/**
 	 * Returns {@code null} as a concrete type cannot be polymorphic itself.
 	 */
 	@Override

@@ -1081,13 +1081,13 @@ class UpdateBuilder {
 						continue;
 				} else if (propHandler
 								instanceof DependentRefPropertyHandler) {
-					if (!processDepRefProperty(propPath,
+					if (!processDepRefProperty(obj, propPath,
 							(DependentRefPropertyHandler) propHandler,
 							curPropVal, newPropVal, depPRsrcIdsToDelete))
 						continue;
 				} else if (propHandler instanceof ObjectPropertyHandler) {
 					if (!processObjectProperty(resources, paramsFactory, ctx,
-							propPath, (ObjectPropertyHandler) propHandler,
+							obj, propPath, (ObjectPropertyHandler) propHandler,
 							curPropVal, newPropVal, actor, updatedProps,
 							depPRsrcIdsToDelete))
 						continue;
@@ -1481,6 +1481,7 @@ class UpdateBuilder {
 	 * @param resources Application resources manager.
 	 * @param paramsFactory Parameter value handlers factory.
 	 * @param ctx Current object statement builder context.
+	 * @param obj Existing object that contains the property.
 	 * @param propPath Path of the nested object property.
 	 * @param propHandler Nested object property handler.
 	 * @param curPropVal Current property value.
@@ -1496,9 +1497,10 @@ class UpdateBuilder {
 	 */
 	private static boolean processObjectProperty(final Resources resources,
 			final ParameterValuesFactoryImpl paramsFactory,
-			final StatementBuilderContext ctx, final StringBuilder propPath,
-			final ObjectPropertyHandler propHandler,
-			final Object curPropVal, final Object newPropVal, final Actor actor,
+			final StatementBuilderContext ctx, final Object obj,
+			final StringBuilder propPath,
+			final ObjectPropertyHandler propHandler, final Object curPropVal,
+			final Object newPropVal, final Actor actor,
 			final Set<String> updatedProps,
 			final Map<Class<?>, Set<Object>> depPRsrcIdsToDelete) {
 
@@ -1827,6 +1829,9 @@ class UpdateBuilder {
 			}
 		}
 
+		// set property in the object
+		propHandler.setValue(obj, newPropVal);
+
 		// property will be modified
 		return true;
 	}
@@ -1835,6 +1840,7 @@ class UpdateBuilder {
 	 * Process dependent resource reference property and determine if any
 	 * referred resource records need to be deleted.
 	 *
+	 * @param obj Existing object that contains the property.
 	 * @param propPath Dependent resource reference property path.
 	 * @param propHandler Dependent resource reference property handler.
 	 * @param curPropVal Current property value.
@@ -1844,7 +1850,8 @@ class UpdateBuilder {
 	 *
 	 * @return {@code true} if the property is modified.
 	 */
-	private static boolean processDepRefProperty(final StringBuilder propPath,
+	private static boolean processDepRefProperty(final Object obj,
+			final StringBuilder propPath,
 			final DependentRefPropertyHandler propHandler,
 			final Object curPropVal, final Object newPropVal,
 			final Map<Class<?>, Set<Object>> depPRsrcIdsToDelete) {
@@ -1935,6 +1942,9 @@ class UpdateBuilder {
 					ids.add(((Ref<?>) refVal).getId());
 			}
 		}
+
+		// set property in the object
+		propHandler.setValue(obj, newPropVal);
 
 		// property will be modified
 		return true;

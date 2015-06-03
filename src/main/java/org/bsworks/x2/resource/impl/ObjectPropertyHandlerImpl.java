@@ -7,9 +7,11 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import org.bsworks.x2.resource.ObjectPropertyHandler;
 import org.bsworks.x2.resource.ResourcePropertyHandler;
+import org.bsworks.x2.resource.annotations.PersistentResource;
 import org.bsworks.x2.resource.annotations.Property;
 import org.bsworks.x2.resource.impl.AccessChecker.TargetType;
 import org.bsworks.x2.util.StringUtils;
@@ -23,6 +25,16 @@ import org.bsworks.x2.util.StringUtils;
 class ObjectPropertyHandlerImpl
 	extends AbstractResourcePropertyHandlerImpl
 	implements ObjectPropertyHandler {
+
+	/**
+	 * Owning persistent resource class, or {@code null}.
+	 */
+	private final Class<?> owningPersistentResourceClass;
+
+	/**
+	 * Tells if borrowed nested object property.
+	 */
+	private final boolean borrowed;
 
 	/**
 	 * Object properties container.
@@ -58,6 +70,9 @@ class ObjectPropertyHandlerImpl
 	/**
 	 * Create new handler.
 	 *
+	 * @param prsrcClasses All persistent resource classes.
+	 * @param prsrcClass Containing persistent resource class, or {@code null}
+	 * if not part of a persistent resource.
 	 * @param containerClass Class that contains the property.
 	 * @param pd Java bean property descriptor.
 	 * @param propAnno Resource property annotation.
@@ -71,14 +86,15 @@ class ObjectPropertyHandlerImpl
 	 * may be empty string but not {@code null} if persistent property.
 	 * Otherwise, ignored.
 	 */
-	ObjectPropertyHandlerImpl(final Class<?> containerClass,
+	ObjectPropertyHandlerImpl(final Set<Class<?>> prsrcClasses,
+			final Class<?> prsrcClass, final Class<?> containerClass,
 			final PropertyDescriptor pd, final Property propAnno,
 			final AbstractResourcePropertyValueHandlerImpl valueHandler,
 			final ObjectResourcePropertyValueHandler leafValueHandler,
 			final String ctxPersistentCollectionName,
 			final String ctxPersistentFieldsPrefix) {
-		this(containerClass, pd, propAnno, valueHandler, leafValueHandler,
-				ctxPersistentCollectionName,
+		this(prsrcClasses, prsrcClass, containerClass, pd, propAnno,
+				valueHandler, leafValueHandler, ctxPersistentCollectionName,
 				(!propAnno.persistence().persistent() ? null :
 					new ResourcePropertyPersistenceImpl(propAnno, pd.getName(),
 							ctxPersistentFieldsPrefix)),
@@ -88,6 +104,9 @@ class ObjectPropertyHandlerImpl
 	/**
 	 * Create new handler.
 	 *
+	 * @param prsrcClasses All persistent resource classes.
+	 * @param prsrcClass Containing persistent resource class, or {@code null}
+	 * if not part of a persistent resource.
 	 * @param containerClass Class that contains the property.
 	 * @param pd Java bean property descriptor.
 	 * @param propAnno Resource property annotation.
@@ -102,18 +121,43 @@ class ObjectPropertyHandlerImpl
 	 * @param concreteTypeName Concrete type name, or {@code null} if not a
 	 * concrete value of a polymorphic type.
 	 */
-	private ObjectPropertyHandlerImpl(final Class<?> containerClass,
+	private ObjectPropertyHandlerImpl(final Set<Class<?>> prsrcClasses,
+			final Class<?> prsrcClass, final Class<?> containerClass,
 			final PropertyDescriptor pd, final Property propAnno,
 			final AbstractResourcePropertyValueHandlerImpl valueHandler,
 			final ObjectResourcePropertyValueHandler leafValueHandler,
 			final String ctxPersistentCollectionName,
 			final ResourcePropertyPersistenceImpl persistenceDesc,
 			final String concreteTypeName) {
-		super(pd, valueHandler,
+		super(containerClass, pd, valueHandler,
 				new AccessChecker(propAnno.accessRestrictions(),
+						((propAnno.ownedBy() != PersistentResource.class)
+								&& (propAnno.ownedBy() != prsrcClass) ?
+							TargetType.BORROWED :
 						(persistenceDesc != null ?
-								TargetType.PERSISTENT : TargetType.TRANSIENT)),
-				persistenceDesc, propAnno.updateIfNull());
+							TargetType.PERSISTENT : TargetType.TRANSIENT))),
+				persistenceDesc, propAnno.updateIfNull(),
+				propAnno.fetchedByDefault());
+
+		// determine and check owning persistent resource class
+		this.owningPersistentResourceClass =
+			(propAnno.ownedBy() != PersistentResource.class ?
+					propAnno.ownedBy() : prsrcClass);
+		if ((this.owningPersistentResourceClass != null)
+				&& !prsrcClasses.contains(this.owningPersistentResourceClass))
+			throw new IllegalArgumentException("Property " + pd.getName()
+					+ " of " + containerClass.getName()
+					+ " has owning persietent resource attribute that does not"
+					+ " point at a persistent resource.");
+		if ((this.owningPersistentResourceClass != null)
+				&& (persistenceDesc == null))
+			throw new IllegalArgumentException("Property " + pd.getName()
+					+ " of " + containerClass.getName()
+					+ " is owned by a  persietent resource and therefore must"
+					+ " be persistent.");
+		this.borrowed =
+			((this.owningPersistentResourceClass != null)
+					&& (this.owningPersistentResourceClass != prsrcClass));
 
 		// check correctness of persistent property definition
 		this.checkPersistentPropertyDef(containerClass, pd, valueHandler,
@@ -185,10 +229,10 @@ class ObjectPropertyHandlerImpl
 				}
 				final String typeName = vProps.getConcreteTypeName();
 				valueTypeHandlers.add(new ConcreteObjectPropertyHandler(
-						new ObjectPropertyHandlerImpl(containerClass, pd,
-								propAnno, valueHandler, vValueHandler,
-								ctxPersistentCollectionName, vPersistenceDesc,
-								typeName),
+						new ObjectPropertyHandlerImpl(prsrcClasses, prsrcClass,
+								containerClass, pd, propAnno, valueHandler,
+								vValueHandler, ctxPersistentCollectionName,
+								vPersistenceDesc, typeName),
 						typePropHandler, typeName));
 			}
 		} else {
@@ -238,6 +282,24 @@ class ObjectPropertyHandlerImpl
 		return this.concreteTypeName;
 	}
 
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public Class<?> getOwningPersistentResourceClass() {
+
+		return this.owningPersistentResourceClass;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public boolean isBorrowed() {
+
+		return this.borrowed;
+	}
 
 	/* (non-Javadoc)
 	 * See overridden method.

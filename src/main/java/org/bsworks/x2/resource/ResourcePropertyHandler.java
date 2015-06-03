@@ -108,4 +108,12 @@ public interface ResourcePropertyHandler {
 	 * leave unchanged.
 	 */
 	boolean updateIfNull();
+
+	/**
+	 * Tell if the property is fetched from the persistent storage by default.
+	 * If not, the property is fetched only if explicitly requested.
+	 *
+	 * @return {@code true} if fetched by default.
+	 */
+	boolean isFetchedByDefault();
 }

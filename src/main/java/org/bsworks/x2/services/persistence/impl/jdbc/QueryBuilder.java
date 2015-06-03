@@ -614,13 +614,12 @@ class QueryBuilder {
 		 * Tell if the specified property needs to be selected.
 		 *
 		 * @param propPath Property path.
-		 * @param fetchedByDefault {@code true} if selected by default when
-		 * explicit properties fetch is not specified.
+		 * @param propHandler Property handler.
 		 *
 		 * @return {@code true} if selected.
 		 */
 		boolean isSelected(final String propPath,
-				final boolean fetchedByDefault) {
+				final ResourcePropertyHandler propHandler) {
 
 			final PropertiesFetchSpec<?> propsFetch =
 				(this.aggregationBranchLevel < 0 ? this.propsFetch :
@@ -628,7 +627,8 @@ class QueryBuilder {
 
 			return (((propsFetch != null)
 						&& propsFetch.isIncluded(propPath))
-					|| ((propsFetch == null) && fetchedByDefault));
+					|| ((propsFetch == null)
+							&& propHandler.isFetchedByDefault()));
 		}
 
 		/**
@@ -1190,7 +1190,7 @@ class QueryBuilder {
 					prsrcHandler.getAggregateProperties()) {
 				final String propPath =
 					ctx.getPropertyPath(propHandler.getName());
-				if (ctx.isSelected(propPath, false)) {
+				if (ctx.isSelected(propPath, propHandler)) {
 					List<AggregatePropertyHandler> phList =
 						aggregatePropHandlers.get(
 							propHandler.getAggregatedCollectionPropertyPath());
@@ -1321,7 +1321,7 @@ class QueryBuilder {
 			addBranch(ctx, createCollectionSimplePropertyBranch(ctx,
 					propHandler, propPersistence),
 					ctx.isSelected(ctx.getPropertyPath(propHandler.getName()),
-							true));
+							propHandler));
 	}
 
 	/**
@@ -1347,7 +1347,7 @@ class QueryBuilder {
 							.getPersistentValueType()));
 
 		// check if selected
-		if (!ctx.isSelected(propPath, true))
+		if (!ctx.isSelected(propPath, propHandler))
 			return;
 
 		// add property to the select list
@@ -1444,15 +1444,15 @@ class QueryBuilder {
 		if (propTableName == null)
 			addBranch(ctx, createEmbeddedObjectPropertyBranch(ctx,
 					propHandler, propPersistence, propPath),
-					ctx.isSelected(propPath, true));
+					ctx.isSelected(propPath, propHandler));
 		else if (propHandler.isSingleValued()) // single-valued
 			addBranch(ctx, createSingleObjectPropertyBranch(ctx,
 					propHandler, propPersistence, propPath, propTableName),
-					ctx.isSelected(propPath, true));
+					ctx.isSelected(propPath, propHandler));
 		else // not embedded collection
 			addBranch(ctx, createCollectionObjectPropertyBranch(ctx,
 					propHandler, propPersistence, propPath, propTableName),
-					ctx.isSelected(propPath, true));
+					ctx.isSelected(propPath, propHandler));
 
 		// add polymorphic type property
 		if (polymorphic && propHandler.isSingleValued()) {
@@ -1717,11 +1717,11 @@ class QueryBuilder {
 			if (propHandler.isSingleValued())
 				addBranch(ctx, createSingleFetchedRefPropertyBranch(ctx,
 						propHandler, propPersistence, propPath,
-						refTargetClass), ctx.isSelected(propPath, true));
+						refTargetClass), ctx.isSelected(propPath, propHandler));
 			else // collection
 				addBranch(ctx, createCollectionFetchedRefPropertyBranch(ctx,
 						propHandler, propPersistence, propPath,
-						refTargetClass), ctx.isSelected(propPath, true));
+						refTargetClass), ctx.isSelected(propPath, propHandler));
 
 		} else { // no fetch requested
 
@@ -1732,7 +1732,7 @@ class QueryBuilder {
 			else // collection
 				addBranch(ctx, createCollectionRefPropertyBranch(ctx,
 						propHandler, propPersistence, refTargetClass),
-						ctx.isSelected(propPath, true));
+						ctx.isSelected(propPath, propHandler));
 		}
 	}
 
@@ -1775,7 +1775,7 @@ class QueryBuilder {
 					propValExpr);
 
 		// add to select list if selected
-		if (ctx.isSelected(propPath, true))
+		if (ctx.isSelected(propPath, propHandler))
 			ctx.appendSelectList(propHandler.getName(), propColValExpr);
 
 		// check if used
@@ -2014,14 +2014,13 @@ class QueryBuilder {
 			if (propHandler.isSingleValued())
 				addBranch(ctx, createSingleFetchedDependentRefPropertyBranch(
 						ctx, propHandler, propPersistence, propPath,
-						refTargetClass), ctx.isSelected(propPath,
-								propHandler.isFetchedByDefault()));
+						refTargetClass), ctx.isSelected(propPath, propHandler));
 			else // collection
 				addBranch(ctx,
 						createCollectionFetchedDependentRefPropertyBranch(ctx,
 								propHandler, propPersistence, propPath,
 								refTargetClass), ctx.isSelected(propPath,
-										propHandler.isFetchedByDefault()));
+										propHandler));
 
 		} else { // no fetch requested
 
@@ -2032,8 +2031,7 @@ class QueryBuilder {
 			else // collection
 				addBranch(ctx, createCollectionDependentRefPropertyBranch(ctx,
 						propHandler, propPersistence, propPath,
-						refTargetClass), ctx.isSelected(propPath,
-								propHandler.isFetchedByDefault()));
+						refTargetClass), ctx.isSelected(propPath, propHandler));
 		}
 	}
 
@@ -2081,7 +2079,7 @@ class QueryBuilder {
 			+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
 
 		// add to select list if selected
-		if (ctx.isSelected(propPath, propHandler.isFetchedByDefault())) {
+		if (ctx.isSelected(propPath, propHandler)) {
 
 			// add the join (will be created by the branch)
 			ctx.selectSingleJoins.add(propPath);

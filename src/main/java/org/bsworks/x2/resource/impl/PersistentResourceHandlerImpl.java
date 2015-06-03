@@ -71,7 +71,7 @@ class PersistentResourceHandlerImpl<R>
 			final Set<Class<?>> prsrcClasses, final Class<R> prsrcClass,
 			final PersistentResource prsrcAnno) {
 		super(new ResourcePropertiesContainerImpl<>(resources, prsrcClasses,
-						prsrcClass, null, null,
+						prsrcClass, prsrcClass, null, null,
 						StringUtils.defaultIfEmpty(
 								prsrcAnno.persistentCollection(),
 								prsrcClass.getSimpleName()), null,

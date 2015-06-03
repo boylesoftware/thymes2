@@ -46,7 +46,7 @@ class TypePropertyHandlerImpl
 			final AbstractResourcePropertyValueHandlerImpl valueHandler,
 			final CanBeIdResourcePropertyValueHandler leafValueHandler,
 			final String ctxPersistentFieldsPrefix) {
-		super(pd, valueHandler,
+		super(containerClass, pd, valueHandler,
 				new AccessChecker(
 						(TypePropertyHandlerImpl.class).getAnnotation(
 								AccessRestrictions.class).value(),
@@ -59,7 +59,7 @@ class TypePropertyHandlerImpl
 										propAnno.persistentField(),
 										pd.getName()),
 							null, null, null, false)),
-				false);
+				false, true);
 
 		// must be single-valued
 		if (valueHandler.getCollectionDegree() > 0)

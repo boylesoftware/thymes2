@@ -217,14 +217,15 @@ public class DefaultPersistentResourceEndpointHandler<R>
 	@Override
 	public R get(final EndpointCallContext ctx, final Object recId,
 			final FilterSpec<R> recFilter,
-			final PropertiesFetchSpec<R> propsFetch)
+			final PropertiesFetchSpec<R> propsFetch, final boolean lock)
 		throws EndpointCallErrorException {
 
 		final PersistentResourceFetch<R> fetch = ctx
 				.getPersistenceTransaction()
 				.createPersistentResourceFetch(this.prsrcClass)
-				.setFilter(recFilter)
-				.lockResult(LockType.SHARED);
+				.setFilter(recFilter);
+		if (lock)
+			fetch.lockResult(LockType.SHARED);
 		if (propsFetch != null)
 			fetch.setPropertiesFetch(propsFetch);
 
