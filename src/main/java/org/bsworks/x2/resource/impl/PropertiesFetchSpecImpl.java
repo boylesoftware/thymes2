@@ -30,9 +30,14 @@ class PropertiesFetchSpecImpl<R>
 	private boolean includeByDefault = false;
 
 	/**
-	 * Property paths.
+	 * Included property paths.
 	 */
-	private final SortedSet<String> paths = new TreeSet<>();
+	private final SortedSet<String> includePaths = new TreeSet<>();
+
+	/**
+	 * Excluded property paths.
+	 */
+	private final SortedSet<String> excludePaths = new TreeSet<>();
 
 
 	/**
@@ -63,9 +68,6 @@ class PropertiesFetchSpecImpl<R>
 	@Override
 	public PropertiesFetchSpec<R> include(final String propPath) {
 
-		if (this.includeByDefault)
-			throw new IllegalStateException("In include by default mode.");
-
 		final Deque<? extends ResourcePropertyHandler> propChain =
 			this.prsrcHandler.getPersistentPropertyChain(propPath);
 
@@ -73,7 +75,7 @@ class PropertiesFetchSpecImpl<R>
 			throw new IllegalArgumentException("Included property cannot be a"
 					+ " nested object itself.");
 
-		this.paths.add(propPath);
+		this.includePaths.add(propPath);
 
 		return this;
 	}
@@ -87,7 +89,7 @@ class PropertiesFetchSpecImpl<R>
 		if (this.includeByDefault)
 			throw new IllegalStateException("In include by default mode.");
 
-		if (!this.paths.isEmpty())
+		if (!this.includePaths.isEmpty() || !this.excludePaths.isEmpty())
 			throw new IllegalStateException(
 					"Must be called before adding properties.");
 
@@ -107,7 +109,7 @@ class PropertiesFetchSpecImpl<R>
 
 		this.prsrcHandler.getPersistentPropertyChain(propPath);
 
-		this.paths.add(propPath);
+		this.excludePaths.add(propPath);
 
 		return this;
 	}
@@ -118,24 +120,39 @@ class PropertiesFetchSpecImpl<R>
 	@Override
 	public boolean isIncluded(final String propPath) {
 
-		boolean included;
-		if (this.includeByDefault) { // check for exclusion
-			included = true;
+		// check if explicitly included
+		final boolean included = (this.includePaths.contains(propPath)
+				|| !this.includePaths.subSet(propPath + ".", propPath + "/")
+				.isEmpty());
+
+		// check for exclusion
+		if (this.includeByDefault) {
+
+			// check that it is not explicitly excluded
 			final StringBuilder propPathBuf = new StringBuilder(propPath);
 			int dotInd = propPathBuf.length();
 			do {
 				propPathBuf.setLength(dotInd);
-				if (this.paths.contains(propPathBuf.toString())) {
-					included = false;
-					break;
-				}
+				if (this.excludePaths.contains(propPathBuf.toString()))
+					return false;
 			} while ((dotInd = propPathBuf.lastIndexOf(".")) > 0);
-		} else { // check for inclusion
-			included = (this.paths.contains(propPath)
-					|| !this.paths.subSet(propPath + ".", propPath + "/")
-						.isEmpty());
+
+			// check if explicitly included
+			if (included)
+				return true;
+
+			// check if all properties in the chain are fetched by default
+			for (final ResourcePropertyHandler ph :
+					this.prsrcHandler.getPersistentPropertyChain(propPath)) {
+				if (!ph.isFetchedByDefault())
+					return false;
+			}
+
+			// OK, it's included
+			return true;
 		}
 
+		// default mode, tell if explicitly included
 		return included;
 	}
 }

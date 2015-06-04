@@ -33,8 +33,6 @@ public interface PropertiesFetchSpec<R> {
 	 *
 	 * @throws IllegalArgumentException If the specified property path is
 	 * invalid.
-	 * @throws IllegalStateException If {@link #includeByDefault()} has been
-	 * called.
 	 */
 	PropertiesFetchSpec<R> include(String propPath);
 
@@ -44,7 +42,12 @@ public interface PropertiesFetchSpec<R> {
 	 * properties are assumed to be excluded unless explicitly included by
 	 * calling the {@link #include(String)} method. If "include by default"
 	 * mode, all properties are assumed to be included unless explicitly
-	 * excluded by calling the {@link #exclude(String)} method.
+	 * excluded by calling the {@link #exclude(String)} method or marked as not
+	 * to be fetched by default
+	 * ({@link ResourcePropertyHandler#isFetchedByDefault()} returns
+	 * {@code false} for the property). A property that is not fetched by
+	 * default can be added to the fetch with the {@link #include(String)}
+	 * method.
 	 *
 	 * @return This object (for chaining).
 	 *

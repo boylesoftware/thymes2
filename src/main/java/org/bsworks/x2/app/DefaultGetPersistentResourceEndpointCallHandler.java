@@ -44,12 +44,16 @@ import org.bsworks.x2.util.StringUtils;
  * <dt>{@value #INCLUDE_PROPS_FETCH_PARAM}</dt><dd>Comma-separated list of
  * persistent resource property paths to include in the result (see
  * {@link PropertiesFetchSpec}). If specified, only these properties are
- * fetched.</dd>
+ * fetched. If the list is prefixed with a plus sign ("+"), all properties that
+ * are normally fetched by default are fetched plus whatever properties
+ * mentioned in the list (makes sense to use to add properties that are not
+ * fetched by default to the result). In this mode, the parameter may be
+ * combined with {@value #EXCLUDE_PROPS_FETCH_PARAM} parameter.</dd>
  * <dt>{@value #EXCLUDE_PROPS_FETCH_PARAM}</dt><dd>Comma-separated list of
  * persistent resource property paths to exclude from the result (see
- * {@link PropertiesFetchSpec}). Either {@value #EXCLUDE_PROPS_FETCH_PARAM} or
- * {@value #INCLUDE_PROPS_FETCH_PARAM} may be specified in a single request, but
- * not both.</dd>
+ * {@link PropertiesFetchSpec}). It is illegal to combine
+ * {@value #EXCLUDE_PROPS_FETCH_PARAM} with {@value #INCLUDE_PROPS_FETCH_PARAM}
+ * unless the latter's value is prefixed with "+" (see above).</dd>
  * <dt>{@value #FILTER_PARAM_RE}</dt><dd>Specifies a filter condition (see
  * {@link FilterSpec}). A condition is a sequence of three parts: the persistent
  * resource property path(s), the conditional operation and a value. The
@@ -568,27 +572,45 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 				ctx.getRequestParam(INCLUDE_PROPS_FETCH_PARAM));
 		final String excludePropsFetchParam = StringUtils.nullIfEmpty(
 				ctx.getRequestParam(EXCLUDE_PROPS_FETCH_PARAM));
+
 		if ((includePropsFetchParam == null)
 				&& (excludePropsFetchParam == null))
 			return null;
-		if ((includePropsFetchParam != null)
-				&& (excludePropsFetchParam != null))
+
+		final boolean includeWithPlus = ((includePropsFetchParam != null)
+				&& includePropsFetchParam.startsWith("+"));
+
+		if (includeWithPlus
+				&& (includePropsFetchParam != null) // redundant, for Eclipse
+				&& (includePropsFetchParam.length() <= 1))
 			throw new EndpointCallErrorException(
 					HttpServletResponse.SC_BAD_REQUEST, null,
-					"Either \"" + INCLUDE_PROPS_FETCH_PARAM + "\" or  \""
-					+ EXCLUDE_PROPS_FETCH_PARAM
-					+ "\" request parameter can be specified, but not both.");
+					"Invalid \"" + INCLUDE_PROPS_FETCH_PARAM
+					+ "\" request parameter.");
+
+		if ((includePropsFetchParam != null)
+				&& (excludePropsFetchParam != null) && !includeWithPlus)
+			throw new EndpointCallErrorException(
+					HttpServletResponse.SC_BAD_REQUEST, null,
+					"Conflicting \"" + INCLUDE_PROPS_FETCH_PARAM + "\" and  \""
+					+ EXCLUDE_PROPS_FETCH_PARAM + "\" request parameters.");
 
 		final PropertiesFetchSpec<R> propsFetch =
 			ctx.getPropertiesFetchSpec(this.prsrcClass);
 		try {
-			if (includePropsFetchParam != null) {
+			if ((includePropsFetchParam != null) && !includeWithPlus) {
 				for (final String propPath : includePropsFetchParam.split(","))
 					propsFetch.include(propPath);
-			} else if (excludePropsFetchParam != null) { // redundant
+			} else {
 				propsFetch.includeByDefault();
-				for (final String propPath : excludePropsFetchParam.split(","))
-					propsFetch.exclude(propPath);
+				if (includePropsFetchParam != null)
+					for (final String propPath :
+						includePropsFetchParam.substring(1).split(","))
+					propsFetch.include(propPath);
+				if (excludePropsFetchParam != null)
+					for (final String propPath :
+							excludePropsFetchParam.split(","))
+						propsFetch.exclude(propPath);
 			}
 		} catch (final IllegalArgumentException e) {
 			if (this.log.isDebugEnabled())
