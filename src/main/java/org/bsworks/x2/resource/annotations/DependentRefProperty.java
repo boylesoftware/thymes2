@@ -21,9 +21,11 @@ import org.bsworks.x2.resource.Ref;
  * the reverse reference property in the target dependent resource.
  *
  * <p>An update of a dependent resource reference property may lead to removal
- * of the dependent resource record(s) from the persistent storage, or it may
- * lead to an update of the dependent resource record(s) that sets the new value
- * to the reverse reference property.
+ * of the dependent resource record(s) from the persistent storage. This is the
+ * only updates that is allowed. For a collection dependent resource property
+ * adding elements via update is not allowed. Also, if a dependent resource
+ * property has {@link #fetchedByDefault} attribute set to {@code false}, it is
+ * completely excluded from the updates.
  *
  * <p>The type of the property marked with this annotation must be {@link Ref}.
  * It can also be a collection, but it cannot be a map. The property must belong

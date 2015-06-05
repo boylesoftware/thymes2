@@ -1856,6 +1856,10 @@ class UpdateBuilder {
 			final Object curPropVal, final Object newPropVal,
 			final Map<Class<?>, Set<Object>> depPRsrcIdsToDelete) {
 
+		// check if excluded from update
+		if (!propHandler.isFetchedByDefault())
+			return false;
+
 		// get referred persistent resource info
 		final Class<?> depPRsrcClass =
 			propHandler.getReferredResourceClass();
