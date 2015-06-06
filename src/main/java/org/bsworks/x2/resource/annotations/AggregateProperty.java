@@ -24,12 +24,15 @@ import org.bsworks.x2.resource.ResourcePropertyAccess;
  * included unless explicitly requested in the provided properties fetch
  * specification.
  *
- * <p>The type of the property marked with this annotation may not be a
- * collection or a map. The type depends on the aggregate function and the type
- * of its parameter (that is types of the properties used for calculating the
- * aggregation). It should not be a primitive type to allow {@code null}, so
- * that it can be excluded from the resource serialized form passed over the API
- * when the aggregation is not requested.
+ * <p>The type of the aggregate property depends on the aggregate function and
+ * the type of its parameter (that is types of the properties used for
+ * calculating the aggregation). It should not be a primitive type to allow
+ * {@code null}, so that it can be excluded from the resource serialized form
+ * passed over the API when the aggregation is not requested.
+ *
+ * <p>Aggregate property can be a single-valued property or a map, in which case
+ * the aggregation is performed for each key in the map in addition to the
+ * containing record id. Aggregate property may not be a non-map collection.
  *
  * @author Lev Himmelfarb
  */
@@ -81,4 +84,12 @@ public @interface AggregateProperty {
 	 * @return The aggregated value expression.
 	 */
 	String valueExpression() default "";
+
+	/**
+	 * For a map aggregate property, name of the aggregated object property used
+	 * as the key in the map. Must be specified if the property is a map.
+	 *
+	 * @return The map key property name.
+	 */
+	String key() default "";
 }

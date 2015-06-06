@@ -278,6 +278,12 @@ class QueryBuilder {
 		private String aggregatedCollectionPropPath;
 
 		/**
+		 * Aggregation key property name, or {@code null} if single-valued
+		 * aggregate property.
+		 */
+		private String aggregationKeyPropName;
+
+		/**
 		 * Aggregated property handlers.
 		 */
 		private List<AggregatePropertyHandler> aggregatedPropHandlers;
@@ -406,6 +412,7 @@ class QueryBuilder {
 					parentCtx.aggregationBranchLevel + 1);
 			this.aggregatedCollectionPropPath =
 				parentCtx.aggregatedCollectionPropPath;
+			this.aggregationKeyPropName = parentCtx.aggregationKeyPropName;
 			this.aggregationPropsFetch = parentCtx.aggregationPropsFetch;
 			this.aggregationRefsFetch = parentCtx.aggregationRefsFetch;
 			this.aggregationValueExprs = parentCtx.aggregationValueExprs;
@@ -417,14 +424,20 @@ class QueryBuilder {
 		 *
 		 * @param propName Property name.
 		 * @param valExpr Value expression.
+		 * @param pureValExpr Core value expression.
 		 */
-		void appendSelectList(final String propName, final String valExpr) {
+		void appendSelectList(final String propName, final String valExpr,
+				final String pureValExpr) {
 
 			if (this.aggregationBranchLevel > 0) {
 
 				if (this.parentPropPath.equals(
-						this.aggregatedCollectionPropPath))
+						this.aggregatedCollectionPropPath)) {
 					this.aggregationValueExprs.put(propName, valExpr);
+					if (propName.equals(this.aggregationKeyPropName))
+						this.aggregationValueExprs.put(propName + "/key",
+								pureValExpr);
+				}
 
 				return;
 			}
@@ -473,6 +486,13 @@ class QueryBuilder {
 				if (groupByList.length() > 0)
 					groupByList.append(", ");
 				groupByList.append(colExprs.get(i));
+			}
+
+			if (this.aggregationKeyPropName != null) {
+				if (groupByList.length() > 0)
+					groupByList.append(", ");
+				groupByList.append(this.aggregationValueExprs.get(
+						this.aggregationKeyPropName + "/key"));
 			}
 
 			return groupByList.toString();
@@ -636,15 +656,19 @@ class QueryBuilder {
 		 *
 		 * @param aggregatedCollectionPropPath Aggregated collection property
 		 * path.
+		 * @param aggregationKeyPropName Aggregation key property name, or
+		 * {@code null} if single-valued aggregate property.
 		 * @param aggregatedPropHandlers Aggregated property handlers.
 		 */
 		void setAggregationMode(
 				final String aggregatedCollectionPropPath,
+				final String aggregationKeyPropName,
 				final List<AggregatePropertyHandler> aggregatedPropHandlers) {
 
 			this.aggregationBranchLevel = 0;
 
 			this.aggregatedPropHandlers = aggregatedPropHandlers;
+			this.aggregationKeyPropName = aggregationKeyPropName;
 
 			// create complete aggregated collection property path
 			final String propPathsPrefix =
@@ -662,8 +686,8 @@ class QueryBuilder {
 						this.prsrcHandler.getResourceClass());
 			for (final AggregatePropertyHandler ph : aggregatedPropHandlers) {
 
-				// add aggregated value properties to the fetch
-				for (final String propName : ph.getUsedValuePropertyNames())
+				// add aggregated properties to the fetch
+				for (final String propName : ph.getAggregatedPropertyNames())
 					this.aggregationPropsFetch.include(
 							this.aggregatedCollectionPropPath + "." + propName);
 
@@ -682,6 +706,7 @@ class QueryBuilder {
 			this.aggregationBranchLevel = -1;
 
 			this.aggregatedCollectionPropPath = null;
+			this.aggregationKeyPropName = null;
 			this.aggregatedPropHandlers = null;
 			this.aggregationPropsFetch = null;
 			this.aggregationRefsFetch = null;
@@ -712,8 +737,28 @@ class QueryBuilder {
 			final StringBuffer selectList = new StringBuffer(64);
 			for (final AggregatePropertyHandler ph :
 					this.aggregatedPropHandlers) {
+
 				if (selectList.length() > 0)
 					selectList.append(", ");
+
+				final String valueColLabel;
+				if (this.aggregationKeyPropName != null) {
+
+					this.prepareNestedProperty(ph);
+
+					valueColLabel = this.propColLabelPrefix + ph.getName();
+
+					selectList
+					.append(this.aggregationValueExprs.get(
+							this.aggregationKeyPropName))
+					.append(" AS ")
+					.append(this.dialect.quoteColumnLabel(
+							this.colLabelPrefix + ph.getName()))
+					.append(", ");
+				} else {
+					valueColLabel = this.colLabelPrefix + ph.getName();
+				}
+
 				final String ending;
 				switch (ph.getFunction()) {
 				case COUNT:
@@ -743,6 +788,7 @@ class QueryBuilder {
 				default: // may not happen
 					throw new AssertionError("Invalid aggregation function.");
 				}
+
 				final Matcher m = ph.getValuePropertiesMatcher();
 				if (m != null) {
 					while (m.find())
@@ -754,9 +800,9 @@ class QueryBuilder {
 							ph.getAggregatedCollectionHandler().getIdProperty()
 								.getName()));
 				}
+
 				selectList.append(ending).append(" AS ")
-					.append(this.dialect.quoteColumnLabel(
-							this.colLabelPrefix + ph.getName()));
+					.append(this.dialect.quoteColumnLabel(valueColLabel));
 			}
 
 			return selectList.toString();
@@ -1125,7 +1171,8 @@ class QueryBuilder {
 
 		// add record id to the select list and the properties
 		if ((idPropHandler != null) && !polymorphic) {
-			ctx.appendSelectList(idPropHandler.getName(), idColValExpr);
+			ctx.appendSelectList(idPropHandler.getName(), idColValExpr,
+					idColValExpr);
 			ctx.singlePropExprs.put(
 					ctx.getPropertyPath(idPropHandler.getName()),
 					new SingleValuedQueryProperty(
@@ -1186,19 +1233,22 @@ class QueryBuilder {
 			// collect all requested aggregate properties and group them
 			final Map<String, List<AggregatePropertyHandler>>
 			aggregatePropHandlers = new HashMap<>();
+			int branchKeyDisc = 0;
 			for (final AggregatePropertyHandler propHandler :
 					prsrcHandler.getAggregateProperties()) {
 				final String propPath =
 					ctx.getPropertyPath(propHandler.getName());
 				if (ctx.isSelected(propPath, propHandler)) {
+					final String branchKey = (
+						propHandler.getKeyPropertyName() == null ?
+							propHandler.getAggregatedCollectionPropertyPath() :
+							propHandler.getAggregatedCollectionPropertyPath()
+								+ "/" + (branchKeyDisc++));
 					List<AggregatePropertyHandler> phList =
-						aggregatePropHandlers.get(
-							propHandler.getAggregatedCollectionPropertyPath());
+						aggregatePropHandlers.get(branchKey);
 					if (phList == null) {
 						phList = new ArrayList<>();
-						aggregatePropHandlers.put(
-							propHandler.getAggregatedCollectionPropertyPath(),
-							phList);
+						aggregatePropHandlers.put(branchKey, phList);
 					}
 					phList.add(propHandler);
 				}
@@ -1207,8 +1257,7 @@ class QueryBuilder {
 			// add aggregate properties if any
 			for (final Map.Entry<String, List<AggregatePropertyHandler>> entry :
 					aggregatePropHandlers.entrySet())
-				addAggregateProperties(ctx, prsrcHandler, entry.getKey(),
-						entry.getValue());
+				addAggregateProperties(ctx, prsrcHandler, entry.getValue());
 		}
 
 		// order by record id if has collections
@@ -1351,7 +1400,7 @@ class QueryBuilder {
 			return;
 
 		// add property to the select list
-		ctx.appendSelectList(propHandler.getName(), propValExpr);
+		ctx.appendSelectList(propHandler.getName(), propValExpr, propValExpr);
 	}
 
 	/**
@@ -1776,7 +1825,8 @@ class QueryBuilder {
 
 		// add to select list if selected
 		if (ctx.isSelected(propPath, propHandler))
-			ctx.appendSelectList(propHandler.getName(), propColValExpr);
+			ctx.appendSelectList(propHandler.getName(), propColValExpr,
+					propValExpr);
 
 		// check if used
 		if (!isUsed(ctx, propPath))
@@ -2085,7 +2135,8 @@ class QueryBuilder {
 			ctx.selectSingleJoins.add(propPath);
 
 			// add property to the select list
-			ctx.appendSelectList(propHandler.getName(), propColValExpr);
+			ctx.appendSelectList(propHandler.getName(), propColValExpr,
+					propValExpr);
 		}
 
 		// create branch
@@ -2288,17 +2339,20 @@ class QueryBuilder {
 	 * @param ctx Query builder context.
 	 * @param prsrcHandler Handler of the persistent resource containing the
 	 * aggregates.
-	 * @param collectionPropPath Aggregation collection property path.
 	 * @param propHandlers Aggregate property handlers.
 	 */
 	private static void addAggregateProperties(
 			final QueryBuilderContext ctx,
 			final PersistentResourceHandler<?> prsrcHandler,
-			final String collectionPropPath,
 			final List<AggregatePropertyHandler> propHandlers) {
 
+		// get collection property path
+		final String collectionPropPath =
+			propHandlers.get(0).getAggregatedCollectionPropertyPath();
+
 		// switch context into the aggregation mode
-		ctx.setAggregationMode(collectionPropPath, propHandlers);
+		ctx.setAggregationMode(collectionPropPath,
+				propHandlers.get(0).getKeyPropertyName(), propHandlers);
 
 		// get aggregated collection property chain
 		final Deque<? extends ResourcePropertyHandler> collectionPropChain =

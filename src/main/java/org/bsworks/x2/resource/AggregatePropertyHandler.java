@@ -66,13 +66,6 @@ public interface AggregatePropertyHandler
 	String getAggregationValueExpression();
 
 	/**
-	 * Get names of properties used in the aggregation value expression.
-	 *
-	 * @return Unmodifiable set of property names.
-	 */
-	Set<String> getUsedValuePropertyNames();
-
-	/**
 	 * Get regular expression matcher for all property names in the aggregation
 	 * value expression.
 	 *
@@ -80,4 +73,20 @@ public interface AggregatePropertyHandler
 	 * value expression.
 	 */
 	Matcher getValuePropertiesMatcher();
+
+	/**
+	 * Get name of the key property in the aggregated object if the aggregate
+	 * property is a map.
+	 *
+	 * @return Key property name, or {@code null} if not a map.
+	 */
+	String getKeyPropertyName();
+
+	/**
+	 * Get names of properties used in the aggregation value expression plus the
+	 * key property, if any.
+	 *
+	 * @return Unmodifiable set of property names.
+	 */
+	Set<String> getAggregatedPropertyNames();
 }

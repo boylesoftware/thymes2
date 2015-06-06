@@ -83,15 +83,20 @@ class AggregatePropertyHandlerImpl
 	private final String aggregationValueExpression;
 
 	/**
-	 * Aggregation value property names.
+	 * Aggregated property names.
 	 */
-	private final Set<String> usedValuePropertyNames = new HashSet<>();
+	private final Set<String> aggregatedPropertyNames = new HashSet<>();
 
 	/**
-	 * Read-only view of aggregation value property names.
+	 * Read-only view of aggregated property names.
 	 */
-	private final Set<String> usedValuePropertyNamesRO =
-		Collections.unmodifiableSet(this.usedValuePropertyNames);
+	private final Set<String> aggregatedPropertyNamesRO =
+		Collections.unmodifiableSet(this.aggregatedPropertyNames);
+
+	/**
+	 * Map key property name, or {@code null} if not a map.
+	 */
+	private final String keyPropertyName;
 
 
 	/**
@@ -113,12 +118,6 @@ class AggregatePropertyHandlerImpl
 						TargetType.AGGREGATE),
 				null, false, false);
 
-		// must be single-valued
-		if (valueHandler.getCollectionDegree() > 0)
-			throw new IllegalArgumentException("Property " + pd.getName()
-					+ " of " + containerClass.getName()
-					+ " cannot be a collection or a map.");
-
 		// must not be primitive
 		if (leafValueHandler.isPrimitive())
 			throw new IllegalArgumentException("Property " + pd.getName()
@@ -138,6 +137,34 @@ class AggregatePropertyHandlerImpl
 			throw new IllegalArgumentException("Property " + pd.getName()
 					+ " of " + containerClass.getName()
 					+ " must have aggregation property specified.");
+
+		// get key property
+		this.keyPropertyName = StringUtils.nullIfEmpty(propAnno.key());
+
+		// map or single-valued?
+		if (valueHandler.getCollectionDegree() > 0) {
+
+			// make sure it's a map
+			if (valueHandler.getType() != ResourcePropertyValueType.MAP)
+				throw new IllegalArgumentException("Property " + pd.getName()
+						+ " of " + containerClass.getName()
+						+ " cannot be a collection.");
+
+
+			// make sure we have a key
+			if (this.keyPropertyName == null)
+				throw new IllegalArgumentException("Property " + pd.getName()
+						+ " of " + containerClass.getName()
+						+ " is a map and must have a key attribute.");
+
+		} else { // single-valued
+
+			// make sure we don't have a key
+			if (this.keyPropertyName != null)
+				throw new IllegalArgumentException("Property " + pd.getName()
+						+ " of " + containerClass.getName()
+						+ " is not a map and cannot have a key.");
+		}
 	}
 
 
@@ -226,7 +253,7 @@ class AggregatePropertyHandlerImpl
 					this.aggregationValueExpression);
 			while (m.find()) {
 				final String propName = m.group();
-				if (this.usedValuePropertyNames.add(propName)) {
+				if (this.aggregatedPropertyNames.add(propName)) {
 					final ResourcePropertyHandler ph =
 						this.aggregatedCollectionHandler.getProperties().get(
 								propName);
@@ -244,8 +271,26 @@ class AggregatePropertyHandlerImpl
 				}
 			}
 		} else {
-			this.usedValuePropertyNames.add(
+			this.aggregatedPropertyNames.add(
 					this.aggregatedCollectionHandler.getIdProperty().getName());
+		}
+
+		// validate key property
+		if (this.keyPropertyName != null) {
+
+			this.aggregatedPropertyNames.add(this.keyPropertyName);
+
+			final ResourcePropertyHandler ph =
+				this.aggregatedCollectionHandler.getProperties().get(
+						this.keyPropertyName);
+			if ((ph == null) || !ph.isSingleValued()
+					|| !(ph.getValueHandler()
+							instanceof CanBeMapKeyResourcePropertyValueHandler))
+				throw new InitializationException("Property "
+						+ this.getName() + " of "
+						+ this.containerClass.getName()
+						+ " refers to key property that does not exist or may"
+						+ " not be used as a map key.");
 		}
 	}
 
@@ -308,20 +353,29 @@ class AggregatePropertyHandlerImpl
 	 * See overridden method.
 	 */
 	@Override
-	public Set<String> getUsedValuePropertyNames() {
-
-		return this.usedValuePropertyNamesRO;
-	}
-
-	/* (non-Javadoc)
-	 * See overridden method.
-	 */
-	@Override
 	public Matcher getValuePropertiesMatcher() {
 
 		if (this.aggregationValueExpression == null)
 			return null;
 
 		return PROPNAME_PATTERN.matcher(this.aggregationValueExpression);
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public String getKeyPropertyName() {
+
+		return this.keyPropertyName;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public Set<String> getAggregatedPropertyNames() {
+
+		return this.aggregatedPropertyNamesRO;
 	}
 }
