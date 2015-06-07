@@ -147,13 +147,13 @@ class ObjectPropertyHandlerImpl
 				&& !prsrcClasses.contains(this.owningPersistentResourceClass))
 			throw new IllegalArgumentException("Property " + pd.getName()
 					+ " of " + containerClass.getName()
-					+ " has owning persietent resource attribute that does not"
+					+ " has owning persistent resource attribute that does not"
 					+ " point at a persistent resource.");
 		if ((this.owningPersistentResourceClass != null)
 				&& (persistenceDesc == null))
 			throw new IllegalArgumentException("Property " + pd.getName()
 					+ " of " + containerClass.getName()
-					+ " is owned by a  persietent resource and therefore must"
+					+ " is owned by a  persistent resource and therefore must"
 					+ " be persistent.");
 		this.borrowed =
 			((this.owningPersistentResourceClass != null)

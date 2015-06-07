@@ -59,7 +59,7 @@ class RefPropertyHandlerImpl
 		if (propAnno.ownedBy() != PersistentResource.class)
 			throw new IllegalArgumentException("Reference property "
 					+ pd.getName() + " of " + containerClass.getName()
-					+ " may not have owner persietent resource attribute.");
+					+ " may not have owner persistent resource attribute.");
 
 		// check correctness of persistent property definition
 		final ResourcePropertyPersistenceImpl persistenceDesc =

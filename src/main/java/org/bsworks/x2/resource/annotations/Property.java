@@ -69,7 +69,7 @@ public @interface Property {
 	/**
 	 * The persistent resource that owns the nested object. This attribute
 	 * allows using nested object resources as properties in multiple persistent
-	 * resources while having only one of the "own" it. Owning such nested
+	 * resources while having only one of them "own" it. Owning such nested
 	 * object resource affects the record versioning: if a persistent resource
 	 * does not own the nested object, when the persistent resource record
 	 * version is calculated the version of the owning persistent resource
@@ -79,7 +79,7 @@ public @interface Property {
 	 *
 	 * <p>If property is owned by a different persistent resource, it is never
 	 * included in this persistent resource updates, creates and deletes. It is
-	 * included in fetches by default, however, so, often it makes sense to set
+	 * included in fetches by default, however, often it makes sense to set
 	 * {@link #fetchedByDefault()} to {@code false} as well.
 	 *
 	 * <p>This attribute is allowed only on nested object properties.
