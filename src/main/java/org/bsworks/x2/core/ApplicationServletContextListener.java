@@ -4,7 +4,9 @@ import javax.servlet.ServletContext;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 import javax.servlet.annotation.WebListener;
+import javax.servlet.http.HttpServletRequest;
 
+import org.bsworks.x2.Actor;
 import org.bsworks.x2.InitializationException;
 import org.bsworks.x2.RuntimeContext;
 
@@ -85,5 +87,29 @@ public class ApplicationServletContextListener
 			return null;
 
 		return app.getRuntimeContext();
+	}
+
+	/**
+	 * Get actor making the request. This method is intended to be solely used
+	 * from application components working outside of the framework stack
+	 * (endpoint call handlers), such as custom application servlets and
+	 * filters. Together with {@link #getRuntimeContext(ServletContext)} this
+	 * method provides such servlets and filters access to the framework
+	 * functionality, including the persistent storage, etc.
+	 *
+	 * @param httpRequest The HTTP request.
+	 *
+	 * @return The actor, or {@code null} if the request does not contain
+	 * authentication information, or the authentication information is invalid,
+	 * expired, or refers to a nonexistent or inactive actor.
+	 */
+	public static Actor getActor(final HttpServletRequest httpRequest) {
+
+		final Application app = getApplication(httpRequest.getServletContext());
+		if (app == null)
+			return null;
+
+		return app.getRuntimeContext().getAuthTokenHandler().getActor(
+				httpRequest);
 	}
 }
