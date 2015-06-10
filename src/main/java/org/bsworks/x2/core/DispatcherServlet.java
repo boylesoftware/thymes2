@@ -10,13 +10,13 @@ import java.util.concurrent.Future;
 
 import javax.servlet.AsyncContext;
 import javax.servlet.UnavailableException;
+import javax.servlet.annotation.MultipartConfig;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.bsworks.x2.EndpointCallErrorException;
 import org.bsworks.x2.EndpointCallHandler;
 import org.bsworks.x2.HttpMethod;
@@ -30,6 +30,7 @@ import org.bsworks.x2.HttpMethod;
  *
  * @author Lev Himmelfarb
  */
+@MultipartConfig
 public class DispatcherServlet
 	extends HttpServlet {
 

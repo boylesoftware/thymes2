@@ -17,6 +17,7 @@ import javax.servlet.AsyncEvent;
 import javax.servlet.AsyncListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.Part;
 import javax.validation.ConstraintViolation;
 
 import org.apache.commons.logging.Log;
@@ -26,6 +27,7 @@ import org.bsworks.x2.EndpointCallErrorException;
 import org.bsworks.x2.EndpointCallHandler;
 import org.bsworks.x2.EndpointCallResponse;
 import org.bsworks.x2.HttpMethod;
+import org.bsworks.x2.RequestEntityPart;
 import org.bsworks.x2.RequestEntityValidationErrors;
 import org.bsworks.x2.resource.InvalidResourceDataException;
 import org.bsworks.x2.services.monitor.ApplicationErrorContext;
@@ -279,17 +281,40 @@ class EndpointCallExecutor<E>
 				this.handler.getRequestEntityClass();
 			if (requestEntityClass != null) {
 
-				// check content type
+				// determine request entity
+				RequestEntityPart httpRequestEntity = null;
 				final String requestCType = httpRequest.getContentType();
-				if ((requestCType == null) || !requestCType.matches(
-						serializer.getContentType() + "(?:;.*)?"))
+				if (requestCType == null)
 					throw new EndpointCallErrorException(
 							HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE,
-							null, "The request entity is not JSON.");
+							null, "The request has no content type.");
+				if (requestCType.matches("multipart/form-data(?:;.*)")) {
+					for (final Part part : httpRequest.getParts()) {
+						final String partCType = part.getContentType();
+						if ((partCType != null) && partCType.matches(
+								serializer.getContentType() + "(?:;.*)?")) {
+							httpRequestEntity = new RequestEntityPartImpl(part);
+							break;
+						}
+					}
+					if (httpRequestEntity == null)
+						throw new EndpointCallErrorException(
+								HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE,
+								null,
+								"The multipart request does not contain any"
+								+ " JSON part.");
+				} else {
+					if (!requestCType.matches(
+							serializer.getContentType() + "(?:;.*)?"))
+						throw new EndpointCallErrorException(
+								HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE,
+								null, "The request entity is not JSON.");
+					httpRequestEntity = new CompleteRequestEntity(httpRequest);
+				}
 
 				// check content length
 				final int maxSize = this.runtimeCtx.getMaxRequestSize();
-				final int contentLength = httpRequest.getContentLength();
+				final long contentLength = httpRequestEntity.getSize();
 				if (contentLength > maxSize)
 					throw new EndpointCallErrorException(
 							HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE,
@@ -297,7 +322,8 @@ class EndpointCallExecutor<E>
 
 				// read the content
 				buf = new byte[maxSize];
-				try (final InputStream in = httpRequest.getInputStream()) {
+				try (final InputStream in =
+						httpRequestEntity.getInputStream()) {
 					int bytesRead;
 					while ((bytesRead = in.read(buf, dataLen,
 							maxSize - dataLen)) != -1) {
@@ -313,7 +339,7 @@ class EndpointCallExecutor<E>
 				try {
 					requestEntity = serializer.deserialize(
 							new ByteArrayInputStream(buf, 0, dataLen),
-							httpRequest.getCharacterEncoding(),
+							httpRequestEntity.getCharacterEncoding(),
 							requestEntityClass, actor);
 				} catch (final UnsupportedEncodingException e) {
 					throw new EndpointCallErrorException(

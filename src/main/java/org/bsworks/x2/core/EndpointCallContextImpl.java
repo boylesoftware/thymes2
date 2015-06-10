@@ -1,9 +1,11 @@
 package org.bsworks.x2.core;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -12,6 +14,7 @@ import org.bsworks.x2.EndpointCallContext;
 import org.bsworks.x2.EndpointCallErrorException;
 import org.bsworks.x2.EndpointCallHttpResponseHook;
 import org.bsworks.x2.HttpMethod;
+import org.bsworks.x2.RequestEntityPart;
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.OrderSpec;
 import org.bsworks.x2.resource.PropertiesFetchSpec;
@@ -290,6 +293,35 @@ class EndpointCallContextImpl
 		final long val = this.httpRequest.getDateHeader(name);
 
 		return (val < 0 ? null : new Date(val));
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public boolean isMultipartRequest() {
+
+		final String ctype = this.httpRequest.getContentType();
+
+		return ((ctype != null) && ctype.matches("multipart/form-data(?:;.*)"));
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public RequestEntityPart getRequestEntityPart(final String name) {
+
+		if (!this.isMultipartRequest())
+			throw new IllegalStateException("Not a multipart request.");
+
+		try {
+			return new RequestEntityPartImpl(this.httpRequest.getPart(name));
+		} catch (final ServletException | IOException e) {
+			throw new RuntimeException(
+					"Error retrieving multipart HTTP request part " + name
+					+ ".", e);
+		}
 	}
 
 	/* (non-Javadoc)

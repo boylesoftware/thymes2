@@ -121,6 +121,26 @@ public interface EndpointCallContext {
 	Date getRequestDateHeader(String name);
 
 	/**
+	 * Tell if multipart HTTP request.
+	 *
+	 * @return {@code true} if multipart.
+	 */
+	boolean isMultipartRequest();
+
+	/**
+	 * Get request entity part for a multipart HTTP request.
+	 *
+	 * @param name Part name.
+	 *
+	 * @return The part, or {@code null} if request does not contain the
+	 * specified part.
+	 *
+	 * @throws IllegalStateException If request is not multipart. Use
+	 * {@link #isMultipartRequest()} to test.
+	 */
+	RequestEntityPart getRequestEntityPart(String name);
+
+	/**
 	 * Set context attribute.
 	 *
 	 * @param name Attribute name.
