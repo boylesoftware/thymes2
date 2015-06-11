@@ -209,6 +209,9 @@ class AccessChecker {
 		if (acl == null)
 			return ANY;
 
+		if (acl == AUTHED_ONLY)
+			return AUTHED_ONLY;
+
 		if (acl.isEmpty())
 			return NONE;
 

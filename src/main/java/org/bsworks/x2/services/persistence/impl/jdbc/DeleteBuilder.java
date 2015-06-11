@@ -318,6 +318,11 @@ class DeleteBuilder {
 						&& ((ObjectPropertyHandler) propHandler).isBorrowed())
 					continue;
 
+				if ((propHandler instanceof DependentRefPropertyHandler)
+						&& !((DependentRefPropertyHandler) propHandler)
+								.isDeleteCascaded())
+					continue;
+
 				if (joinedTablesBufLen > 0)
 					joinedTablesBuf.append(", ");
 				joinedTablesBuf.append(objTableName).append(" AS ")

@@ -94,4 +94,21 @@ public @interface DependentRefProperty {
 	 * @return The reverse reference property name.
 	 */
 	String reverseRefProperty();
+
+	/**
+	 * Normally, when the resource record is deleted, all of its dependent
+	 * resource records are deleted as well. If this attribute is set to
+	 * {@code false}, no attempt to delete the dependent resource records is
+	 * made.
+	 *
+	 * <p>Note, that if the persistent storage enforces referential integrity
+	 * (e.g. foreign key constraints in an RDBMS), the whole delete operation
+	 * will fail. This attribute, therefore, is used to prevent deletion of the
+	 * dependent resource records and the check that such records do not exist
+	 * is supposed to be performed separately before making the deletion call.
+	 *
+	 * @return {@code false} to prevent dependent resource records deletions.
+	 * The default is {@code true}.
+	 */
+	boolean cascadeDelete() default true;
 }

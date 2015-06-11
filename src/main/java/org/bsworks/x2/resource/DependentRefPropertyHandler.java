@@ -26,4 +26,12 @@ public interface DependentRefPropertyHandler
 	 * resource that contains the handled property and not a wildcard.
 	 */
 	String getReverseRefPropertyName();
+
+	/**
+	 * Tell if deletion of the containing resource should trigger deletion of
+	 * the dependent resource records.
+	 *
+	 * @return {@code true} to cascade delete.
+	 */
+	boolean isDeleteCascaded();
 }

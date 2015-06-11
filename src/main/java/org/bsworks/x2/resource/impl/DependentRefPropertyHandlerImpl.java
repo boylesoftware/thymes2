@@ -40,6 +40,11 @@ class DependentRefPropertyHandlerImpl
 	private final boolean optional;
 
 	/**
+	 * Tells if delete is cascaded.
+	 */
+	private final boolean cascadeDelete;
+
+	/**
 	 * Persistence descriptor.
 	 */
 	private ResourcePropertyPersistenceImpl persistence;
@@ -97,6 +102,7 @@ class DependentRefPropertyHandlerImpl
 		this.referredResourceClass = leafValueHandler.getRefTargetClass();
 		this.reverseRefPropertyName = propAnno.reverseRefProperty();
 		this.optional = propAnno.optional();
+		this.cascadeDelete = propAnno.cascadeDelete();
 	}
 
 
@@ -171,5 +177,14 @@ class DependentRefPropertyHandlerImpl
 	public String getReverseRefPropertyName() {
 
 		return this.reverseRefPropertyName;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public boolean isDeleteCascaded() {
+
+		return this.cascadeDelete;
 	}
 }
