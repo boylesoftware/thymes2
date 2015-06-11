@@ -86,7 +86,8 @@ class AuthTokenHandler {
 
 
 	/**
-	 * Get actor making the specified HTTP request.
+	 * Get actor making the specified HTTP request using authentication token in
+	 * the request "Authorization" header.
 	 *
 	 * @param httpRequest The HTTP request.
 	 *
@@ -113,8 +114,23 @@ class AuthTokenHandler {
 				this.log.debug("invalid Authorization header value");
 			return null;
 		}
-		final String tokenP0 = m.group(1);
-		final String tokenP1 = m.group(2);
+
+		// parser the token
+		return this.getActor(m.group(1), m.group(2));
+	}
+
+	/**
+	 * Get actor for the specified authentication token.
+	 *
+	 * @param tokenP0 First (general) part of the authentication token.
+	 * @param tokenP1 Second (user-specific) part of the authentication token.
+	 *
+	 * @return The actor, or {@code null} if the the authentication token is
+	 * invalid, expired, or refers to a nonexistent or inactive actor.
+	 */
+	Actor getActor(final String tokenP0, final String tokenP1) {
+
+		final boolean debug = this.log.isDebugEnabled();
 		if (debug)
 			this.log.debug("decrypting Authorization header: p0=" + tokenP0
 					+ ", p1=" + tokenP1);
