@@ -10,7 +10,6 @@ import java.util.concurrent.Future;
 
 import javax.servlet.AsyncContext;
 import javax.servlet.UnavailableException;
-import javax.servlet.annotation.MultipartConfig;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -30,7 +29,6 @@ import org.bsworks.x2.HttpMethod;
  *
  * @author Lev Himmelfarb
  */
-@MultipartConfig
 public class DispatcherServlet
 	extends HttpServlet {
 
