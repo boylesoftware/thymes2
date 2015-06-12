@@ -1,12 +1,10 @@
 package org.bsworks.x2.services.persistence.impl.jdbc;
 
-import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.bsworks.x2.Actor;
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.OrderSpec;
 import org.bsworks.x2.resource.PersistentResourceHandler;
@@ -88,29 +86,14 @@ class PersistentResourceFetchImpl<R>
 	private final Resources resources;
 
 	/**
-	 * SQL dialect.
+	 * The transaction.
 	 */
-	private final SQLDialect dialect;
-
-	/**
-	 * Query parameter value handlers factory.
-	 */
-	private final ParameterValuesFactoryImpl paramsFactory;
-
-	/**
-	 * Database connection.
-	 */
-	private final Connection con;
+	private final JDBCPersistenceTransaction tx;
 
 	/**
 	 * Persistent resource handler.
 	 */
 	private final PersistentResourceHandler<R> prsrcHandler;
-
-	/**
-	 * Data consumer.
-	 */
-	private final Actor actor;
 
 	/**
 	 * Properties fetch specification.
@@ -162,24 +145,15 @@ class PersistentResourceFetchImpl<R>
 	 * Create new fetch.
 	 *
 	 * @param resources Application resources manager.
-	 * @param dialect SQL dialect.
-	 * @param paramsFactory Query parameter value handlers factory.
-	 * @param con Database connection.
+	 * @param tx The transaction.
 	 * @param prsrcClass Persistent resource class.
-	 * @param actor The fetch data consumer.
 	 */
 	PersistentResourceFetchImpl(final Resources resources,
-			final SQLDialect dialect,
-			final ParameterValuesFactoryImpl paramsFactory,
-			final Connection con, final Class<R> prsrcClass,
-			final Actor actor) {
+			final JDBCPersistenceTransaction tx, final Class<R> prsrcClass) {
 
 		this.resources = resources;
-		this.dialect = dialect;
-		this.paramsFactory = paramsFactory;
-		this.con = con;
+		this.tx = tx;
 		this.prsrcHandler = resources.getPersistentResourceHandler(prsrcClass);
-		this.actor = actor;
 
 		this.anchorTableName =
 			"q_" + this.prsrcHandler.getPersistentCollectionName();
@@ -418,8 +392,9 @@ class PersistentResourceFetchImpl<R>
 	 */
 	private QueryBuilder buildQuery() {
 
-		return QueryBuilder.createQueryBuilder(this.resources, this.dialect,
-				this.paramsFactory, this.actor, this.prsrcHandler,
+		return QueryBuilder.createQueryBuilder(this.resources,
+				this.tx.getSQLDialect(), this.tx.getParameterValuesFactory(),
+				this.tx.getActor(), this.prsrcHandler,
 				this.propsFetch, this.refsFetch, this.filter, this.order);
 	}
 
@@ -431,8 +406,9 @@ class PersistentResourceFetchImpl<R>
 	 */
 	private QueryBuilder buildQueryForCount() {
 
-		return QueryBuilder.createQueryBuilder(this.resources, this.dialect,
-				this.paramsFactory, this.actor, this.prsrcHandler,
+		return QueryBuilder.createQueryBuilder(this.resources,
+				this.tx.getSQLDialect(), this.tx.getParameterValuesFactory(),
+				this.tx.getActor(), this.prsrcHandler,
 				this.resources.getPropertiesFetchSpec(
 						this.prsrcHandler.getResourceClass()),
 				this.refsFetch, this.filter, this.order);
@@ -457,6 +433,11 @@ class PersistentResourceFetchImpl<R>
 		final String dataQueryText;
 		final Map<String, JDBCParameterValue> params = new HashMap<>();
 
+		// needed objects from the transaction
+		final SQLDialect dialect = this.tx.getSQLDialect();
+		final ParameterValuesFactoryImpl paramsFactory =
+			this.tx.getParameterValuesFactory();
+
 		// get "WHERE" and "ORDER BY" clauses
 		final WhereClause whereClause = (this.filter == null ? null :
 			qb.buildWhereClause(params));
@@ -476,11 +457,11 @@ class PersistentResourceFetchImpl<R>
 					dataQueryText = q;
 				else switch (this.lockType) {
 				case SHARED:
-					dataQueryText = this.dialect.makeSelectWithShareLock(
+					dataQueryText = dialect.makeSelectWithShareLock(
 							q, qb.getRootTableAlias());
 					break;
 				case EXCLUSIVE:
-					dataQueryText = this.dialect.makeSelectWithExclusiveLock(
+					dataQueryText = dialect.makeSelectWithExclusiveLock(
 							q, qb.getRootTableAlias());
 					break;
 				default: // cannot happen
@@ -493,20 +474,20 @@ class PersistentResourceFetchImpl<R>
 				if (!qb.hasCollections()) {
 
 					// ranged direct select
-					final String q = this.dialect.makeRangedSelect(
+					final String q = dialect.makeRangedSelect(
 							qb.buildDirectSelectQuery(whereClause,
 									orderByClause),
-							this.range, this.paramsFactory, params);
+							this.range, paramsFactory, params);
 					if (this.lockType == null)
 						dataQueryText = q;
 					else switch (this.lockType) {
 					case SHARED:
-						dataQueryText = this.dialect.makeSelectWithShareLock(
+						dataQueryText = dialect.makeSelectWithShareLock(
 								q, qb.getRootTableAlias());
 						break;
 					case EXCLUSIVE:
 						dataQueryText =
-							this.dialect.makeSelectWithExclusiveLock(
+							dialect.makeSelectWithExclusiveLock(
 									q, qb.getRootTableAlias());
 						break;
 					default: // cannot happen
@@ -516,15 +497,16 @@ class PersistentResourceFetchImpl<R>
 				} else { // ranged and has collections
 
 					// create anchor table
-					final String q = this.dialect.makeRangedSelect(
+					final String q = dialect.makeRangedSelect(
 							qb.buildIdsQuery(whereClause, orderByClause),
-							this.range, this.paramsFactory, params);
-					this.dialect.makeSelectIntoTempTable(
+							this.range, paramsFactory, params);
+					dialect.makeSelectIntoTempTable(
 							this.anchorTableName,
+							this.tx.addTempTable(this.anchorTableName),
 							(this.lockType == LockType.EXCLUSIVE
-									? this.dialect.makeSelectWithExclusiveLock(
+									? dialect.makeSelectWithExclusiveLock(
 											q, qb.getRootTableAlias())
-									: this.dialect.makeSelectWithShareLock(
+									: dialect.makeSelectWithShareLock(
 											q, qb.getRootTableAlias())),
 							preStmtTexts, postStmtTexts);
 
@@ -542,27 +524,29 @@ class PersistentResourceFetchImpl<R>
 
 				// create anchor table
 				final String q = qb.buildIdsQuery(whereClause, null);
-				this.dialect.makeSelectIntoTempTable(
+				dialect.makeSelectIntoTempTable(
 						this.anchorTableName,
+						this.tx.addTempTable(this.anchorTableName),
 						(this.lockType == LockType.EXCLUSIVE
-								? this.dialect.makeSelectWithExclusiveLock(
+								? dialect.makeSelectWithExclusiveLock(
 										q, qb.getRootTableAlias())
-								: this.dialect.makeSelectWithShareLock(
+								: dialect.makeSelectWithShareLock(
 										q, qb.getRootTableAlias())),
 						preStmtTexts, postStmtTexts);
 
 			} else {  // ranged query
 
 				// create anchor table
-				final String q = this.dialect.makeRangedSelect(
+				final String q = dialect.makeRangedSelect(
 						qb.buildIdsQuery(whereClause, orderByClause),
-						this.range, this.paramsFactory, params);
-				this.dialect.makeSelectIntoTempTable(
+						this.range, paramsFactory, params);
+				dialect.makeSelectIntoTempTable(
 						this.anchorTableName,
+						this.tx.addTempTable(this.anchorTableName),
 						(this.lockType == LockType.EXCLUSIVE
-								? this.dialect.makeSelectWithExclusiveLock(
+								? dialect.makeSelectWithExclusiveLock(
 										q, qb.getRootTableAlias())
-								: this.dialect.makeSelectWithShareLock(
+								: dialect.makeSelectWithShareLock(
 										q, qb.getRootTableAlias())),
 						preStmtTexts, postStmtTexts);
 			}
@@ -578,8 +562,8 @@ class PersistentResourceFetchImpl<R>
 		if (!preStmtTexts.isEmpty()) {
 			preStmts = new ArrayList<>(preStmtTexts.size());
 			for (final String stmtText : preStmtTexts)
-				preStmts.add(new PersistenceUpdateImpl(this.resources, this.con,
-						this.paramsFactory, stmtText, params));
+				preStmts.add(new PersistenceUpdateImpl(this.resources, this.tx,
+						stmtText, params));
 		} else {
 			preStmts = null;
 		}
@@ -587,17 +571,17 @@ class PersistentResourceFetchImpl<R>
 		if (!postStmtTexts.isEmpty()) {
 			postStmts = new ArrayList<>(postStmtTexts.size());
 			for (final String stmtText : postStmtTexts)
-				postStmts.add(new PersistenceUpdateImpl(this.resources,
-						this.con, this.paramsFactory, stmtText, params));
+				postStmts.add(new PersistenceUpdateImpl(this.resources, this.tx,
+						stmtText, params));
 		} else {
 			postStmts = null;
 		}
 
 		// create the query
 		ResourcePersistenceQueryImpl<R> query =
-			new ResourcePersistenceQueryImpl<>(this.resources, this.con,
-					this.paramsFactory, dataQueryText,
-					this.prsrcHandler.getResourceClass(), this.actor, params);
+			new ResourcePersistenceQueryImpl<>(this.resources, this.tx,
+					dataQueryText, this.prsrcHandler.getResourceClass(),
+					params);
 		query.setSessionCache(new ResourceReadSessionCache());
 
 		// create records count query
@@ -610,7 +594,7 @@ class PersistentResourceFetchImpl<R>
 		return new MainQuery(preStmts, postStmts, query,
 				(countQueryText == null ? null :
 					new SimpleValuePersistenceQueryImpl<>(this.resources,
-							this.con, this.paramsFactory, countQueryText,
+							this.tx, countQueryText,
 							ResultSetValueReader.LONG_VALUE_READER, params)));
 	}
 

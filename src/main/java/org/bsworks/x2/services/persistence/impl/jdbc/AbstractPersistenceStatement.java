@@ -1,6 +1,5 @@
 package org.bsworks.x2.services.persistence.impl.jdbc;
 
-import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -11,6 +10,7 @@ import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.bsworks.x2.Actor;
 import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.services.persistence.PersistentValueType;
 
@@ -33,14 +33,9 @@ abstract class AbstractPersistenceStatement {
 	protected final Resources resources;
 
 	/**
-	 * Database connection.
+	 * The transaction.
 	 */
-	private final Connection con;
-
-	/**
-	 * Query parameter value handlers factory.
-	 */
-	private final ParameterValuesFactoryImpl paramsFactory;
+	private final JDBCPersistenceTransaction tx;
 
 	/**
 	 * The statement text.
@@ -57,18 +52,15 @@ abstract class AbstractPersistenceStatement {
 	 * Create new statement.
 	 *
 	 * @param resources Application resources manager.
-	 * @param con Database connection.
-	 * @param paramsFactory Query parameter value handlers factory.
+	 * @param tx The transaction.
 	 * @param params Initial parameters. May be {@code null} for none.
 	 */
 	protected AbstractPersistenceStatement(final Resources resources,
-			final Connection con,
-			final ParameterValuesFactoryImpl paramsFactory,
+			final JDBCPersistenceTransaction tx,
 			final Map<String, JDBCParameterValue> params) {
 
 		this.resources = resources;
-		this.con = con;
-		this.paramsFactory = paramsFactory;
+		this.tx = tx;
 		this.params = (params != null ? params :
 			new HashMap<String, JDBCParameterValue>());
 	}
@@ -96,7 +88,8 @@ abstract class AbstractPersistenceStatement {
 			final PersistentValueType paramType, final Object paramValue) {
 
 		this.params.put(paramName,
-				this.paramsFactory.getParameterValue(paramType, paramValue));
+				this.tx.getParameterValuesFactory().getParameterValue(
+						paramType, paramValue));
 	}
 
 	/**
@@ -123,7 +116,7 @@ abstract class AbstractPersistenceStatement {
 
 		// prepare statement
 		final PreparedStatement pstmt =
-			this.con.prepareStatement(sql,
+			this.tx.getRawConnection().prepareStatement(sql,
 					ResultSet.TYPE_FORWARD_ONLY,
 					ResultSet.CONCUR_READ_ONLY,
 					ResultSet.CLOSE_CURSORS_AT_COMMIT);
@@ -135,5 +128,15 @@ abstract class AbstractPersistenceStatement {
 
 		// return the prepared statement
 		return pstmt;
+	}
+
+	/**
+	 * Get actor.
+	 *
+	 * @return The actor, or {@code null} if anonymous.
+	 */
+	protected final Actor getActor() {
+
+		return this.tx.getActor();
 	}
 }

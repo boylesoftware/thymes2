@@ -471,6 +471,21 @@ class EndpointCallContextImpl
 	 * See overridden method.
 	 */
 	@Override
+	public void lockPersistentResourceCollections(
+			final Class<?>... prsrcClasses) {
+
+		final Set<Class<?>> asSet = new HashSet<>(
+				prsrcClasses.length > 16 ? prsrcClasses.length : 16);
+		for (final Class<?> prsrcClass : prsrcClasses)
+			asSet.add(prsrcClass);
+
+		this.lockPersistentResourceCollections(asSet);
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public <R> RefsFetchSpec<R> getRefsFetchSpec(final Class<R> prsrcClass) {
 
 		return this.runtimeCtx.getResources().getRefsFetchSpec(prsrcClass);

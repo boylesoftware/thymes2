@@ -21,6 +21,15 @@ class MySQLDialect
 	 * See overridden method.
 	 */
 	@Override
+	public boolean tempTablesRequireReadWrite() {
+
+		return true;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public String quoteColumnLabel(final String colLabel) {
 
 		return "\"" + colLabel.replace("\"", "\"\"") + "\"";
@@ -164,10 +173,11 @@ class MySQLDialect
 	 */
 	@Override
 	public void makeSelectIntoTempTable(final String tempTableName,
-			final String selectQuery, final List<String> preStatements,
+			final boolean create, final String selectQuery,
+			final List<String> preStatements,
 			final List<String> postStatements) {
 
-		preStatements.add("CREATE TEMPORARY TABLE IF NOT EXISTS "
+		preStatements.add("CREATE TEMPORARY TABLE "
 				+ tempTableName + " " + selectQuery);
 
 		postStatements.add("DROP TABLE " + tempTableName);
@@ -240,8 +250,44 @@ class MySQLDialect
 	 * See overridden method.
 	 */
 	@Override
-	public boolean tempTablesRequireReadWrite() {
+	public String lockTablesInShareMode(final String... tables) {
 
-		return true;
+		final StringBuilder stmt = new StringBuilder(256);
+		stmt.append("LOCK TABLES ");
+		for (int i = 0; i < tables.length; i++) {
+			if (i > 0)
+				stmt.append(", ");
+			stmt.append(tables[i]);
+		}
+		stmt.append(" READ");
+
+		return stmt.toString();
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public String lockTablesInExclusiveMode(final String... tables) {
+
+		final StringBuilder stmt = new StringBuilder(256);
+		stmt.append("LOCK TABLES ");
+		for (int i = 0; i < tables.length; i++) {
+			if (i > 0)
+				stmt.append(", ");
+			stmt.append(tables[i]);
+		}
+		stmt.append(" WRITE");
+
+		return stmt.toString();
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public String unlockTables(final String... tables) {
+
+		return "UNLOCK TABLES";
 	}
 }

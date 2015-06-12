@@ -203,7 +203,7 @@ class RDBMSPersistentResourceVersioningService
 		if (this.lockQuery == null) {
 			final SQLDialect dialect = tx.getSQLDialect();
 			this.lockQuery = dialect.makeSelectWithExclusiveLock(
-					"SELECT COUNT(*) FROM " + this.tableName
+					"SELECT " + this.nameColName + " FROM " + this.tableName
 					+ " WHERE " + this.nameColName + " IN (??prsrcNames)");
 		}
 
@@ -215,11 +215,11 @@ class RDBMSPersistentResourceVersioningService
 
 		// lock the rows and get the count
 		final int count = tx
-				.createQuery(this.lockQuery, Integer.class)
+				.createQuery(this.lockQuery, String.class)
 				.setParameter("prsrcNames",
 						PersistentValueType.STRING, prsrcNames)
-				.getFirstResult(null)
-				.intValue();
+				.getResultList(null)
+				.size();
 
 		// check that we've got all the resources
 		if (count != numCollections) {

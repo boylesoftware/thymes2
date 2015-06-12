@@ -27,6 +27,14 @@ public interface SQLDialect {
 
 
 	/**
+	 * Tell if working with temporary tables require read-write transaction
+	 * mode.
+	 *
+	 * @return {@code true} if read-write transaction mode is required.
+	 */
+	boolean tempTablesRequireReadWrite();
+
+	/**
 	 * Quote column label in the select list.
 	 *
 	 * @param colLabel The label.
@@ -111,14 +119,17 @@ public interface SQLDialect {
 	 * transaction scope temporary table.
 	 *
 	 * @param tempTableName The temporary table name.
+	 * @param create Tells if the temporary table has not been created yet in
+	 * the current transaction.
 	 * @param selectQuery The "SELECT" query.
 	 * @param preStatements List, to which this method adds statements to be
 	 * executed to create and populate the temporary table.
 	 * @param postStatements List, to which this method adds statements to be
 	 * executed after the temporary tables is no longer needed.
 	 */
-	void makeSelectIntoTempTable(String tempTableName, String selectQuery,
-			List<String> preStatements, List<String> postStatements);
+	void makeSelectIntoTempTable(String tempTableName, boolean create,
+			String selectQuery, List<String> preStatements,
+			List<String> postStatements);
 
 	/**
 	 * Make the specified "SELECT" query lock the rows in share mode.
@@ -198,10 +209,32 @@ public interface SQLDialect {
 			String whereClause);
 
 	/**
-	 * Tell if working with temporary tables require read-write transaction
-	 * mode.
+	 * Create statement for placing a share lock on the specified tables.
 	 *
-	 * @return {@code true} if read-write transaction mode is required.
+	 * @param tables The table names.
+	 *
+	 * @return The lock statement.
 	 */
-	boolean tempTablesRequireReadWrite();
+	String lockTablesInShareMode(String... tables);
+
+	/**
+	 * Create statement for placing an exclusive lock on the specified tables.
+	 *
+	 * @param tables The table names.
+	 *
+	 * @return The lock statement.
+	 */
+	String lockTablesInExclusiveMode(String... tables);
+
+	/**
+	 * Create statement for unlocking all previously locked tables.
+	 *
+	 * @param tables Name of previously locked tables. This is only a hint to
+	 * the dialect - depending on the database implementation, the resulting
+	 * statement may be releasing all locks regardless of the specified list.
+	 *
+	 * @return The unlock statement, or {@code null} if locks are released by
+	 * the database implementation automatically upon transaction end.
+	 */
+	String unlockTables(String... tables);
 }

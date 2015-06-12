@@ -277,6 +277,14 @@ public interface EndpointCallContext {
 	void lockPersistentResourceCollections(Set<Class<?>> prsrcClasses);
 
 	/**
+	 * Similar to {@link #lockPersistentResourceCollections(Set)} but supports
+	 * multiple arguments.
+	 *
+	 * @param prsrcClasses Persistent resource classes.
+	 */
+	void lockPersistentResourceCollections(Class<?>... prsrcClasses);
+
+	/**
 	 * Get empty referred persistent resource records fetch specification
 	 * object. This is a convenience shortcut method for
 	 * {@link Resources#getRefsFetchSpec(Class)}.

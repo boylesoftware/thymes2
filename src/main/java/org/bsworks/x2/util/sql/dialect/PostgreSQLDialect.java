@@ -21,6 +21,15 @@ class PostgreSQLDialect
 	 * See overridden method.
 	 */
 	@Override
+	public boolean tempTablesRequireReadWrite() {
+
+		return true;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public String quoteColumnLabel(final String colLabel) {
 
 		return "\"" + colLabel.replace("\"", "\"\"") + "\"";
@@ -151,11 +160,18 @@ class PostgreSQLDialect
 	 */
 	@Override
 	public void makeSelectIntoTempTable(final String tempTableName,
-			final String selectQuery, final List<String> preStatements,
+			final boolean create, final String selectQuery,
+			final List<String> preStatements,
 			final List<String> postStatements) {
 
-		preStatements.add("CREATE TEMPORARY TABLE " + tempTableName
-				+ " ON COMMIT DROP AS " + selectQuery);
+		if (create) {
+			preStatements.add("CREATE TEMPORARY TABLE " + tempTableName
+					+ " ON COMMIT DROP AS " + selectQuery);
+		} else {
+			preStatements.add("TRUNCATE TABLE " + tempTableName);
+			preStatements.add("INSERT INTO " + tempTableName + " "
+					+ selectQuery);
+		}
 	}
 
 	/* (non-Javadoc)
@@ -246,8 +262,44 @@ class PostgreSQLDialect
 	 * See overridden method.
 	 */
 	@Override
-	public boolean tempTablesRequireReadWrite() {
+	public String lockTablesInShareMode(final String... tables) {
 
-		return true;
+		final StringBuilder stmt = new StringBuilder(256);
+		stmt.append("LOCK TABLE ");
+		for (int i = 0; i < tables.length; i++) {
+			if (i > 0)
+				stmt.append(", ");
+			stmt.append(tables[i]);
+		}
+		stmt.append(" IN SHARE MODE");
+
+		return stmt.toString();
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public String lockTablesInExclusiveMode(final String... tables) {
+
+		final StringBuilder stmt = new StringBuilder(256);
+		stmt.append("LOCK TABLE ");
+		for (int i = 0; i < tables.length; i++) {
+			if (i > 0)
+				stmt.append(", ");
+			stmt.append(tables[i]);
+		}
+		stmt.append(" IN EXCLUSIVE MODE");
+
+		return stmt.toString();
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public String unlockTables(final String... tables) {
+
+		return null;
 	}
 }

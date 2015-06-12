@@ -2,7 +2,9 @@ package org.bsworks.x2.services.persistence;
 
 import java.util.Set;
 
+import org.bsworks.x2.EndpointCallContext;
 import org.bsworks.x2.resource.FilterSpec;
+import org.bsworks.x2.services.versioning.PersistentResourceVersioningService;
 
 
 /**
@@ -129,4 +131,24 @@ public interface PersistenceTransaction {
 	 */
 	<R> boolean delete(Class<R> prsrcClass, FilterSpec<R> filter,
 			Set<Class<?>> affectedResources);
+
+	/**
+	 * Lock entire persistent collections used to store the specified persistent
+	 * resources. The method may be called only once per transaction. The locks
+	 * are automatically released immediately after the transaction ends.
+	 *
+	 * <p>Note, that often it is more efficient to lock persistent resource
+	 * collections using
+	 * {@link PersistentResourceVersioningService#lockCollections(PersistenceTransaction, Set)}
+	 * method, also available to the endpoint handlers through
+	 * {@link EndpointCallContext#lockPersistentResourceCollections(Set)}
+	 * method.
+	 *
+	 * @param lockType Lock type.
+	 * @param prsrcClasses Persistent resource classes.
+	 *
+	 * @throws IllegalStateException If lock has been already called for the
+	 * transaction.
+	 */
+	void lock(LockType lockType, Class<?>... prsrcClasses);
 }

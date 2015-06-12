@@ -99,9 +99,11 @@ class PersistenceTransactionHandlerImpl
 	@Override
 	public void close() {
 
+		final boolean debug = this.log.isDebugEnabled();
+
 		try {
 			if (!this.isCommitted.getAndSet(true)) {
-				if (this.log.isDebugEnabled())
+				if (debug)
 					this.log.debug("rolling back transaction on connection #"
 							+ this.con.hashCode());
 				try {
@@ -112,12 +114,18 @@ class PersistenceTransactionHandlerImpl
 				}
 			}
 		} finally {
-			if (this.log.isDebugEnabled())
-				this.log.debug("closing connection #" + this.con.hashCode());
 			try {
-				this.con.close();
-			} catch (final SQLException e) {
-				throw new PersistenceException("Error closing connection.", e);
+				this.tx.releaseLocks();
+			} finally {
+				if (debug)
+					this.log.debug("closing connection #"
+							+ this.con.hashCode());
+				try {
+					this.con.close();
+				} catch (final SQLException e) {
+					throw new PersistenceException("Error closing connection.",
+							e);
+				}
 			}
 		}
 	}

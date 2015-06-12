@@ -1,6 +1,5 @@
 package org.bsworks.x2.services.persistence.impl.jdbc;
 
-import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Map;
@@ -24,16 +23,14 @@ class PersistenceUpdateImpl
 	 * Create new statement.
 	 *
 	 * @param resources Application resources manager.
-	 * @param con Database connection.
-	 * @param paramsFactory Query parameter value handlers factory.
+	 * @param tx the transaction.
 	 * @param stmtText The statement text.
 	 * @param params Initial parameters. May be {@code null} for none.
 	 */
-	PersistenceUpdateImpl(final Resources resources, final Connection con,
-			final ParameterValuesFactoryImpl paramsFactory,
-			final String stmtText,
+	PersistenceUpdateImpl(final Resources resources,
+			final JDBCPersistenceTransaction tx, final String stmtText,
 			final Map<String, JDBCParameterValue> params) {
-		super(resources, con, paramsFactory, params);
+		super(resources, tx, params);
 
 		this.setStatementText(stmtText);
 	}

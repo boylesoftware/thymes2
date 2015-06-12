@@ -904,25 +904,28 @@ class UpdateBuilder {
 	 * Create builder.
 	 *
 	 * @param resources Application resources manager.
-	 * @param dialect SQL dialect.
-	 * @param paramsFactory Parameter value handlers factory.
+	 * @param tx The transaction.
 	 * @param prsrcHandler Persistent resource handler.
 	 * @param rec Existing persistent resource record.
 	 * @param recTmpl Persistent resource record template with new data.
-	 * @param actor The actor.
 	 * @param updatedProps Set, to which to add paths of the record properties
 	 * that were updated, or {@code null} if such information is not needed by
 	 * the caller.
 	 */
-	UpdateBuilder(final Resources resources, final SQLDialect dialect,
-			final ParameterValuesFactoryImpl paramsFactory,
+	UpdateBuilder(final Resources resources,
+			final JDBCPersistenceTransaction tx,
 			final PersistentResourceHandler<?> prsrcHandler,
-			final Object rec, final Object recTmpl, final Actor actor,
+			final Object rec, final Object recTmpl,
 			final Set<String> updatedProps) {
+
+		final ParameterValuesFactoryImpl paramsFactory =
+			tx.getParameterValuesFactory();
+		final Actor actor = tx.getActor();
 
 		// create top update context
 		final StatementBuilderContext topCtx = new StatementBuilderContext(
-				resources, dialect, paramsFactory, actor, prsrcHandler, rec);
+				resources, tx.getSQLDialect(), paramsFactory, actor,
+				prsrcHandler, rec);
 
 		// process persistent resource record
 		final Map<Class<?>, Set<Object>> depPRsrcIdsToDelete = new HashMap<>();
@@ -993,8 +996,7 @@ class UpdateBuilder {
 			this.executionPlan.add(new DeleteBuilderExecutionPlanStep(
 					new DeleteBuilder(
 							resources,
-							dialect,
-							paramsFactory,
+							tx,
 							depRefHandler,
 							resources
 								.getFilterSpec(depRefClass)
@@ -1002,8 +1004,7 @@ class UpdateBuilder {
 										depRefHandler.getIdProperty().getName(),
 										FilterConditionType.EQ,
 										false,
-										ids.toArray(new Object[ids.size()])),
-							actor)));
+										ids.toArray(new Object[ids.size()])))));
 		}
 
 		// log updated properties for debugging

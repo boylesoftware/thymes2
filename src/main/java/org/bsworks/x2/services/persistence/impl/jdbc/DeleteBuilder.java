@@ -13,7 +13,6 @@ import java.util.Set;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import org.bsworks.x2.Actor;
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.IdPropertyHandler;
@@ -87,17 +86,17 @@ class DeleteBuilder {
 	 * specified filter.
 	 *
 	 * @param resources Application resources manager.
-	 * @param dialect SQL dialect.
-	 * @param paramsFactory Parameter value handlers factory.
+	 * @param tx The transaction.
 	 * @param prsrcHandler Persistent resource handler.
 	 * @param filter Filter specification, may be {@code null} for deleting all
 	 * records.
-	 * @param actor The actor.
 	 */
-	DeleteBuilder(final Resources resources, final SQLDialect dialect,
-			final ParameterValuesFactoryImpl paramsFactory,
+	DeleteBuilder(final Resources resources,
+			final JDBCPersistenceTransaction tx,
 			final PersistentResourceHandler<?> prsrcHandler,
-			final FilterSpec<?> filter, final Actor actor) {
+			final FilterSpec<?> filter) {
+
+		final SQLDialect dialect = tx.getSQLDialect();
 
 		if ((filter == null) || filter.isEmpty()) { // no filter
 
@@ -123,7 +122,7 @@ class DeleteBuilder {
 			final WhereClause whereClauseBuilder = new WhereClause(
 					resources,
 					dialect,
-					paramsFactory,
+					tx.getParameterValuesFactory(),
 					filter,
 					Collections.singletonMap(idPropHandler.getName(),
 							new SingleValuedQueryProperty(
@@ -160,8 +159,8 @@ class DeleteBuilder {
 			final QueryBuilder queryBuilder = QueryBuilder.createQueryBuilder(
 					resources,
 					dialect,
-					paramsFactory,
-					actor,
+					tx.getParameterValuesFactory(),
+					tx.getActor(),
 					prsrcHandler,
 					resources
 						.getPropertiesFetchSpec(prsrcClass)
@@ -179,6 +178,7 @@ class DeleteBuilder {
 			final List<String> preStatements = new ArrayList<>();
 			final List<String> postStatements = new ArrayList<>();
 			dialect.makeSelectIntoTempTable(anchorTableName,
+					tx.addTempTable(anchorTableName),
 					dialect.makeSelectWithExclusiveLock(
 							queryBuilder.buildIdsQuery(whereClauseBuilder,
 									null),

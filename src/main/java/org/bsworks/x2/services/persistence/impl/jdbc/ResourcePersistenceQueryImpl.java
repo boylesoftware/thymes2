@@ -1,7 +1,6 @@
 package org.bsworks.x2.services.persistence.impl.jdbc;
 
 import java.io.IOException;
-import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -9,7 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.bsworks.x2.Actor;
 import org.bsworks.x2.resource.InvalidResourceDataException;
 import org.bsworks.x2.resource.ResourceHandler;
 import org.bsworks.x2.resource.ResourcePropertyAccess;
@@ -43,11 +41,6 @@ class ResourcePersistenceQueryImpl<R>
 	private final ResourcePropertyValueHandler rsrcValueHandler;
 
 	/**
-	 * The query data consumer.
-	 */
-	private final Actor actor;
-
-	/**
 	 * Session cache.
 	 */
 	private ResourceReadSessionCache sessionCache;
@@ -67,22 +60,18 @@ class ResourcePersistenceQueryImpl<R>
 	 * Create new query.
 	 *
 	 * @param resources Application resources manager.
-	 * @param con Database connection.
-	 * @param paramsFactory Query parameter value handlers factory.
+	 * @param tx The transaction.
 	 * @param queryText The query text.
 	 * @param rsrcClass Query result resource class.
-	 * @param actor The query data consumer.
 	 * @param params Initial parameters. May be {@code null} for none.
 	 */
 	ResourcePersistenceQueryImpl(final Resources resources,
-			final Connection con,
-			final ParameterValuesFactoryImpl paramsFactory,
-			final String queryText, final Class<R> rsrcClass, final Actor actor,
+			final JDBCPersistenceTransaction tx, final String queryText,
+			final Class<R> rsrcClass,
 			final Map<String, JDBCParameterValue> params) {
-		super(resources, con, paramsFactory, params);
+		super(resources, tx, params);
 
 		this.rsrcClass = rsrcClass;
-		this.actor = actor;
 
 		final ResourceHandler<R> rsrcHandler =
 			resources.getResourceHandler(rsrcClass);
@@ -169,7 +158,7 @@ class ResourcePersistenceQueryImpl<R>
 					return res;
 				final ResultSetParser rsParser =
 					new ResultSetParser(this.resources, rs, this.sessionCache,
-							this.actor, refsFetchResult);
+							this.getActor(), refsFetchResult);
 				do {
 					res.add(this.rsrcClass.cast(
 							this.rsrcValueHandler.readValue(
@@ -203,7 +192,7 @@ class ResourcePersistenceQueryImpl<R>
 					return null;
 				final ResultSetParser rsParser =
 					new ResultSetParser(this.resources, rs, this.sessionCache,
-							this.actor, refsFetchResult);
+							this.getActor(), refsFetchResult);
 				return this.rsrcClass.cast(
 						this.rsrcValueHandler.readValue(
 								ResourcePropertyAccess.LOAD, rsParser));

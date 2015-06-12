@@ -1,6 +1,5 @@
 package org.bsworks.x2.services.persistence.impl.jdbc;
 
-import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -46,18 +45,16 @@ class SimpleValuePersistenceQueryImpl<Y>
 	 * Create new query.
 	 *
 	 * @param resources Application resources manager.
-	 * @param con Database connection.
-	 * @param paramsFactory Query parameter value handlers factory.
+	 * @param tx The transaction.
 	 * @param queryText The query text.
 	 * @param valueReader Query result value reader.
 	 * @param params Initial parameters. May be {@code null} for none.
 	 */
 	SimpleValuePersistenceQueryImpl(final Resources resources,
-			final Connection con,
-			final ParameterValuesFactoryImpl paramsFactory,
+			final JDBCPersistenceTransaction tx,
 			final String queryText, final ResultSetValueReader<Y> valueReader,
 			final Map<String, JDBCParameterValue> params) {
-		super(resources, con, paramsFactory, params);
+		super(resources, tx, params);
 
 		this.valueReader = valueReader;
 
@@ -123,7 +120,7 @@ class SimpleValuePersistenceQueryImpl<Y>
 
 			// get the data
 			try (final ResultSet rs = this.getResultSet(pstmt)) {
-				while (!rs.next())
+				while (rs.next())
 					res.add(this.valueReader.readValue(rs, 1));
 			}
 
