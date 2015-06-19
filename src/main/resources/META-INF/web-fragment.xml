@@ -111,6 +111,16 @@
 
 	<context-param>
 		<description>
+			If "false", an HTTP cookie is used to pass the authentication token
+			between the server and the client instead of the "Authorization"
+			and "Authentication-Info" request/response headers.
+		</description>
+		<param-name>x2.auth.useCookie</param-name>
+		<param-value>false</param-value>
+	</context-param>
+
+	<context-param>
+		<description>
 			Number of milliseconds after which to expire results of actor lookup
 			in the actor authentication service. If 0, caching of actor lookup
 			results is disabled.

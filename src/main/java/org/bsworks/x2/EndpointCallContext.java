@@ -203,6 +203,15 @@ public interface EndpointCallContext {
 	boolean isAssumedActor();
 
 	/**
+	 * Purge actor from any cache between the actor authentication service and
+	 * the context. This is a convenience shortcut method for
+	 * {@link RuntimeContext#purgeCachedActor(Actor)}.
+	 *
+	 * @param actor The actor.
+	 */
+	void purgeCachedActor(Actor actor);
+
+	/**
 	 * Get persistence transaction associated with the endpoint call. If
 	 * transaction has not been started yet, start it. Otherwise, return
 	 * existing transaction.

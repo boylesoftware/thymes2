@@ -392,6 +392,15 @@ class EndpointCallContextImpl
 	 * See overridden method.
 	 */
 	@Override
+	public void purgeCachedActor(final Actor actor) {
+
+		this.runtimeCtx.getAuthTokenHandler().purgeCachedActor(actor);
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PersistenceTransaction getPersistenceTransaction() {
 
 		if (this.tx == null)

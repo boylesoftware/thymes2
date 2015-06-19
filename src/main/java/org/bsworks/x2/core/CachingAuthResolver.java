@@ -306,6 +306,31 @@ class CachingAuthResolver {
 	}
 
 	/**
+	 * Purge specified actor from the cache.
+	 *
+	 * @param actorId Actor id.
+	 * @param opaque Actor opaque value, or {@code null} if not used.
+	 */
+	void purgeActor(final String actorId, final String opaque) {
+
+		// caching disabled?
+		if (this.discardAfter == 0)
+			return;
+
+		// get the key
+		final String key = createKey(actorId, opaque);
+
+		// get the write lock and remove the cache element
+		final Lock writeLock = this.lock.writeLock();
+		writeLock.lock();
+		try {
+			this.cache.remove(key);
+		} finally {
+			writeLock.unlock();
+		}
+	}
+
+	/**
 	 * Purge expired cache elements and make room for one new element.
 	 */
 	private void purgeExpired() {

@@ -95,6 +95,28 @@ public interface RuntimeContext {
 	static final String AUTH_TOKEN_TTL_INITPARAM =
 		"x2.auth.tokenTTL";
 
+	/**
+	 * Name of web-application context initialization parameter used to tell the
+	 * framework to use an HTTP cookie to pass the authentication token between
+	 * the client and the server.
+	 *
+	 * <p>The default behavior is to use "Authorization" HTTP request header to
+	 * pass the token to the server and "Authentication-Info" HTTP response
+	 * header to pass the renewed token back to the client to use with the
+	 * subsequent request. In certain configurations this mechanism does not
+	 * work well. For example, when the server responds with an HTTP 304 (Not
+	 * Modified) response and the server is behind a proxy, some proxy
+	 * implementations strip "Authentication-Info" response header from the
+	 * response not considering it a response header, but an entity header (an
+	 * example is Apache HTTPD with mod_proxy_ajp). In such configurations,
+	 * using a cookie instead of the HTTP request/response headers is the
+	 * solution.
+	 *
+	 * <p>The values for this parameters are "true" or "false" (the default).
+	 */
+	static final String AUTH_USE_COOKIE_INITPARAM =
+		"x2.auth.useCookie";
+
 
 	/**
 	 * Get instance id. A unique application instance id is assigned to the
@@ -145,6 +167,14 @@ public interface RuntimeContext {
 	 * @return The secret key.
 	 */
 	SecretKey getAuthSecretKey();
+
+	/**
+	 * Purge actor from any cache set on top of the actor authentication
+	 * service.
+	 *
+	 * @param actor The actor.
+	 */
+	void purgeCachedActor(Actor actor);
 
 	/**
 	 * Submit a job for execution in a "long job" thread. "Long jobs" are

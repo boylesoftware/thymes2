@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.servlet.ServletContext;
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -23,30 +24,44 @@ import org.bsworks.x2.util.Base64;
 
 
 /**
- * Collection of methods used to handle the "AuthToken" HTTP authentication
- * scheme.
+ * Collection of methods used to handle the authentication token.
  *
  * @author Lev Himmelfarb
  */
 class AuthTokenHandler {
 
 	/**
-	 * Pattern used to parse the "Authorization" header.
+	 * Authentication token pattern.
 	 */
-	private static final Pattern AUTH_HDR_EL_PATTERN = Pattern.compile(
-			"^\\s*AuthToken\\s+"
-			+ "([A-Za-z0-9+/]+={0,2})\\.([A-Za-z0-9+/]+={0,2})\\s*$");
+	private static final Pattern AUTH_TOKEN_PATTERN = Pattern.compile(
+			"([A-Za-z0-9+/]+={0,2})\\.([A-Za-z0-9+/]+={0,2})");
+
+	/**
+	 * "Authorization" header pattern.
+	 */
+	private static final Pattern AUTH_HDR_PATTERN = Pattern.compile(
+			"\\s*AuthToken\\s+" + AUTH_TOKEN_PATTERN.pattern() + "\\s*");
 
 	/**
 	 * UTF-8 charset.
 	 */
 	private static final Charset UTF8 = Charset.forName("UTF-8");
 
+	/**
+	 * Authentication token cookie name.
+	 */
+	private static final String COOKIE_NAME = "X2AuthToken";
+
 
 	/**
 	 * The log.
 	 */
 	private final Log log = LogFactory.getLog(this.getClass());
+
+	/**
+	 * Servlet context.
+	 */
+	private final ServletContext sc;
 
 	/**
 	 * Application-wide secret key.
@@ -57,6 +72,11 @@ class AuthTokenHandler {
 	 * Authentication token time-to-live in milliseconds.
 	 */
 	private final long authTokenTTL;
+
+	/**
+	 * Tells to use HTTP cookie instead of the headers for passing the token.
+	 */
+	private final boolean useCookie;
 
 	/**
 	 * Actor resolver.
@@ -76,10 +96,14 @@ class AuthTokenHandler {
 			final RuntimeContextImpl runtimeCtx)
 		throws InitializationException {
 
+		this.sc = sc;
+
 		this.appSecretKey = runtimeCtx.getAuthSecretKey();
 
 		this.authTokenTTL = Long.parseLong(
 				sc.getInitParameter(RuntimeContext.AUTH_TOKEN_TTL_INITPARAM));
+		this.useCookie = Boolean.parseBoolean(
+				sc.getInitParameter(RuntimeContext.AUTH_USE_COOKIE_INITPARAM));
 
 		this.authResolver = new CachingAuthResolver(sc, runtimeCtx);
 	}
@@ -87,7 +111,7 @@ class AuthTokenHandler {
 
 	/**
 	 * Get actor making the specified HTTP request using authentication token in
-	 * the request "Authorization" header.
+	 * the request.
 	 *
 	 * @param httpRequest The HTTP request.
 	 *
@@ -99,24 +123,63 @@ class AuthTokenHandler {
 
 		final boolean debug = this.log.isDebugEnabled();
 
-		// get authorization header
-		final String authHeader = httpRequest.getHeader("Authorization");
-		if (authHeader == null) {
-			if (debug)
-				this.log.debug("no Authorization header");
-			return null;
-		}
+		final String tokenP0;
+		final String tokenP1;
+		if (this.useCookie) {
 
-		// parse authorization header
-		final Matcher m = AUTH_HDR_EL_PATTERN.matcher(authHeader);
-		if (!m.matches()) {
-			if (debug)
-				this.log.debug("invalid Authorization header value");
-			return null;
+			// get the authentication token cookie
+			final Cookie[] cookies = httpRequest.getCookies();
+			String authToken = null;
+			if (cookies != null)
+				for (final Cookie c : cookies) {
+					if (c.getName().equals(COOKIE_NAME)) {
+						authToken = c.getValue();
+						break;
+					}
+				}
+			if (authToken == null) {
+				if (debug)
+					this.log.debug("no " + COOKIE_NAME + " cookie");
+				return null;
+			}
+
+			// parse the cookie
+			final Matcher m = AUTH_TOKEN_PATTERN.matcher(authToken);
+			if (!m.matches()) {
+				if (debug)
+					this.log.debug("invalid authentication token cookie value");
+				return null;
+			}
+
+			// get the token parts
+			tokenP0 = m.group(1);
+			tokenP1 = m.group(2);
+
+		} else {
+
+			// get authorization header
+			final String authHeader = httpRequest.getHeader("Authorization");
+			if (authHeader == null) {
+				if (debug)
+					this.log.debug("no Authorization header");
+				return null;
+			}
+
+			// parse authorization header
+			final Matcher m = AUTH_HDR_PATTERN.matcher(authHeader);
+			if (!m.matches()) {
+				if (debug)
+					this.log.debug("invalid Authorization header value");
+				return null;
+			}
+
+			// get the token parts
+			tokenP0 = m.group(1);
+			tokenP1 = m.group(2);
 		}
 
 		// parser the token
-		return this.getActor(m.group(1), m.group(2));
+		return this.getActor(tokenP0, tokenP1);
 	}
 
 	/**
@@ -132,7 +195,7 @@ class AuthTokenHandler {
 
 		final boolean debug = this.log.isDebugEnabled();
 		if (debug)
-			this.log.debug("decrypting Authorization header: p0=" + tokenP0
+			this.log.debug("decrypting authentication token: p0=" + tokenP0
 					+ ", p1=" + tokenP1);
 
 		// get bytes of the first part of the token
@@ -295,6 +358,16 @@ class AuthTokenHandler {
 	}
 
 	/**
+	 * Purge actor from the cache of the actor resolver.
+	 *
+	 * @param actor The actor.
+	 */
+	void purgeCachedActor(final Actor actor) {
+
+		this.authResolver.purgeActor(actor.getActorId(), actor.getOpaque());
+	}
+
+	/**
 	 * Add authentication information to the HTTP response.
 	 *
 	 * @param httpResponse The HTTP response.
@@ -375,8 +448,26 @@ class AuthTokenHandler {
 		base64Buf.flip();
 		final String tokenP1 = base64Buf.toString();
 
-		// add authentication info header
-		httpResponse.setHeader("Authentication-Info",
-				"nexttoken=" + tokenP0 + "." + tokenP1);
+		// add authentication token to the response
+		if (this.useCookie) {
+			final Cookie c = new Cookie(COOKIE_NAME,
+					tokenP0 + "." + tokenP1);
+			c.setPath(this.sc.getContextPath() + "/");
+			httpResponse.addCookie(c);
+		} else {
+			httpResponse.setHeader("Authentication-Info",
+					"nexttoken=" + tokenP0 + "." + tokenP1);
+		}
+	}
+
+	/**
+	 * Tell if an HTTP cookie is used to pass the authentication token instead
+	 * of the headers.
+	 *
+	 * @return {@code true} if a cookie is used.
+	 */
+	boolean isUseCookie() {
+
+		return this.useCookie;
 	}
 }

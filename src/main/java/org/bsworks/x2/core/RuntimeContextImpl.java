@@ -26,6 +26,7 @@ import javax.validation.ValidatorFactory;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.bsworks.x2.Actor;
 import org.bsworks.x2.EndpointCallHandler;
 import org.bsworks.x2.InitializationException;
 import org.bsworks.x2.RuntimeContext;
@@ -624,6 +625,15 @@ class RuntimeContextImpl
 	public SecretKey getAuthSecretKey() {
 
 		return this.appSecretKey;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public void purgeCachedActor(final Actor actor) {
+
+		this.authTokenHandler.purgeCachedActor(actor);
 	}
 
 	/* (non-Javadoc)

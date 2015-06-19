@@ -10,11 +10,7 @@ import org.bsworks.x2.services.auth.ActorAuthenticationService;
 /**
  * Actor, such as a user, performing an operation. Actor objects are looked up
  * by the framework in an implementation of {@link ActorAuthenticationService},
- * provided by the web-application. Actor objects are used by the framework for
- * the "AuthToken" HTTP authentication scheme, which uses an encrypted
- * authentication token passed between the client and the server in
- * "Authorization" (from the client to the server) and "Authentication-Info"
- * (from the server to the client) HTTP headers.
+ * provided by the web-application.
  *
  * @author Lev Himmelfarb
  */

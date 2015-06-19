@@ -126,8 +126,9 @@ class EndpointCallResponder {
 				httpResponse.setHeader("Access-Control-Allow-Origin", "null");
 			}
 			if (allowOrigin) {
-				httpResponse.setHeader("Access-Control-Expose-Headers",
-						EXPOSE_HEADERS);
+				if (!this.runtimeCtx.getAuthTokenHandler().isUseCookie())
+					httpResponse.setHeader("Access-Control-Expose-Headers",
+							EXPOSE_HEADERS);
 				httpResponse.setHeader("Access-Control-Allow-Methods",
 						allowedMethodsList);
 				final String requestHeaders =
@@ -274,7 +275,7 @@ class EndpointCallResponder {
 			httpResponse.setHeader("Access-Control-Allow-Origin", "null");
 		}
 
-		if (allowOrigin)
+		if (allowOrigin && !this.runtimeCtx.getAuthTokenHandler().isUseCookie())
 			httpResponse.setHeader("Access-Control-Expose-Headers",
 					EXPOSE_HEADERS);
 	}
