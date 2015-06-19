@@ -28,6 +28,22 @@ public @interface Property {
 	AccessRestriction[] accessRestrictions() default {};
 
 	/**
+	 * If {@code true}, which is the default, when the property value is
+	 * deserialized (e.g. from the serialized form submitted via the API, or
+	 * loaded from the persistent storage) and the input is an empty string, the
+	 * property value is set to {@code null}. To preserve the empty string as
+	 * the deserialized property value, this attribute can be explicitly set to
+	 * {@code false}.
+	 *
+	 * <p>This attribute only applies to string properties, both single and
+	 * multi-valued.
+	 *
+	 * @return {@code true} to deserialize empty strings as {@code null},
+	 * {@code false} to preserve empty strings.
+	 */
+	boolean readEmptyAsNull() default true;
+
+	/**
 	 * If {@code true}, which is the default, the property is fetched by default
 	 * when the resource is loaded from the persistent storage. If
 	 * {@code false}, the property is fetched only if explicitly requested by

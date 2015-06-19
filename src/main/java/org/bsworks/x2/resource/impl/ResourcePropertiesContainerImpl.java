@@ -374,7 +374,9 @@ class ResourcePropertiesContainerImpl<O>
 		AbstractResourcePropertyValueHandlerImpl elValueHandler;
 		switch (valueType) {
 		case STRING:
-			return StringResourcePropertyValueHandler.INSTANCE;
+			return new StringResourcePropertyValueHandler(
+					propAnno instanceof Property ?
+							((Property) propAnno).readEmptyAsNull() : false);
 		case BYTE:
 			return (((Class<?>) valueJavaType).isPrimitive()
 						? ByteResourcePropertyValueHandler.INSTANCE_PRIM

@@ -18,17 +18,21 @@ class StringResourcePropertyValueHandler
 	extends CanBeIdResourcePropertyValueHandler {
 
 	/**
-	 * The instance.
+	 * Tells if empty strings should be read as {@code null}.
 	 */
-	static final StringResourcePropertyValueHandler INSTANCE =
-		new StringResourcePropertyValueHandler();
+	private final boolean readEmptyAsNull;
 
 
 	/**
 	 * Single stateless instance.
+	 *
+	 * @param readEmptyAsNull {@code true} if empty strings should be read as
+	 * {@code null}.
 	 */
-	private StringResourcePropertyValueHandler() {
+	StringResourcePropertyValueHandler(final boolean readEmptyAsNull) {
 		super(ResourcePropertyValueType.STRING, false);
+
+		this.readEmptyAsNull = readEmptyAsNull;
 	}
 
 
@@ -78,6 +82,11 @@ class StringResourcePropertyValueHandler
 			final ResourceReadSession in)
 		throws InvalidResourceDataException, IOException {
 
-		return in.readStringValue();
+		final String val = in.readStringValue();
+
+		if (val == null)
+			return null;
+
+		return (this.readEmptyAsNull && val.isEmpty() ? null : val);
 	}
 }
