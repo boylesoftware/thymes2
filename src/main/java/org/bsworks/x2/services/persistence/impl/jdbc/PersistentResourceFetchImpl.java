@@ -442,7 +442,7 @@ class PersistentResourceFetchImpl<R>
 		final WhereClause whereClause = (this.filter == null ? null :
 			qb.buildWhereClause(params));
 		final OrderByClause orderByClause = (this.order == null ? null :
-			qb.buildOrderByClause());
+			qb.buildOrderByClause(params));
 
 		// check if no branches
 		if (qb.getBranches().isEmpty()) {

@@ -5,9 +5,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
 
+import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.OrderSpec;
 import org.bsworks.x2.resource.OrderSpecElement;
 import org.bsworks.x2.resource.OrderType;
+import org.bsworks.x2.resource.Resources;
+import org.bsworks.x2.util.sql.dialect.SQLDialect;
 
 
 /**
@@ -31,16 +34,37 @@ class OrderByClause {
 	/**
 	 * Create new "ORDER BY" clause.
 	 *
+	 * @param resources Application resources manager.
+	 * @param dialect SQL dialect.
+	 * @param paramsFactory Query parameter value handlers factory.
 	 * @param order Order specification.
 	 * @param singlePropExprs Single-valued properties available from the query.
+	 * @param collectionProps Collection property stumps from the query.
 	 * @param allSingleJoins Joins for the single-valued properties.
+	 * @param params Parameters collection, to which to add any query
+	 * parameters.
 	 */
-	OrderByClause(final OrderSpec<?> order,
+	OrderByClause(final Resources resources, final SQLDialect dialect,
+			final ParameterValuesFactoryImpl paramsFactory,
+			final OrderSpec<?> order,
 			final Map<String, SingleValuedQueryProperty> singlePropExprs,
-			final SortedMap<String, String> allSingleJoins) {
+			final Map<String, CollectionQueryProperty> collectionProps,
+			final SortedMap<String, String> allSingleJoins,
+			final Map<String, JDBCParameterValue> params) {
 
 		// create buffer for building the clause
 		final StringBuilder body = new StringBuilder(64);
+
+		// process order segments
+		int segmentNum = 0;
+		for (final FilterSpec<?> segment : order.getSegments()) {
+			final WhereClause splitClause = new WhereClause(resources, dialect,
+					paramsFactory, segment, "s" + (segmentNum++),
+					singlePropExprs, collectionProps, allSingleJoins, params);
+			if (body.length() > 0)
+				body.append(", ");
+			body.append(splitClause.getBody());
+		}
 
 		// process order specification elements
 		final StringBuilder propPathBuf = new StringBuilder(128);

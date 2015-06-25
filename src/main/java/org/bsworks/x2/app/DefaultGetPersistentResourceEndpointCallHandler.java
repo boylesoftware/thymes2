@@ -92,6 +92,12 @@ import org.bsworks.x2.util.StringUtils;
  * property paths used to order the result (see {@link OrderSpec}). Each
  * property path in the list can be suffixed with ":asc" or ":desc" to specify
  * the order direction. If not specified, ":asc" is assumed.</dd>
+ * <dt>{@value #SPLIT_PARAM}</dt><dd>Defines result list segmentation (see
+ * {@link OrderSpec#addSegment}). The syntax of the parameter value is the same
+ * as for the filter condition parameter. Multiple {@value #SPLIT_PARAM}
+ * parameters can be specified for a request to create sub-segmentation. Splits
+ * are always added before any order specifications provided by the
+ * {@link #ORDER_PARAM} parameter.</dd>
  * <dt>{@value #RANGE_PARAM}</dt><dd>Collection fetch range specification (see
  * {@link RangeSpec}), which a pair of comma-separated integer numbers. The
  * first number is for the first record index, zero-based. The second number is
@@ -157,6 +163,12 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 * Name of request parameter used to specify {@link OrderSpec}.
 	 */
 	public static final String ORDER_PARAM = "o";
+
+	/**
+	 * Name of request parameter used to specify segments in the
+	 * {@link OrderSpec}.
+	 */
+	public static final String SPLIT_PARAM = "s";
 
 	/**
 	 * Name of request parameter used to specify {@link RangeSpec}.
@@ -682,66 +694,81 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			final Matcher m)
 		throws EndpointCallErrorException {
 
-		final String[] filterParams =
-			ctx.getRequestParamValues(filterParamName);
+		for (final String condExpr : ctx.getRequestParamValues(filterParamName))
+			this.addFilterCondition(filter, filterParamName, condExpr, m);
+	}
 
-		for (final String filterParam : filterParams) {
+	/**
+	 * Add filter condition to the specified filter.
+	 *
+	 * @param filter The filter specification, to which to add the condition.
+	 * @param paramName Name of the request parameter that provides the
+	 * condition.
+	 * @param condExpr Condition expression (the parameter value).
+	 * @param m Matcher for filter condition pattern.
+	 *
+	 * @throws EndpointCallErrorException If condition expression is invalid.
+	 */
+	private void addFilterCondition(final FilterSpec<R> filter,
+			final String paramName, final String condExpr, final Matcher m)
+		throws EndpointCallErrorException {
 
-			if (!m.reset(filterParam).matches())
-				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_BAD_REQUEST, null,
-						"Invalid filter specification parameter.");
+		if (!m.reset(condExpr).matches())
+			throw new EndpointCallErrorException(
+					HttpServletResponse.SC_BAD_REQUEST, null,
+					"Invalid condition expression in parameter \"" + paramName
+						+ "\".");
 
-			final boolean negate = (m.group(2) != null);
+		final FilterConditionType condType;
+		final List<String> operandsList;
+		int g = 2;
+		if (m.group(++g) != null) {
+			condType = FilterConditionType.EQ;
+			operandsList = Collections.singletonList(m.group(g));
+		} else if (m.group(++g) != null) {
+			condType = FilterConditionType.LE;
+			operandsList = Collections.singletonList(m.group(g));
+		} else if (m.group(++g) != null) {
+			condType = FilterConditionType.GE;
+			operandsList = Collections.singletonList(m.group(g));
+		} else if (m.group(++g) != null) {
+			condType = FilterConditionType.MATCH;
+			operandsList = Collections.singletonList(m.group(g));
+		} else if (m.group(++g) != null) {
+			condType = FilterConditionType.SUBSTRING;
+			operandsList = Collections.singletonList(m.group(g));
+		} else if (m.group(++g) != null) {
+			condType = FilterConditionType.PREFIX;
+			operandsList = Collections.singletonList(m.group(g));
+		} else if (m.group(++g) != null) {
+			condType = FilterConditionType.EQ;
+			operandsList = Arrays.asList(m.group(g).split("\\|"));
+		} else {
+			condType = FilterConditionType.NOT_EMPTY;
+			operandsList = Collections.emptyList();
+		}
 
-			final FilterConditionType condType;
-			final List<String> operandsList;
-			int g = 2;
-			if (m.group(++g) != null) {
-				condType = FilterConditionType.EQ;
-				operandsList = Collections.singletonList(m.group(g));
-			} else if (m.group(++g) != null) {
-				condType = FilterConditionType.LE;
-				operandsList = Collections.singletonList(m.group(g));
-			} else if (m.group(++g) != null) {
-				condType = FilterConditionType.GE;
-				operandsList = Collections.singletonList(m.group(g));
-			} else if (m.group(++g) != null) {
-				condType = FilterConditionType.MATCH;
-				operandsList = Collections.singletonList(m.group(g));
-			} else if (m.group(++g) != null) {
-				condType = FilterConditionType.SUBSTRING;
-				operandsList = Collections.singletonList(m.group(g));
-			} else if (m.group(++g) != null) {
-				condType = FilterConditionType.PREFIX;
-				operandsList = Collections.singletonList(m.group(g));
-			} else if (m.group(++g) != null) {
-				condType = FilterConditionType.EQ;
-				operandsList = Arrays.asList(m.group(g).split("\\|"));
-			} else {
-				condType = FilterConditionType.NOT_EMPTY;
-				operandsList = Collections.emptyList();
-			}
-
-			final Object[] operands =
-					operandsList.toArray(new Object[operandsList.size()]);
-			try {
-				final String[] propPaths = m.group(1).split(",");
-				if (propPaths.length > 1) {
-					final FilterSpec<R> junc = filter.addDisjunction();
-					for (final String propPath : propPaths)
-						junc.addCondition(propPath, condType, negate, operands);
-				} else {
-					filter.addCondition(propPaths[0], condType, negate,
+		final Object[] operands =
+				operandsList.toArray(new Object[operandsList.size()]);
+		final boolean negated = (m.group(2) != null);
+		try {
+			final String[] propPaths = m.group(1).split(",");
+			if (propPaths.length > 1) {
+				final FilterSpec<R> junc = filter.addDisjunction();
+				for (final String propPath : propPaths)
+					junc.addCondition(propPath, condType, negated,
 							operands);
-				}
-			} catch (final IllegalArgumentException e) {
-				if (this.log.isDebugEnabled())
-					this.log.debug("invalid parameter", e);
-				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_BAD_REQUEST, null,
-						"Invalid filter specification parameter.");
+			} else {
+				filter.addCondition(propPaths[0], condType, negated,
+						operands);
 			}
+		} catch (final IllegalArgumentException e) {
+			if (this.log.isDebugEnabled())
+				this.log.debug("invalid parameter", e);
+			throw new EndpointCallErrorException(
+					HttpServletResponse.SC_BAD_REQUEST, null,
+					"Invalid condition expression in parameter \"" + paramName
+						+ "\": " + e.getMessage());
 		}
 	}
 
@@ -757,37 +784,55 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	private OrderSpec<R> getOrderSpec(final EndpointCallContext ctx)
 		throws EndpointCallErrorException {
 
+		OrderSpec<R> order = null;
+
+		final String[] segmentParams = ctx.getRequestParamValues(SPLIT_PARAM);
+		if ((segmentParams != null) && (segmentParams.length > 0)) {
+
+			order = ctx.getOrderSpec(this.prsrcClass);
+
+			final Matcher m = FILTER_COND_PATTERN.matcher("");
+
+			for (final String condExpr : segmentParams) {
+				final FilterSpec<R> split = ctx.getFilterSpec(this.prsrcClass);
+				this.addFilterCondition(split, SPLIT_PARAM, condExpr, m);
+				order.addSegment(split);
+			}
+		}
+
 		final String orderParam = StringUtils.nullIfEmpty(
 				ctx.getRequestParam(ORDER_PARAM));
-		if (orderParam == null)
-			return null;
+		if (orderParam != null) {
 
-		final OrderSpec<R> order = ctx.getOrderSpec(this.prsrcClass);
-		for (final String orderElParam : orderParam.split(",")) {
+			if (order == null)
+				order = ctx.getOrderSpec(this.prsrcClass);
 
-			final OrderType orderType;
-			final String propPath;
-			if (orderElParam.endsWith(":asc")) {
-				orderType = OrderType.ASC;
-				propPath = orderElParam.substring(0,
-						orderElParam.length() - ":asc".length());
-			} else if (orderElParam.endsWith(":desc")) {
-				orderType = OrderType.DESC;
-				propPath = orderElParam.substring(0,
-						orderElParam.length() - ":desc".length());
-			} else {
-				orderType = OrderType.ASC;
-				propPath = orderElParam;
-			}
+			for (final String orderElParam : orderParam.split(",")) {
 
-			try {
-				order.add(orderType, propPath);
-			} catch (final IllegalArgumentException e) {
-				if (this.log.isDebugEnabled())
-					this.log.debug("invalid parameter", e);
-				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_BAD_REQUEST, null,
-						"Invalid order specification parameter.");
+				final OrderType orderType;
+				final String propPath;
+				if (orderElParam.endsWith(":asc")) {
+					orderType = OrderType.ASC;
+					propPath = orderElParam.substring(0,
+							orderElParam.length() - ":asc".length());
+				} else if (orderElParam.endsWith(":desc")) {
+					orderType = OrderType.DESC;
+					propPath = orderElParam.substring(0,
+							orderElParam.length() - ":desc".length());
+				} else {
+					orderType = OrderType.ASC;
+					propPath = orderElParam;
+				}
+
+				try {
+					order.add(orderType, propPath);
+				} catch (final IllegalArgumentException e) {
+					if (this.log.isDebugEnabled())
+						this.log.debug("invalid parameter", e);
+					throw new EndpointCallErrorException(
+							HttpServletResponse.SC_BAD_REQUEST, null,
+							"Invalid order specification parameter.");
+				}
 			}
 		}
 

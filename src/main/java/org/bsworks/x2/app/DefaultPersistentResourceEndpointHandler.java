@@ -204,8 +204,8 @@ public class DefaultPersistentResourceEndpointHandler<R>
 		throws EndpointCallErrorException {
 
 		return ctx.getFilterSpec(this.prsrcClass)
-				.addCondition(this.idPropHandler.getName(),
-						FilterConditionType.EQ, false, recId);
+				.addTrueCondition(this.idPropHandler.getName(),
+						FilterConditionType.EQ, recId);
 	}
 
 	/**

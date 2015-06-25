@@ -124,6 +124,7 @@ class DeleteBuilder {
 					dialect,
 					tx.getParameterValuesFactory(),
 					filter,
+					"p",
 					Collections.singletonMap(idPropHandler.getName(),
 							new SingleValuedQueryProperty(
 									"t." + idPropHandler.getPersistence()

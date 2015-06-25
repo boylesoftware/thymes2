@@ -107,5 +107,59 @@ public enum FilterConditionType {
 	/**
 	 * Value exists.
 	 */
-	NOT_EMPTY
+	NOT_EMPTY;
+
+
+	/**
+	 * Get condition type that has inverse effect to this one.
+	 *
+	 * @return The inverse condition type.
+	 */
+	public FilterConditionType inverse() {
+
+		switch (this) {
+		case EQ:
+			return NE;
+		case NE:
+			return EQ;
+		case LT:
+			return GE;
+		case LE:
+			return GT;
+		case GT:
+			return LE;
+		case GE:
+			return LT;
+		case MATCH:
+			return NOT_MATCH;
+		case NOT_MATCH:
+			return MATCH;
+		case MATCH_CS:
+			return NOT_MATCH_CS;
+		case NOT_MATCH_CS:
+			return MATCH_CS;
+		case SUBSTRING:
+			return NOT_SUBSTRING;
+		case NOT_SUBSTRING:
+			return SUBSTRING;
+		case SUBSTRING_CS:
+			return NOT_SUBSTRING_CS;
+		case NOT_SUBSTRING_CS:
+			return SUBSTRING_CS;
+		case PREFIX:
+			return NOT_PREFIX;
+		case NOT_PREFIX:
+			return PREFIX;
+		case PREFIX_CS:
+			return NOT_PREFIX_CS;
+		case NOT_PREFIX_CS:
+			return PREFIX_CS;
+		case EMPTY:
+			return NOT_EMPTY;
+		case NOT_EMPTY:
+			return EMPTY;
+		}
+
+		throw new AssertionError("Unknown filter condition type.");
+	}
 }

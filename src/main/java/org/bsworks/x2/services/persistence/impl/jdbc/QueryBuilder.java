@@ -2773,19 +2773,23 @@ class QueryBuilder {
 	WhereClause buildWhereClause(final Map<String, JDBCParameterValue> params) {
 
 		return new WhereClause(this.resources, this.dialect, this.paramsFactory,
-				this.filter, this.singlePropExprs, this.collectionProps,
+				this.filter, "p", this.singlePropExprs, this.collectionProps,
 				this.allSingleJoins, params);
 	}
 
 	/**
 	 * Build "ORDER BY" clause for the query.
 	 *
+	 * @param params Map, to which to add query parameters.
+	 *
 	 * @return Object representing the SQL "ORDER BY" clause.
 	 */
-	OrderByClause buildOrderByClause() {
+	OrderByClause buildOrderByClause(
+			final Map<String, JDBCParameterValue> params) {
 
-		return new OrderByClause(this.order, this.singlePropExprs,
-				this.allSingleJoins);
+		return new OrderByClause(this.resources, this.dialect,
+				this.paramsFactory, this.order, this.singlePropExprs,
+				this.collectionProps, this.allSingleJoins, params);
 	}
 
 	/**

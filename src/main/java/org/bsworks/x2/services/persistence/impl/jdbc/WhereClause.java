@@ -353,6 +353,7 @@ class WhereClause {
 	 * @param dialect SQL dialect.
 	 * @param paramsFactory Query parameter value handlers factory.
 	 * @param filter Filter specification.
+	 * @param paramPrefix Query parameter names prefix to use.
 	 * @param singlePropExprs Single-valued properties available from the query.
 	 * @param collectionProps Collection property stumps from the query.
 	 * @param allSingleJoins Joins for the single-valued properties.
@@ -361,16 +362,16 @@ class WhereClause {
 	 */
 	WhereClause(final Resources resources, final SQLDialect dialect,
 			final ParameterValuesFactoryImpl paramsFactory,
-			final FilterSpec<?> filter,
+			final FilterSpec<?> filter, final String paramPrefix,
 			final Map<String, SingleValuedQueryProperty> singlePropExprs,
 			final Map<String, CollectionQueryProperty> collectionProps,
 			final SortedMap<String, String> allSingleJoins,
 			final Map<String, JDBCParameterValue> params) {
 
 		final StringBuilder body = new StringBuilder(256);
-		buildFilterExpression(resources, body, 0, dialect, paramsFactory,
-				filter, singlePropExprs, collectionProps, allSingleJoins,
-				params, this.usedJoins);
+		buildFilterExpression(resources, body, paramPrefix, 0, dialect,
+				paramsFactory, filter, singlePropExprs, collectionProps,
+				allSingleJoins, params, this.usedJoins);
 		this.body = body.toString();
 	}
 
@@ -379,6 +380,7 @@ class WhereClause {
 	 *
 	 * @param resources Application resources manager.
 	 * @param buf Filter expression builder.
+	 * @param paramPrefix Query parameter names prefix to use.
 	 * @param nextParamInd Index for the next query parameter placeholder name.
 	 * @param dialect SQL dialect.
 	 * @param paramsFactory Query parameter value handlers factory.
@@ -393,8 +395,8 @@ class WhereClause {
 	 * @return Index for the next query parameter placeholder name.
 	 */
 	private static int buildFilterExpression(final Resources resources,
-			final StringBuilder buf, final int nextParamInd,
-			final SQLDialect dialect,
+			final StringBuilder buf, final String paramPrefix,
+			final int nextParamInd, final SQLDialect dialect,
 			final ParameterValuesFactoryImpl paramsFactory,
 			final FilterSpec<?> filter,
 			final Map<String, SingleValuedQueryProperty> singlePropExprs,
@@ -431,9 +433,10 @@ class WhereClause {
 				} while ((dotInd = propPathBuf.lastIndexOf(".")) > 0);
 
 				// add the condition
-				newNextParamInd = appendCondition(buf, newNextParamInd, dialect,
-						paramsFactory, disjunction, cond,
-						prop.getValueExpression(), prop.getValueType(), params);
+				newNextParamInd = appendCondition(buf, paramPrefix,
+						newNextParamInd, dialect, paramsFactory, disjunction,
+						cond, prop.getValueExpression(), prop.getValueType(),
+						params);
 
 			} else { // collection
 
@@ -466,8 +469,8 @@ class WhereClause {
 
 				// add condition to the sub-query
 				newNextParamInd = appendConditionToSubquery(resources, subquery,
-						newNextParamInd, dialect, paramsFactory, disjunction,
-						cond, params);
+						paramPrefix, newNextParamInd, dialect, paramsFactory,
+						disjunction, cond, params);
 			}
 		}
 
@@ -497,7 +500,7 @@ class WhereClause {
 				buf.append("(");
 			final StringBuilder juncBody = new StringBuilder(256);
 			newNextParamInd = buildFilterExpression(resources, juncBody,
-					newNextParamInd, dialect, paramsFactory, junc,
+					paramPrefix, newNextParamInd, dialect, paramsFactory, junc,
 					singlePropExprs, collectionProps, allSingleJoins, params,
 					usedJoins);
 			buf.append(juncBody);
@@ -514,6 +517,7 @@ class WhereClause {
 	 *
 	 * @param resources Application resources manager.
 	 * @param subquery The sub-query builder.
+	 * @param paramPrefix Query parameter names prefix to use.
 	 * @param nextParamInd Index for the next query parameter placeholder name.
 	 * @param dialect SQL dialect.
 	 * @param paramsFactory Query parameter value handlers factory.
@@ -526,8 +530,8 @@ class WhereClause {
 	 * @return Index for the next query parameter placeholder name.
 	 */
 	private static int appendConditionToSubquery(final Resources resources,
-			final SubQueryBuilder subquery, final int nextParamInd,
-			final SQLDialect dialect,
+			final SubQueryBuilder subquery, final String paramPrefix,
+			final int nextParamInd, final SQLDialect dialect,
 			final ParameterValuesFactoryImpl paramsFactory,
 			final boolean disjunction, final FilterCondition cond,
 			final Map<String, JDBCParameterValue> params) {
@@ -687,15 +691,16 @@ class WhereClause {
 		}
 
 		// append condition to the sub-query
-		return appendCondition(subquery.whereClauseConditions, nextParamInd,
-				dialect, paramsFactory, disjunction, cond, valueExpr, valueType,
-				params);
+		return appendCondition(subquery.whereClauseConditions, paramPrefix,
+				nextParamInd, dialect, paramsFactory, disjunction, cond,
+				valueExpr, valueType, params);
 	}
 
 	/**
 	 * Append condition to the filter expression.
 	 *
 	 * @param buf Filter expression builder.
+	 * @param paramPrefix Query parameter names prefix to use.
 	 * @param nextParamInd Index for the next query parameter placeholder name.
 	 * @param dialect SQL dialect.
 	 * @param paramsFactory Query parameter value handlers factory.
@@ -710,8 +715,9 @@ class WhereClause {
 	 * @return Index for the next query parameter placeholder name.
 	 */
 	private static int appendCondition(final StringBuilder buf,
-			final int nextParamInd, final SQLDialect dialect,
-			ParameterValuesFactoryImpl paramsFactory,
+			final String paramPrefix, final int nextParamInd,
+			final SQLDialect dialect,
+			final ParameterValuesFactoryImpl paramsFactory,
 			final boolean disjunction, final FilterCondition cond,
 			final String valueExpr, final PersistentValueType valueType,
 			final Map<String, JDBCParameterValue> params) {
@@ -724,110 +730,110 @@ class WhereClause {
 			cond.getOperands();
 		switch (cond.getType()) {
 		case EQ:
-			newNextParamInd = appendInCondition(buf, newNextParamInd,
-					paramsFactory, cond.isNegated(), operands, valueExpr,
-					valueType, params);
+			newNextParamInd = appendInCondition(buf, paramPrefix,
+					newNextParamInd, paramsFactory, cond.isNegated(), operands,
+					valueExpr, valueType, params);
 			break;
 		case NE:
-			newNextParamInd = appendInCondition(buf, newNextParamInd,
-					paramsFactory, !cond.isNegated(), operands, valueExpr,
-					valueType, params);
+			newNextParamInd = appendInCondition(buf, paramPrefix,
+					newNextParamInd, paramsFactory, !cond.isNegated(), operands,
+					valueExpr, valueType, params);
 			break;
 		case LT:
-			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
-					dialect, paramsFactory,
+			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
+					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_LT : EXPR_GE), operands,
 					valueExpr, valueType, params);
 			break;
 		case LE:
-			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
-					dialect, paramsFactory,
+			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
+					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_LE : EXPR_GT), operands,
 					valueExpr, valueType, params);
 			break;
 		case GT:
-			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
-					dialect, paramsFactory,
+			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
+					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_GT : EXPR_LE), operands,
 					valueExpr, valueType, params);
 			break;
 		case GE:
-			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
-					dialect, paramsFactory,
+			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
+					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_GE : EXPR_LT), operands,
 					valueExpr, valueType, params);
 			break;
 		case MATCH:
-			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
-					dialect, paramsFactory,
+			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
+					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_MATCH : EXPR_NOT_MATCH), operands,
 					valueExpr, valueType, params);
 			break;
 		case NOT_MATCH:
-			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
-					dialect, paramsFactory,
+			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
+					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_NOT_MATCH : EXPR_MATCH), operands,
 					valueExpr, valueType, params);
 			break;
 		case MATCH_CS:
-			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
-					dialect, paramsFactory,
+			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
+					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_MATCH_CS : EXPR_NOT_MATCH_CS),
 					operands, valueExpr, valueType, params);
 			break;
 		case NOT_MATCH_CS:
-			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
-					dialect, paramsFactory,
+			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
+					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_NOT_MATCH_CS : EXPR_MATCH_CS),
 					operands, valueExpr, valueType, params);
 			break;
 		case SUBSTRING:
-			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
-					dialect, paramsFactory,
+			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
+					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_SUBSTRING : EXPR_NOT_SUBSTRING),
 					operands, valueExpr, valueType, params);
 			break;
 		case NOT_SUBSTRING:
-			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
-					dialect, paramsFactory,
+			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
+					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_NOT_SUBSTRING : EXPR_SUBSTRING),
 					operands, valueExpr, valueType, params);
 			break;
 		case SUBSTRING_CS:
-			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
-					dialect, paramsFactory,
+			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
+					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_SUBSTRING_CS :
 						EXPR_NOT_SUBSTRING_CS),
 					operands, valueExpr, valueType, params);
 			break;
 		case NOT_SUBSTRING_CS:
-			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
-					dialect, paramsFactory,
+			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
+					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_NOT_SUBSTRING_CS :
 						EXPR_SUBSTRING_CS),
 					operands, valueExpr, valueType, params);
 			break;
 		case PREFIX:
-			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
-					dialect, paramsFactory,
+			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
+					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_PREFIX : EXPR_NOT_PREFIX),
 					operands, valueExpr, valueType, params);
 			break;
 		case NOT_PREFIX:
-			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
-					dialect, paramsFactory,
+			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
+					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_NOT_PREFIX : EXPR_PREFIX),
 					operands, valueExpr, valueType, params);
 			break;
 		case PREFIX_CS:
-			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
-					dialect, paramsFactory,
+			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
+					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_PREFIX_CS : EXPR_NOT_PREFIX_CS),
 					operands, valueExpr, valueType, params);
 			break;
 		case NOT_PREFIX_CS:
-			newNextParamInd = appendBinaryCondition(buf, newNextParamInd,
-					dialect, paramsFactory,
+			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
+					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_NOT_PREFIX_CS : EXPR_PREFIX_CS),
 					operands, valueExpr, valueType, params);
 			break;
@@ -849,6 +855,7 @@ class WhereClause {
 	 * Append binary operator condition to the filter expression.
 	 *
 	 * @param buf Filter expression builder.
+	 * @param paramPrefix Query parameter names prefix to use.
 	 * @param nextParamInd Index for the next query parameter placeholder name.
 	 * @param dialect SQL dialect.
 	 * @param paramsFactory Query parameter value handlers factory.
@@ -862,8 +869,9 @@ class WhereClause {
 	 * @return Index for the next query parameter placeholder name.
 	 */
 	private static int appendBinaryCondition(final StringBuilder buf,
-			final int nextParamInd, final SQLDialect dialect,
-			ParameterValuesFactoryImpl paramsFactory,
+			final String paramPrefix, final int nextParamInd,
+			final SQLDialect dialect,
+			final ParameterValuesFactoryImpl paramsFactory,
 			final BinaryExprFactory opFactory,
 			final Collection<? extends FilterConditionOperand> operands,
 			final String valueExpr, final PersistentValueType valueType,
@@ -872,7 +880,7 @@ class WhereClause {
 		int newNextParamInd = nextParamInd;
 		if (operands.size() == 1) {
 			final FilterConditionOperand operand = operands.iterator().next();
-			final String paramName = "p" + (newNextParamInd++);
+			final String paramName = paramPrefix + (newNextParamInd++);
 			buf.append(opFactory.make(dialect, valueExpr, "?" + paramName));
 			params.put(paramName, paramsFactory.getParameterValue(valueType,
 					operand.getValue()));
@@ -883,7 +891,7 @@ class WhereClause {
 				final FilterConditionOperand operand = i.next();
 				if (newNextParamInd > nextParamInd)
 					buf.append(" OR ");
-				final String paramName = "p" + (newNextParamInd++);
+				final String paramName = paramPrefix + (newNextParamInd++);
 				buf.append(opFactory.make(dialect, valueExpr, "?" + paramName));
 				params.put(paramName, paramsFactory.getParameterValue(
 						valueType, operand.getValue()));
@@ -898,6 +906,7 @@ class WhereClause {
 	 * Append equality condition to the filter expression.
 	 *
 	 * @param buf Filter expression builder.
+	 * @param paramPrefix Query parameter names prefix to use.
 	 * @param nextParamInd Index for the next query parameter placeholder name.
 	 * @param paramsFactory Query parameter value handlers factory.
 	 * @param negate {@code true} for inequality.
@@ -910,7 +919,8 @@ class WhereClause {
 	 * @return Index for the next query parameter placeholder name.
 	 */
 	private static int appendInCondition(final StringBuilder buf,
-			final int nextParamInd, ParameterValuesFactoryImpl paramsFactory,
+			final String paramPrefix, final int nextParamInd,
+			final ParameterValuesFactoryImpl paramsFactory,
 			final boolean negate,
 			final Collection<? extends FilterConditionOperand> operands,
 			final String valueExpr, final PersistentValueType valueType,
@@ -919,7 +929,7 @@ class WhereClause {
 		int newNextParamInd = nextParamInd;
 		final int numOps = operands.size();
 		if (numOps == 1) {
-			final String paramName = "p" + (newNextParamInd++);
+			final String paramName = paramPrefix + (newNextParamInd++);
 			buf.append(valueExpr).append(" ").append(negate ? "<>" : "=")
 				.append(" ?").append(paramName);
 			params.put(paramName, paramsFactory.getParameterValue(valueType,
@@ -930,7 +940,7 @@ class WhereClause {
 			for (final Iterator<? extends FilterConditionOperand> i =
 					operands.iterator(); i.hasNext();)
 				opVals.add(i.next().getValue());
-			final String paramName = "p" + (newNextParamInd++);
+			final String paramName = paramPrefix + (newNextParamInd++);
 			buf.append(valueExpr);
 			if (negate)
 				buf.append(" NOT");

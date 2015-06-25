@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.OrderSpec;
 import org.bsworks.x2.resource.OrderType;
 
@@ -37,6 +38,17 @@ class OrderSpecImpl<R>
 	 */
 	private final List<OrderSpecElementImpl> elementsRO =
 		Collections.unmodifiableList(this.elements);
+
+	/**
+	 * Segments.
+	 */
+	private final List<FilterSpec<R>> segments = new ArrayList<>();
+
+	/**
+	 * Read-only view of the segments.
+	 */
+	private final List<FilterSpec<R>> segmentsRO =
+		Collections.unmodifiableList(this.segments);
 
 	/**
 	 * Used property paths.
@@ -94,6 +106,19 @@ class OrderSpecImpl<R>
 	 * See overridden method.
 	 */
 	@Override
+	public OrderSpec<R> addSegment(final FilterSpec<R> split) {
+
+		this.segments.add(split);
+
+		this.prsrcClasses.addAll(split.getParticipatingPersistentResources());
+
+		return this;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public List<OrderSpecElementImpl> getElements() {
 
 		return this.elementsRO;
@@ -103,9 +128,18 @@ class OrderSpecImpl<R>
 	 * See overridden method.
 	 */
 	@Override
+	public List<FilterSpec<R>> getSegments() {
+
+		return this.segmentsRO;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public boolean isEmpty() {
 
-		return this.usedProps.isEmpty();
+		return (this.elements.isEmpty() && this.segments.isEmpty());
 	}
 
 	/* (non-Javadoc)
@@ -114,9 +148,16 @@ class OrderSpecImpl<R>
 	@Override
 	public boolean isUsed(final String propPath) {
 
-		return (this.usedProps.contains(propPath)
+		if (this.usedProps.contains(propPath)
 				|| !this.usedProps.subSet(propPath + ".", propPath + "/")
-					.isEmpty());
+					.isEmpty())
+			return true;
+
+		for (final FilterSpec<R> segment : this.segments)
+			if (segment.isUsed(propPath))
+				return true;
+
+		return false;
 	}
 
 	/* (non-Javadoc)

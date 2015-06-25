@@ -40,12 +40,41 @@ public interface OrderSpec<R> {
 	OrderSpec<R> add(OrderType orderType, String propPath);
 
 	/**
+	 * Add segmentation by the specified condition. Adding a segment splits the
+	 * result list in two: all records, for which the condition is false appear
+	 * first, followed by all records, for which the condition is true. This is
+	 * achieved by including ordering by the result of the condition evaluation.
+	 * Multiple segments can be added to create sub-segmentation.
+	 *
+	 * <p>Note, that segmentation is always performed before sorting specified
+	 * by the {@link #add(OrderType, String)} method calls.
+	 *
+	 * @param split Filter specification that expresses the segment split
+	 * condition. Records included by the filter will appear after the records
+	 * excluded by the filter.
+	 *
+	 * @return This order specification object (for chaining).
+	 *
+	 * @throws IllegalArgumentException If the specified property path is
+	 * invalid.
+	 */
+	OrderSpec<R> addSegment(FilterSpec<R> split);
+
+	/**
 	 * Get order specification elements.
 	 *
 	 * @return Unmodifiable list of order specification elements. May be empty,
 	 * but never {@code null}.
 	 */
 	List<? extends OrderSpecElement> getElements();
+
+	/**
+	 * Get segments.
+	 *
+	 * @return Unmodifiable list of segment splits. May be empty, but never
+	 * {@code null}.
+	 */
+	List<FilterSpec<R>> getSegments();
 
 	/**
 	 * Tell if the order specification is empty, that is no ordering rule has
