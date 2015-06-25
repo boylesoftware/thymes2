@@ -11,11 +11,11 @@ import java.util.Deque;
 public interface OrderSpecElement {
 
 	/**
-	 * Get order type.
+	 * Get sort direction.
 	 *
-	 * @return The order type.
+	 * @return The sort direction.
 	 */
-	OrderType getType();
+	SortDirection getSortDirection();
 
 	/**
 	 * Get path of the used property.
@@ -23,6 +23,21 @@ public interface OrderSpecElement {
 	 * @return The property path.
 	 */
 	String getPropertyPath();
+
+	/**
+	 * Get function for the value used for sorting.
+	 *
+	 * @return The value transformation function.
+	 */
+	PropertyValueFunction getValueFunction();
+
+	/**
+	 * Get value function parameters.
+	 *
+	 * @return The parameters, specific for the function returned by
+	 * {@link #getValueFunction()}. May be empty but never {@code null}.
+	 */
+	Object[] getValueFunctionParams();
 
 	/**
 	 * Get chain of property handlers leading to the used property.

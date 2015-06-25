@@ -15,14 +15,15 @@ import org.bsworks.x2.resource.FilterConditionType;
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.ObjectPropertyHandler;
 import org.bsworks.x2.resource.OrderSpec;
-import org.bsworks.x2.resource.OrderType;
 import org.bsworks.x2.resource.PersistentResourceHandler;
 import org.bsworks.x2.resource.PropertiesFetchSpec;
+import org.bsworks.x2.resource.PropertyValueFunction;
 import org.bsworks.x2.resource.RangeResult;
 import org.bsworks.x2.resource.RangeSpec;
 import org.bsworks.x2.resource.RefsFetchResult;
 import org.bsworks.x2.resource.RefsFetchSpec;
 import org.bsworks.x2.resource.Resources;
+import org.bsworks.x2.resource.SortDirection;
 import org.bsworks.x2.responses.NotModifiedResponse;
 import org.bsworks.x2.responses.OKResponse;
 import org.bsworks.x2.services.versioning.PersistentResourceVersionInfo;
@@ -91,7 +92,10 @@ import org.bsworks.x2.util.StringUtils;
  * <dt>{@value #ORDER_PARAM}</dt><dd>Comma-separated list of persistent resource
  * property paths used to order the result (see {@link OrderSpec}). Each
  * property path in the list can be suffixed with ":asc" or ":desc" to specify
- * the order direction. If not specified, ":asc" is assumed.</dd>
+ * the order direction. If not specified, ":asc" is assumed. In between the
+ * property name and the optional ":asc" or ":desc" a value transformation
+ * function can be specified, including ":len" for the string value length and
+ * ":lpad:<i>width</i>[:<i>char</i>]" for left padding.</dd>
  * <dt>{@value #SPLIT_PARAM}</dt><dd>Defines result list segmentation (see
  * {@link OrderSpec#addSegment}). The syntax of the parameter value is the same
  * as for the filter condition parameter. Multiple {@value #SPLIT_PARAM}
@@ -206,6 +210,18 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 					+ "|\\|(.+)" // 9. alternatives
 				+ ")?"
 			+ ")", Pattern.CASE_INSENSITIVE);
+
+	/**
+	 * Pattern for order specification element.
+	 */
+	private static final Pattern ORDER_SPEC_PATTERN = Pattern.compile(
+			"([a-z]\\w*(?:\\.[a-z]\\w*)*(?:/id)?)"  // 1. property path
+			+ "(?:"
+				+ "(:len)"                          // 2. length
+				+ "|(:lpad:(\\d+)(?::([^\\s,:]))?)" // 3. lpad, 4. wdth, 5. char
+			+ ")?"
+			+ "(?::(asc|desc))?",                   // 6. sort direction
+			Pattern.CASE_INSENSITIVE);
 
 
 	/**
@@ -807,31 +823,56 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			if (order == null)
 				order = ctx.getOrderSpec(this.prsrcClass);
 
+			final Matcher m = ORDER_SPEC_PATTERN.matcher("");
+
 			for (final String orderElParam : orderParam.split(",")) {
 
-				final OrderType orderType;
-				final String propPath;
-				if (orderElParam.endsWith(":asc")) {
-					orderType = OrderType.ASC;
-					propPath = orderElParam.substring(0,
-							orderElParam.length() - ":asc".length());
-				} else if (orderElParam.endsWith(":desc")) {
-					orderType = OrderType.DESC;
-					propPath = orderElParam.substring(0,
-							orderElParam.length() - ":desc".length());
+				if (!m.reset(orderElParam).matches())
+					throw new EndpointCallErrorException(
+							HttpServletResponse.SC_BAD_REQUEST, null,
+							"Invalid order specification parameter.");
+
+				final String propPath = m.group(1);
+
+				final PropertyValueFunction func;
+				final Object[] funcParams;
+				if (m.group(2) != null) {
+					func = PropertyValueFunction.LENGTH;
+					funcParams = null;
+				} else if (m.group(3) != null) {
+					func = PropertyValueFunction.LPAD;
+					final int width = Integer.parseInt(m.group(4));
+					if (width > 255)
+						throw new EndpointCallErrorException(
+								HttpServletResponse.SC_BAD_REQUEST, null,
+								"Invalid order specification parameter:"
+										+ " padding is too large.");
+					final String paddingCharStr = m.group(5);
+					final char paddingChar =
+						(paddingCharStr != null ?
+								paddingCharStr.charAt(0) : ' ');
+					funcParams = new Object[] {
+							Integer.valueOf(width),
+							Character.valueOf(paddingChar)
+					};
 				} else {
-					orderType = OrderType.ASC;
-					propPath = orderElParam;
+					func = PropertyValueFunction.PLAIN;
+					funcParams = null;
 				}
 
+				final SortDirection dir =
+					("desc".equalsIgnoreCase(m.group(6)) ? SortDirection.DESC :
+						SortDirection.ASC);
+
 				try {
-					order.add(orderType, propPath);
+					order.add(dir, propPath, func, funcParams);
 				} catch (final IllegalArgumentException e) {
 					if (this.log.isDebugEnabled())
 						this.log.debug("invalid parameter", e);
 					throw new EndpointCallErrorException(
 							HttpServletResponse.SC_BAD_REQUEST, null,
-							"Invalid order specification parameter.");
+							"Invalid order specification parameter: "
+									+ e.getMessage());
 				}
 			}
 		}

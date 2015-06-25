@@ -10,7 +10,8 @@ import java.util.TreeSet;
 
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.OrderSpec;
-import org.bsworks.x2.resource.OrderType;
+import org.bsworks.x2.resource.PropertyValueFunction;
+import org.bsworks.x2.resource.SortDirection;
 
 
 /**
@@ -91,11 +92,20 @@ class OrderSpecImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public OrderSpecImpl<R> add(final OrderType orderType,
-			final String propPath) {
+	public OrderSpec<R> add(final SortDirection dir, final String propPath) {
 
-		this.elements.add(new OrderSpecElementImpl(orderType, this.prsrcHandler,
-				propPath, this.prsrcClasses));
+		return this.add(dir, propPath, PropertyValueFunction.PLAIN);
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public OrderSpec<R> add(final SortDirection dir, final String propPath,
+			final PropertyValueFunction func, final Object... funcParams) {
+
+		this.elements.add(new OrderSpecElementImpl(dir, this.prsrcHandler,
+				propPath, func, funcParams, this.prsrcClasses));
 
 		this.usedProps.add(propPath);
 

@@ -8,8 +8,8 @@ import java.util.SortedMap;
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.OrderSpec;
 import org.bsworks.x2.resource.OrderSpecElement;
-import org.bsworks.x2.resource.OrderType;
 import org.bsworks.x2.resource.Resources;
+import org.bsworks.x2.resource.SortDirection;
 import org.bsworks.x2.util.sql.dialect.SQLDialect;
 
 
@@ -86,11 +86,28 @@ class OrderByClause {
 					this.usedJoins.add(propPathPrefix);
 			} while ((dotInd = propPathBuf.lastIndexOf(".")) > 0);
 
+			// get value expression
+			final String valExpr;
+			final Object[] funcParams = orderEl.getValueFunctionParams();
+			switch (orderEl.getValueFunction()) {
+			case LENGTH:
+				valExpr = dialect.stringLength(prop.getValueExpression());
+				break;
+			case LPAD:
+				valExpr = dialect.stringLeftPad(prop.getValueExpression(),
+						((Integer) funcParams[0]).intValue(),
+						((Character) funcParams[1]).charValue());
+				break;
+			default:
+				valExpr = prop.getValueExpression();
+			}
+
 			// add element to the clause
 			if (body.length() > 0)
 				body.append(", ");
-			body.append(prop.getValueExpression())
-				.append(orderEl.getType() == OrderType.ASC ? " ASC" : " DESC");
+			body.append(valExpr)
+				.append(orderEl.getSortDirection() == SortDirection.ASC ?
+						" ASC" : " DESC");
 		}
 
 		// save the clause

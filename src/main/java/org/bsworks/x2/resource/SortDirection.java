@@ -2,11 +2,11 @@ package org.bsworks.x2.resource;
 
 
 /**
- * Order type.
+ * Sort direction.
  *
  * @author Lev Himmelfarb
  */
-public enum OrderType {
+public enum SortDirection {
 
 	/**
 	 * Ascending.

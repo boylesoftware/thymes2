@@ -8,9 +8,10 @@ import org.bsworks.x2.resource.AggregatePropertyHandler;
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
 import org.bsworks.x2.resource.ObjectPropertyHandler;
 import org.bsworks.x2.resource.OrderSpecElement;
-import org.bsworks.x2.resource.OrderType;
+import org.bsworks.x2.resource.PropertyValueFunction;
 import org.bsworks.x2.resource.RefPropertyHandler;
 import org.bsworks.x2.resource.ResourcePropertyHandler;
+import org.bsworks.x2.resource.SortDirection;
 
 
 /**
@@ -22,14 +23,30 @@ class OrderSpecElementImpl
 	implements OrderSpecElement {
 
 	/**
-	 * Order type.
+	 * Empty value transformation function parameters.
 	 */
-	private final OrderType type;
+	private static final Object[] NO_PARAMS = new Object[0];
+
+
+	/**
+	 * Sort direction.
+	 */
+	private final SortDirection dir;
 
 	/**
 	 * Property path.
 	 */
 	private final String propPath;
+
+	/**
+	 * Property value transformation function.
+	 */
+	private final PropertyValueFunction func;
+
+	/**
+	 * Transformation function parameters.
+	 */
+	private final Object[] funcParams;
 
 	/**
 	 * Property chain.
@@ -40,17 +57,21 @@ class OrderSpecElementImpl
 	/**
 	 * Create new element.
 	 *
-	 * @param type Order type.
+	 * @param dir Sort direction.
 	 * @param prsrcHandler Top persistent resource handler.
 	 * @param propPath Property path.
 	 * @param prsrcClasses Set, to which to add any participating persistent
 	 * resource classes.
+	 * @param func Value transformation function.
+	 * @param funcParams Value transformation function parameters. May be
+	 * {@code null} for no parameters.
 	 */
-	OrderSpecElementImpl(final OrderType type,
+	OrderSpecElementImpl(final SortDirection dir,
 			final PersistentResourceHandlerImpl<?> prsrcHandler,
-			final String propPath, final Set<Class<?>> prsrcClasses) {
+			final String propPath, final PropertyValueFunction func,
+			final Object[] funcParams, final Set<Class<?>> prsrcClasses) {
 
-		this.type = type;
+		this.dir = dir;
 
 		final boolean refId = propPath.endsWith("/id");
 		if (refId)
@@ -58,6 +79,19 @@ class OrderSpecElementImpl
 				propPath.substring(0, propPath.length() - "/id".length());
 		else
 			this.propPath = propPath;
+
+		this.func = func;
+		this.funcParams = (funcParams != null ? funcParams : NO_PARAMS);
+		final Class<?>[] funcParamTypes = this.func.paramTypes();
+		if (funcParamTypes.length != this.funcParams.length)
+			throw new IllegalArgumentException("Invalid \"" + this.func
+					+ "\" value transformation function parameters number.");
+		for (int i = 0; i < this.funcParams.length; i++)
+			if ((this.funcParams[i] == null)
+					|| !this.funcParams[i].getClass().equals(funcParamTypes[i]))
+				throw new IllegalArgumentException("Invalid \"" + this.func
+						+ "\" value transformation function parameter " + i
+						+ " type.");
 
 		this.propChain = prsrcHandler.getPersistentPropertyChain(this.propPath);
 
@@ -104,9 +138,9 @@ class OrderSpecElementImpl
 	 * See overridden method.
 	 */
 	@Override
-	public OrderType getType() {
+	public SortDirection getSortDirection() {
 
-		return this.type;
+		return this.dir;
 	}
 
 	/* (non-Javadoc)
@@ -116,6 +150,24 @@ class OrderSpecElementImpl
 	public String getPropertyPath() {
 
 		return this.propPath;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public PropertyValueFunction getValueFunction() {
+
+		return this.func;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public Object[] getValueFunctionParams() {
+
+		return this.funcParams;
 	}
 
 	/* (non-Javadoc)

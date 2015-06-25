@@ -57,6 +57,27 @@ public interface SQLDialect {
 	String nullableConcat(String stringLiteral, String selectExpr);
 
 	/**
+	 * Cast specified expression to string and get its length.
+	 *
+	 * @param valExpr Value expression.
+	 *
+	 * @return SQL expression for the value expression's length.
+	 */
+	String stringLength(String valExpr);
+
+	/**
+	 * Cast specified expression to string and pad it on the left with the
+	 * specified character to make it at least the specified length.
+	 *
+	 * @param valExpr Value expression.
+	 * @param width Minimum result width.
+	 * @param paddingChar Padding character.
+	 *
+	 * @return SQL expression for the value expression's length.
+	 */
+	String stringLeftPad(String valExpr, int width, char paddingChar);
+
+	/**
 	 * Create Boolean expression that tests if a value contains a substring that
 	 * matches a regular expression.
 	 *

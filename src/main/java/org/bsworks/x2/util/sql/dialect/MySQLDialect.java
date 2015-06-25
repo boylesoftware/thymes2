@@ -50,6 +50,27 @@ class MySQLDialect
 	 * See overridden method.
 	 */
 	@Override
+	public String stringLength(final String valExpr) {
+
+		return "LENGTH(CAST(" + valExpr + " AS CHAR))";
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public String stringLeftPad(final String valExpr, final int width,
+			final char paddingChar) {
+
+		return "LPAD(CAST(" + valExpr + " AS CHAR), " + width + ", '"
+				+ (paddingChar == '\'' ? "''" : String.valueOf(paddingChar))
+				+ "')";
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public String regularExpressionMatch(final String valExpr,
 			final String reExpr, final boolean negate,
 			final boolean caseSensitive) {
