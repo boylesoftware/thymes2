@@ -10,6 +10,7 @@ import org.bsworks.x2.resource.OrderSpec;
 import org.bsworks.x2.resource.OrderSpecElement;
 import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.resource.SortDirection;
+import org.bsworks.x2.services.persistence.PersistentValueType;
 import org.bsworks.x2.util.sql.dialect.SQLDialect;
 
 
@@ -91,10 +92,17 @@ class OrderByClause {
 			final Object[] funcParams = orderEl.getValueFunctionParams();
 			switch (orderEl.getValueFunction()) {
 			case LENGTH:
-				valExpr = dialect.stringLength(prop.getValueExpression());
+				valExpr = dialect.stringLength(
+						prop.getValueType() == PersistentValueType.STRING ?
+						prop.getValueExpression() :
+						dialect.castToString(prop.getValueExpression())
+				);
 				break;
 			case LPAD:
-				valExpr = dialect.stringLeftPad(prop.getValueExpression(),
+				valExpr = dialect.stringLeftPad(
+						(prop.getValueType() == PersistentValueType.STRING ?
+							prop.getValueExpression() :
+							dialect.castToString(prop.getValueExpression())),
 						((Integer) funcParams[0]).intValue(),
 						((Character) funcParams[1]).charValue());
 				break;

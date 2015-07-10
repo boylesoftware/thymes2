@@ -11,103 +11,120 @@ public enum FilterConditionType {
 	/**
 	 * Equal.
 	 */
-	EQ,
+	EQ(false),
 
 	/**
 	 * Not equal.
 	 */
-	NE,
+	NE(false),
 
 	/**
 	 * Less than.
 	 */
-	LT,
+	LT(false),
 
 	/**
 	 * Less than or equal.
 	 */
-	LE,
+	LE(false),
 
 	/**
 	 * Greater than.
 	 */
-	GT,
+	GT(false),
 
 	/**
 	 * Greater than or equal.
 	 */
-	GE,
+	GE(false),
 
 	/**
 	 * Contains substring matching a regular expression. Case-insensitive.
 	 */
-	MATCH,
+	MATCH(true),
 
 	/**
 	 * Does not contain substring matching a regular expression.
 	 * Case-insensitive.
 	 */
-	NOT_MATCH,
+	NOT_MATCH(true),
 
 	/**
 	 * Contains substring matching a regular expression. Case-sensitive.
 	 */
-	MATCH_CS,
+	MATCH_CS(true),
 
 	/**
 	 * Does not contain substring matching a regular expression. Case-sensitive.
 	 */
-	NOT_MATCH_CS,
+	NOT_MATCH_CS(true),
 
 	/**
 	 * Contains substring. Case-insensitive.
 	 */
-	SUBSTRING,
+	SUBSTRING(true),
 
 	/**
 	 * Does not contain substring. Case-insensitive.
 	 */
-	NOT_SUBSTRING,
+	NOT_SUBSTRING(true),
 
 	/**
 	 * Contains substring. Case-sensitive.
 	 */
-	SUBSTRING_CS,
+	SUBSTRING_CS(true),
 
 	/**
 	 * Does not contain substring. Case-sensitive.
 	 */
-	NOT_SUBSTRING_CS,
+	NOT_SUBSTRING_CS(true),
 
 	/**
 	 * Starts with a prefix. Case-insensitive.
 	 */
-	PREFIX,
+	PREFIX(true),
 
 	/**
 	 * Does not start with a prefix. Case-insensitive.
 	 */
-	NOT_PREFIX,
+	NOT_PREFIX(true),
 
 	/**
 	 * Starts with a prefix. Case-sensitive.
 	 */
-	PREFIX_CS,
+	PREFIX_CS(true),
 
 	/**
 	 * Does not starts with a prefix. Case-sensitive.
 	 */
-	NOT_PREFIX_CS,
+	NOT_PREFIX_CS(true),
 
 	/**
 	 * Value does not exist.
 	 */
-	EMPTY,
+	EMPTY(false),
 
 	/**
 	 * Value exists.
 	 */
-	NOT_EMPTY;
+	NOT_EMPTY(false);
+
+
+	/**
+	 * Tells if the condition is string-specific.
+	 */
+	private final boolean _requiresString;
+
+
+	/**
+	 * Create new value.
+	 *
+	 * @param requiresString {@code true} if the condition is string-specific.
+	 */
+	private FilterConditionType(final boolean requiresString) {
+
+		this._requiresString = requiresString;
+	}
 
 
 	/**
@@ -161,5 +178,16 @@ public enum FilterConditionType {
 		}
 
 		throw new AssertionError("Unknown filter condition type.");
+	}
+
+	/**
+	 * Tell if the condition is string-specific (that is requires a string
+	 * operand(s)).
+	 *
+	 * @return {@code true} if string-specific.
+	 */
+	public boolean requiresString() {
+
+		return this._requiresString;
 	}
 }

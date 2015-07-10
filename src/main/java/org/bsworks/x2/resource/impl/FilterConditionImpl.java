@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
@@ -17,7 +16,6 @@ import org.bsworks.x2.resource.InvalidResourceDataException;
 import org.bsworks.x2.resource.RefPropertyHandler;
 import org.bsworks.x2.resource.ResourcePropertyHandler;
 import org.bsworks.x2.resource.ResourcePropertyValueHandler;
-import org.bsworks.x2.services.persistence.PersistentValueType;
 
 
 /**
@@ -27,27 +25,6 @@ import org.bsworks.x2.services.persistence.PersistentValueType;
  */
 class FilterConditionImpl
 	implements FilterCondition {
-
-	/**
-	 * Condition types that require a string operand.
-	 */
-	private static final Set<FilterConditionType> STRING_OP_ONLY;
-	static {
-		STRING_OP_ONLY = new HashSet<>(12);
-		STRING_OP_ONLY.add(FilterConditionType.MATCH);
-		STRING_OP_ONLY.add(FilterConditionType.NOT_MATCH);
-		STRING_OP_ONLY.add(FilterConditionType.MATCH_CS);
-		STRING_OP_ONLY.add(FilterConditionType.NOT_MATCH_CS);
-		STRING_OP_ONLY.add(FilterConditionType.SUBSTRING);
-		STRING_OP_ONLY.add(FilterConditionType.NOT_SUBSTRING);
-		STRING_OP_ONLY.add(FilterConditionType.SUBSTRING_CS);
-		STRING_OP_ONLY.add(FilterConditionType.NOT_SUBSTRING_CS);
-		STRING_OP_ONLY.add(FilterConditionType.PREFIX);
-		STRING_OP_ONLY.add(FilterConditionType.NOT_PREFIX);
-		STRING_OP_ONLY.add(FilterConditionType.PREFIX_CS);
-		STRING_OP_ONLY.add(FilterConditionType.NOT_PREFIX_CS);
-	}
-
 
 	/**
 	 * Condition type.
@@ -186,14 +163,6 @@ class FilterConditionImpl
 			// use property value handler for operand values
 			opValueHandler = propHandler.getValueHandler();
 		}
-
-		// make sure string only condition type has a string
-		if ((opValueHandler.getPersistentValueType()
-					!= PersistentValueType.STRING)
-				&& STRING_OP_ONLY.contains(this.type))
-			throw new IllegalArgumentException("This type of filter"
-					+ " condition is not applicable to non-string property "
-					+ propPath + ".");
 
 		// gather all operands using appropriate value handler
 		try {

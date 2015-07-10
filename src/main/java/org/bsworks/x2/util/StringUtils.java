@@ -28,7 +28,7 @@ public final class StringUtils {
 	}
 
 	/**
-	 * Returns specified default value if the specified string is empty.
+	 * Return specified default value if the specified string is empty.
 	 *
 	 * @param str Input string.
 	 * @param def Default value.
@@ -39,5 +39,22 @@ public final class StringUtils {
 	public static String defaultIfEmpty(final String str, final String def) {
 
 		return ((str == null) || str.isEmpty() ? def : str);
+	}
+
+	/**
+	 * Convert specified value to String using its {@link Object#toString()}
+	 * method.
+	 *
+	 * @param val The value, may be {@code null}.
+	 *
+	 * @return String representation of the specified value, or {@code null} if
+	 * the specified value was {@code null}.
+	 */
+	public static String asString(final Object val) {
+
+		if (val == null)
+			return null;
+
+		return val.toString();
 	}
 }

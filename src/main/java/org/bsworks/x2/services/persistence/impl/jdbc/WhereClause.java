@@ -23,6 +23,7 @@ import org.bsworks.x2.resource.ResourcePropertyHandler;
 import org.bsworks.x2.resource.ResourcePropertyPersistence;
 import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.services.persistence.PersistentValueType;
+import org.bsworks.x2.util.StringUtils;
 import org.bsworks.x2.util.sql.dialect.SQLDialect;
 
 
@@ -725,117 +726,122 @@ class WhereClause {
 		if (buf.length() > 0)
 			buf.append(disjunction ? " OR " : " AND ");
 
+		final FilterConditionType condType = cond.getType();
+
+		final boolean convertToString = (condType.requiresString()
+				&& (valueType != PersistentValueType.STRING));
+
 		int newNextParamInd = nextParamInd;
 		final Collection<? extends FilterConditionOperand> operands =
 			cond.getOperands();
-		switch (cond.getType()) {
+		switch (condType) {
 		case EQ:
 			newNextParamInd = appendInCondition(buf, paramPrefix,
-					newNextParamInd, paramsFactory, cond.isNegated(), operands,
-					valueExpr, valueType, params);
+					newNextParamInd, dialect, paramsFactory, cond.isNegated(),
+					operands, valueExpr, valueType, convertToString, params);
 			break;
 		case NE:
 			newNextParamInd = appendInCondition(buf, paramPrefix,
-					newNextParamInd, paramsFactory, !cond.isNegated(), operands,
-					valueExpr, valueType, params);
+					newNextParamInd, dialect, paramsFactory, !cond.isNegated(),
+					operands, valueExpr, valueType, convertToString, params);
 			break;
 		case LT:
 			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
 					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_LT : EXPR_GE), operands,
-					valueExpr, valueType, params);
+					valueExpr, valueType, convertToString, params);
 			break;
 		case LE:
 			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
 					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_LE : EXPR_GT), operands,
-					valueExpr, valueType, params);
+					valueExpr, valueType, convertToString, params);
 			break;
 		case GT:
 			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
 					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_GT : EXPR_LE), operands,
-					valueExpr, valueType, params);
+					valueExpr, valueType, convertToString, params);
 			break;
 		case GE:
 			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
 					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_GE : EXPR_LT), operands,
-					valueExpr, valueType, params);
+					valueExpr, valueType, convertToString, params);
 			break;
 		case MATCH:
 			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
 					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_MATCH : EXPR_NOT_MATCH), operands,
-					valueExpr, valueType, params);
+					valueExpr, valueType, convertToString, params);
 			break;
 		case NOT_MATCH:
 			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
 					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_NOT_MATCH : EXPR_MATCH), operands,
-					valueExpr, valueType, params);
+					valueExpr, valueType, convertToString, params);
 			break;
 		case MATCH_CS:
 			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
 					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_MATCH_CS : EXPR_NOT_MATCH_CS),
-					operands, valueExpr, valueType, params);
+					operands, valueExpr, valueType, convertToString, params);
 			break;
 		case NOT_MATCH_CS:
 			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
 					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_NOT_MATCH_CS : EXPR_MATCH_CS),
-					operands, valueExpr, valueType, params);
+					operands, valueExpr, valueType, convertToString, params);
 			break;
 		case SUBSTRING:
 			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
 					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_SUBSTRING : EXPR_NOT_SUBSTRING),
-					operands, valueExpr, valueType, params);
+					operands, valueExpr, valueType, convertToString, params);
 			break;
 		case NOT_SUBSTRING:
 			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
 					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_NOT_SUBSTRING : EXPR_SUBSTRING),
-					operands, valueExpr, valueType, params);
+					operands, valueExpr, valueType, convertToString, params);
 			break;
 		case SUBSTRING_CS:
 			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
 					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_SUBSTRING_CS :
 						EXPR_NOT_SUBSTRING_CS),
-					operands, valueExpr, valueType, params);
+					operands, valueExpr, valueType, convertToString, params);
 			break;
 		case NOT_SUBSTRING_CS:
 			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
 					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_NOT_SUBSTRING_CS :
 						EXPR_SUBSTRING_CS),
-					operands, valueExpr, valueType, params);
+					operands, valueExpr, valueType, convertToString, params);
 			break;
 		case PREFIX:
 			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
 					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_PREFIX : EXPR_NOT_PREFIX),
-					operands, valueExpr, valueType, params);
+					operands, valueExpr, valueType, convertToString, params);
 			break;
 		case NOT_PREFIX:
 			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
 					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_NOT_PREFIX : EXPR_PREFIX),
-					operands, valueExpr, valueType, params);
+					operands, valueExpr, valueType, convertToString, params);
 			break;
 		case PREFIX_CS:
 			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
 					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_PREFIX_CS : EXPR_NOT_PREFIX_CS),
-					operands, valueExpr, valueType, params);
+					operands, valueExpr, valueType, convertToString, params);
 			break;
 		case NOT_PREFIX_CS:
 			newNextParamInd = appendBinaryCondition(buf, paramPrefix,
 					newNextParamInd, dialect, paramsFactory,
 					(!cond.isNegated() ? EXPR_NOT_PREFIX_CS : EXPR_PREFIX_CS),
-					operands, valueExpr, valueType, params);
+					operands, valueExpr, valueType, convertToString, params);
 			break;
 		case EMPTY:
 			buf.append(valueExpr)
@@ -863,6 +869,8 @@ class WhereClause {
 	 * @param operands Operands.
 	 * @param valueExpr Value expression that the condition tests.
 	 * @param valueType Value type.
+	 * @param convertToString {@code true} to explicitly convert the values to a
+	 * string type.
 	 * @param params Parameters collection, to which to add any query
 	 * parameters.
 	 *
@@ -875,15 +883,25 @@ class WhereClause {
 			final BinaryExprFactory opFactory,
 			final Collection<? extends FilterConditionOperand> operands,
 			final String valueExpr, final PersistentValueType valueType,
+			final boolean convertToString,
 			final Map<String, JDBCParameterValue> params) {
 
 		int newNextParamInd = nextParamInd;
 		if (operands.size() == 1) {
 			final FilterConditionOperand operand = operands.iterator().next();
 			final String paramName = paramPrefix + (newNextParamInd++);
-			buf.append(opFactory.make(dialect, valueExpr, "?" + paramName));
-			params.put(paramName, paramsFactory.getParameterValue(valueType,
-					operand.getValue()));
+			if (convertToString) {
+				buf.append(opFactory.make(dialect,
+						dialect.castToString(valueExpr), "?" + paramName));
+				params.put(paramName, paramsFactory.getParameterValue(
+						PersistentValueType.STRING,
+						StringUtils.asString(operand.getValue())));
+			} else {
+				buf.append(opFactory.make(dialect,
+						valueExpr, "?" + paramName));
+				params.put(paramName, paramsFactory.getParameterValue(valueType,
+						operand.getValue()));
+			}
 		} else {
 			buf.append("(");
 			for (final Iterator<? extends FilterConditionOperand> i =
@@ -892,9 +910,18 @@ class WhereClause {
 				if (newNextParamInd > nextParamInd)
 					buf.append(" OR ");
 				final String paramName = paramPrefix + (newNextParamInd++);
-				buf.append(opFactory.make(dialect, valueExpr, "?" + paramName));
-				params.put(paramName, paramsFactory.getParameterValue(
-						valueType, operand.getValue()));
+				if (convertToString) {
+					buf.append(opFactory.make(dialect,
+							dialect.castToString(valueExpr), "?" + paramName));
+					params.put(paramName, paramsFactory.getParameterValue(
+							PersistentValueType.STRING,
+							StringUtils.asString(operand.getValue())));
+				} else {
+					buf.append(opFactory.make(dialect,
+							valueExpr, "?" + paramName));
+					params.put(paramName, paramsFactory.getParameterValue(
+							valueType, operand.getValue()));
+				}
 			}
 			buf.append(")");
 		}
@@ -908,11 +935,14 @@ class WhereClause {
 	 * @param buf Filter expression builder.
 	 * @param paramPrefix Query parameter names prefix to use.
 	 * @param nextParamInd Index for the next query parameter placeholder name.
+	 * @param dialect SQL dialect.
 	 * @param paramsFactory Query parameter value handlers factory.
 	 * @param negate {@code true} for inequality.
 	 * @param operands Operands.
 	 * @param valueExpr Value expression that the condition tests.
 	 * @param valueType Value type.
+	 * @param convertToString {@code true} to explicitly convert the values to a
+	 * string type.
 	 * @param params Parameters collection, to which to add any query
 	 * parameters.
 	 *
@@ -920,28 +950,46 @@ class WhereClause {
 	 */
 	private static int appendInCondition(final StringBuilder buf,
 			final String paramPrefix, final int nextParamInd,
+			final SQLDialect dialect,
 			final ParameterValuesFactoryImpl paramsFactory,
 			final boolean negate,
 			final Collection<? extends FilterConditionOperand> operands,
 			final String valueExpr, final PersistentValueType valueType,
+			final boolean convertToString,
 			final Map<String, JDBCParameterValue> params) {
 
 		int newNextParamInd = nextParamInd;
 		final int numOps = operands.size();
 		if (numOps == 1) {
 			final String paramName = paramPrefix + (newNextParamInd++);
-			buf.append(valueExpr).append(" ").append(negate ? "<>" : "=")
-				.append(" ?").append(paramName);
-			params.put(paramName, paramsFactory.getParameterValue(valueType,
-					operands.iterator().next().getValue()));
+			if (convertToString) {
+				buf.append(dialect.castToString(valueExpr)).append(" ")
+					.append(negate ? "<>" : "=").append(" ?").append(paramName);
+				params.put(paramName, paramsFactory.getParameterValue(
+						PersistentValueType.STRING,
+						StringUtils.asString(
+								operands.iterator().next().getValue())));
+			} else {
+				buf.append(valueExpr).append(" ")
+					.append(negate ? "<>" : "=").append(" ?").append(paramName);
+				params.put(paramName, paramsFactory.getParameterValue(valueType,
+						operands.iterator().next().getValue()));
+			}
 		} else {
 			final List<Object> opVals =
 				new ArrayList<>(numOps > 10 ? numOps : 10);
 			for (final Iterator<? extends FilterConditionOperand> i =
-					operands.iterator(); i.hasNext();)
-				opVals.add(i.next().getValue());
+					operands.iterator(); i.hasNext();) {
+				if (convertToString)
+					opVals.add(StringUtils.asString(i.next().getValue()));
+				else
+					opVals.add(i.next().getValue());
+			}
 			final String paramName = paramPrefix + (newNextParamInd++);
-			buf.append(valueExpr);
+			if (convertToString)
+				buf.append(dialect.castToString(valueExpr));
+			else
+				buf.append(valueExpr);
 			if (negate)
 				buf.append(" NOT");
 			buf.append(" IN (??").append(paramName);

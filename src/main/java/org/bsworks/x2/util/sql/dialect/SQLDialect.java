@@ -57,19 +57,33 @@ public interface SQLDialect {
 	String nullableConcat(String stringLiteral, String selectExpr);
 
 	/**
-	 * Cast specified expression to string and get its length.
+	 * Create new SQL value expression from the specified SQL value expression
+	 * cast to SQL type that can be used with string SQL functions.
 	 *
 	 * @param valExpr Value expression.
+	 *
+	 * @return String value expression.
+	 */
+	String castToString(String valExpr);
+
+	/**
+	 * Get SQL expression for getting the length of the specified string
+	 * expression result.
+	 *
+	 * @param valExpr Value expression, must be usable by SQL string length
+	 * function.
 	 *
 	 * @return SQL expression for the value expression's length.
 	 */
 	String stringLength(String valExpr);
 
 	/**
-	 * Cast specified expression to string and pad it on the left with the
-	 * specified character to make it at least the specified length.
+	 * Get SQL expression that pads the result of the specified expression on
+	 * the left with the specified character to make it at least the specified
+	 * length.
 	 *
-	 * @param valExpr Value expression.
+	 * @param valExpr Value expression, must be usable by SQL string padding
+	 * function.
 	 * @param width Minimum result width.
 	 * @param paddingChar Padding character.
 	 *

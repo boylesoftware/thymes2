@@ -49,9 +49,18 @@ class PostgreSQLDialect
 	 * See overridden method.
 	 */
 	@Override
+	public String castToString(final String valExpr) {
+
+		return "CAST(" + valExpr + " AS VARCHAR)";
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public String stringLength(final String valExpr) {
 
-		return "LENGTH(CAST(" + valExpr + " AS VARCHAR))";
+		return "LENGTH(" + valExpr + ")";
 	}
 
 	/* (non-Javadoc)
@@ -61,7 +70,7 @@ class PostgreSQLDialect
 	public String stringLeftPad(final String valExpr, final int width,
 			final char paddingChar) {
 
-		return "LPAD(CAST(" + valExpr + " AS VARCHAR), " + width + ", '"
+		return "LPAD(" + valExpr + ", " + width + ", '"
 				+ (paddingChar == '\'' ? "''" : String.valueOf(paddingChar))
 				+ "')";
 	}
