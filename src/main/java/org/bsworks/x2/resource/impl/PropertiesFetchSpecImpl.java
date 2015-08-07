@@ -141,10 +141,15 @@ class PropertiesFetchSpecImpl<R>
 			if (included)
 				return true;
 
-			// check if all properties in the chain are fetched by default
+			// check if all properties in the chain are fetched
+			propPathBuf.setLength(0);
 			for (final ResourcePropertyHandler ph :
 					this.prsrcHandler.getPersistentPropertyChain(propPath)) {
-				if (!ph.isFetchedByDefault())
+				if (propPathBuf.length() > 0)
+					propPathBuf.append('.');
+				propPathBuf.append(ph.getName());
+				if (!ph.isFetchedByDefault()
+						&& !this.includePaths.contains(propPathBuf.toString()))
 					return false;
 			}
 
