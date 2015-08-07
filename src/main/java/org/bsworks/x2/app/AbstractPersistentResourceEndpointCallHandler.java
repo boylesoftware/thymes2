@@ -241,6 +241,16 @@ public abstract class AbstractPersistentResourceEndpointCallHandler<R, E>
 
 		final StringBuilder eTagBuf = new StringBuilder(64);
 		eTagBuf.append(ctx.getRuntimeContext().getApplicationVersion());
+		final Actor actor = ctx.getActor();
+		if (actor != null) {
+			eTagBuf.append("-").append(actor.getActorId());
+			final String actorVersion = actor.getActorVersion();
+			if (actorVersion != null)
+				eTagBuf.append(":").append(actorVersion);
+			final String actorOpaque = actor.getOpaque();
+			if (actorOpaque != null)
+				eTagBuf.append(":").append(actorOpaque);
+		}
 		if (rec != null)
 			eTagBuf.append("-").append(this.versionPropHandler.getValue(rec));
 		if (colsVerInfo != null)

@@ -27,6 +27,20 @@ public interface Actor {
 	String getActorId();
 
 	/**
+	 * Get actor record version in the actor authentication service. Whenever
+	 * the actor data provided by the authentication service changes (for
+	 * example, the actor roles change), a new version must be reported. The
+	 * resources available via the application API may be presented differently
+	 * for different actors depending on the actor roles. For that reason, the
+	 * resources included in the API responses are tagged with the actor id,
+	 * actor version and the actor opaque value.
+	 *
+	 * @return The actor record version, or {@code null} if not provided by the
+	 * authentication service.
+	 */
+	String getActorVersion();
+
+	/**
 	 * Get actor name. The actor name is used by the framework to identify the
 	 * actor for logging and auditing purposes. That includes, for example,
 	 * such persistent resource meta-properties as "created by" and
