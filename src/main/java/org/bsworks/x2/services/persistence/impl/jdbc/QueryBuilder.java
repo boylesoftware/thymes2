@@ -595,7 +595,7 @@ class QueryBuilder {
 				this.colLabelPrefix + (this.nextColLabelPrefixChar++) + "$";
 
 			this.propTableAlias =
-				"t" + this.propColLabelPrefix.replace("$", "");
+				"z" + this.propColLabelPrefix.replace("$", "");
 		}
 
 		/**
