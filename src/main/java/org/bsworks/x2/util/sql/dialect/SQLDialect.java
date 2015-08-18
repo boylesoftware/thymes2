@@ -92,6 +92,20 @@ public interface SQLDialect {
 	String stringLeftPad(String valExpr, int width, char paddingChar);
 
 	/**
+	 * Get SQL expression that extracts a substring from the result of the
+	 * specified string expression.
+	 *
+	 * @param valExpr Value expression, must be usable by SQL string substring
+	 * function.
+	 * @param from Zero-based index of the first included substring character.
+	 * @param length Maximum substring length, or zero or negative for the rest
+	 * of the string.
+	 *
+	 * @return SQL expression for the substring.
+	 */
+	String stringSubstring(String valExpr, int from, int length);
+
+	/**
 	 * Create Boolean expression that tests if a value contains a substring that
 	 * matches a regular expression.
 	 *

@@ -98,6 +98,14 @@ class OrderByClause {
 						dialect.castToString(prop.getValueExpression())
 				);
 				break;
+			case SUBSTRING:
+				valExpr = dialect.stringSubstring(
+						(prop.getValueType() == PersistentValueType.STRING ?
+							prop.getValueExpression() :
+							dialect.castToString(prop.getValueExpression())),
+						((Integer) funcParams[0]).intValue(),
+						((Integer) funcParams[1]).intValue());
+				break;
 			case LPAD:
 				valExpr = dialect.stringLeftPad(
 						(prop.getValueType() == PersistentValueType.STRING ?

@@ -79,6 +79,18 @@ class PostgreSQLDialect
 	 * See overridden method.
 	 */
 	@Override
+	public String stringSubstring(final String valExpr, final int from,
+			final int length) {
+
+		return "SUBSTRING(" + valExpr + " FROM " + (from + 1)
+				+ (length > 0 ? " FOR " + length : "")
+				+ ")";
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public String regularExpressionMatch(final String valExpr,
 			final String reExpr, final boolean negate,
 			final boolean caseSensitive) {

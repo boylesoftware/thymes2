@@ -80,6 +80,18 @@ class MySQLDialect
 	 * See overridden method.
 	 */
 	@Override
+	public String stringSubstring(final String valExpr, final int from,
+			final int length) {
+
+		return "SUBSTRING(" + valExpr + ", " + (from + 1)
+				+ (length > 0 ? ", " + length : "")
+				+ ")";
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public String regularExpressionMatch(final String valExpr,
 			final String reExpr, final boolean negate,
 			final boolean caseSensitive) {

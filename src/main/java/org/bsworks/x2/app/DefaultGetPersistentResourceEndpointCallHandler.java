@@ -94,7 +94,8 @@ import org.bsworks.x2.util.StringUtils;
  * property path in the list can be suffixed with ":asc" or ":desc" to specify
  * the order direction. If not specified, ":asc" is assumed. In between the
  * property name and the optional ":asc" or ":desc" a value transformation
- * function can be specified, including ":len" for the string value length and
+ * function can be specified, including ":len" for the string value length,
+ * ":sub:<i>from</i>[:<i>len</i>]" for substring (from is zero-based), and
  * ":lpad:<i>width</i>[:<i>char</i>]" for left padding.</dd>
  * <dt>{@value #SPLIT_PARAM}</dt><dd>Defines result list segmentation (see
  * {@link OrderSpec#addSegment}). The syntax of the parameter value is the same
@@ -218,9 +219,10 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			"([a-z]\\w*(?:\\.[a-z]\\w*)*(?:/id)?)"  // 1. property path
 			+ "(?:"
 				+ "(:len)"                          // 2. length
-				+ "|(:lpad:(\\d+)(?::([^\\s,:]))?)" // 3. lpad, 4. wdth, 5. char
+				+ "|(:sub:(\\d+)(?::(\\d+))?)"      // 3. sub, 4. from, 5. len
+				+ "|(:lpad:(\\d+)(?::([^\\s,:]))?)" // 6. lpad, 7. wdth, 8. char
 			+ ")?"
-			+ "(?::(asc|desc))?",                   // 6. sort direction
+			+ "(?::(asc|desc))?",                   // 9. sort direction
 			Pattern.CASE_INSENSITIVE);
 
 
@@ -840,14 +842,23 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 					func = PropertyValueFunction.LENGTH;
 					funcParams = null;
 				} else if (m.group(3) != null) {
+					func = PropertyValueFunction.SUBSTRING;
+					final int from = Integer.parseInt(m.group(4));
+					final int len =
+						(m.group(5) != null ? Integer.parseInt(m.group(5)) : 0);
+					funcParams = new Object[] {
+							Integer.valueOf(from),
+							Integer.valueOf(len)
+					};
+				} else if (m.group(6) != null) {
 					func = PropertyValueFunction.LPAD;
-					final int width = Integer.parseInt(m.group(4));
+					final int width = Integer.parseInt(m.group(7));
 					if (width > 255)
 						throw new EndpointCallErrorException(
 								HttpServletResponse.SC_BAD_REQUEST, null,
 								"Invalid order specification parameter:"
 										+ " padding is too large.");
-					final String paddingCharStr = m.group(5);
+					final String paddingCharStr = m.group(8);
 					final char paddingChar =
 						(paddingCharStr != null ?
 								paddingCharStr.charAt(0) : ' ');
@@ -861,7 +872,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 				}
 
 				final SortDirection dir =
-					("desc".equalsIgnoreCase(m.group(6)) ? SortDirection.DESC :
+					("desc".equalsIgnoreCase(m.group(9)) ? SortDirection.DESC :
 						SortDirection.ASC);
 
 				try {

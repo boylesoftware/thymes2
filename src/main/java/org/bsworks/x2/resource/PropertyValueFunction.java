@@ -19,6 +19,11 @@ public enum PropertyValueFunction {
 	LENGTH(new Class<?>[] {}),
 
 	/**
+	 * Value string representation's substring.
+	 */
+	SUBSTRING(new Class<?>[] { Integer.class, Integer.class }),
+
+	/**
 	 * Value string representation padded on the left side to the specified
 	 * total length using the specified padding character.
 	 */
