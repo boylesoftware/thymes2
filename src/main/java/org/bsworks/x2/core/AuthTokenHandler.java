@@ -376,6 +376,29 @@ class AuthTokenHandler {
 	void addAuthInfo(final HttpServletResponse httpResponse,
 			final Actor actor) {
 
+		// get the token
+		final String token = this.createAuthToken(actor);
+
+		// add authentication token to the response
+		if (this.useCookie) {
+			final Cookie c = new Cookie(COOKIE_NAME, token);
+			c.setPath(this.sc.getContextPath() + "/");
+			httpResponse.addCookie(c);
+		} else {
+			httpResponse.setHeader("Authentication-Info",
+					"nexttoken=" + token);
+		}
+	}
+
+	/**
+	 * Create authentication token for the specified actor.
+	 *
+	 * @param actor The actor.
+	 *
+	 * @return The token.
+	 */
+	String createAuthToken(final Actor actor) {
+
 		final boolean debug = this.log.isDebugEnabled();
 
 		// assemble first part of the token
@@ -448,16 +471,8 @@ class AuthTokenHandler {
 		base64Buf.flip();
 		final String tokenP1 = base64Buf.toString();
 
-		// add authentication token to the response
-		if (this.useCookie) {
-			final Cookie c = new Cookie(COOKIE_NAME,
-					tokenP0 + "." + tokenP1);
-			c.setPath(this.sc.getContextPath() + "/");
-			httpResponse.addCookie(c);
-		} else {
-			httpResponse.setHeader("Authentication-Info",
-					"nexttoken=" + tokenP0 + "." + tokenP1);
-		}
+		// return the combined token value
+		return (tokenP0 + "." + tokenP1);
 	}
 
 	/**

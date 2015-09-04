@@ -169,6 +169,16 @@ public interface RuntimeContext {
 	SecretKey getAuthSecretKey();
 
 	/**
+	 * Issue new authentication token for the specified actor. The token can be
+	 * used to make requests on behalf of the actor.
+	 *
+	 * @param actor The actor.
+	 *
+	 * @return The token value.
+	 */
+	String createAuthToken(Actor actor);
+
+	/**
 	 * Purge actor from any cache set on top of the actor authentication
 	 * service.
 	 *

@@ -631,6 +631,15 @@ class RuntimeContextImpl
 	 * See overridden method.
 	 */
 	@Override
+	public String createAuthToken(final Actor actor) {
+
+		return this.authTokenHandler.createAuthToken(actor);
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public void purgeCachedActor(final Actor actor) {
 
 		this.authTokenHandler.purgeCachedActor(actor);
