@@ -185,6 +185,23 @@ class AuthTokenHandler {
 	/**
 	 * Get actor for the specified authentication token.
 	 *
+	 * @param token Combined authentication token.
+	 *
+	 * @return The actor, or {@code null} if the the authentication token is
+	 * invalid, expired, or refers to a nonexistent or inactive actor.
+	 */
+	Actor getActor(final String token) {
+
+		final String[] tokenParts = token.split("\\.");
+		if (tokenParts.length != 2)
+			return null;
+
+		return this.getActor(tokenParts[0], tokenParts[1]);
+	}
+
+	/**
+	 * Get actor for the specified authentication token.
+	 *
 	 * @param tokenP0 First (general) part of the authentication token.
 	 * @param tokenP1 Second (user-specific) part of the authentication token.
 	 *

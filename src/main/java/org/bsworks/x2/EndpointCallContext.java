@@ -195,6 +195,25 @@ public interface EndpointCallContext {
 	void assumeActor(Actor actor);
 
 	/**
+	 * Decrypt and parse the specified authentication token and, similarly to
+	 * {@link #assumeActor(Actor)} method, assume the associated with the token
+	 * actor.
+	 *
+	 * <p>This method allows passing authentication token into a call handler
+	 * without involving the mechanisms provided by the framework. A token can
+	 * be passed, for example, via a request parameter, into a handler the the
+	 * handler can authenticate the call context using this method.
+	 *
+	 * @param authToken The authentication token (may not be {@code null}).
+	 *
+	 * @return {@code true} if actor was successfully assumed, {@code false} if
+	 * the token is invalid.
+	 *
+	 * @see RuntimeContext#createAuthToken(Actor)
+	 */
+	boolean assumeActor(String authToken);
+
+	/**
 	 * Tell if the actor associated with the context was assumed via
 	 * {@link #assumeActor(Actor)} method.
 	 *

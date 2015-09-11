@@ -383,6 +383,22 @@ class EndpointCallContextImpl
 	 * See overridden method.
 	 */
 	@Override
+	public boolean assumeActor(final String authToken) {
+
+		final Actor actor =
+			this.runtimeCtx.getAuthTokenHandler().getActor(authToken);
+		if (actor == null)
+			return false;
+
+		this.assumeActor(actor);
+
+		return true;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public boolean isAssumedActor() {
 
 		return this.assumedActor;
