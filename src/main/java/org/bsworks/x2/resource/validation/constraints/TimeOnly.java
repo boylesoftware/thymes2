@@ -45,5 +45,5 @@ public @interface TimeOnly {
 	 *
 	 * @return Constraint payload.
 	 */
-	Class<? extends Payload>[] payload() default{};
+	Class<? extends Payload>[] payload() default {};
 }
