@@ -1286,7 +1286,8 @@ class QueryBuilder {
 				ctx.branches);
 		final QueryBranch resBranch = new QueryBranch(resQB,
 				ctx.parentAnchorColExpr, joinExpr, joinAttachmentExpr,
-				parentPropPath, parentCtx.propChain);
+				ctx.mergedJoinAttachmentExprs.toString(), parentPropPath,
+				parentCtx.propChain);
 
 		// return the resulting branch
 		return resBranch;
@@ -1344,6 +1345,7 @@ class QueryBuilder {
 				propAnchorColExpr,
 				propJoinExpr,
 				propAttachmentExpr,
+				null,
 				propPath,
 				ctx.propChain);
 	}
@@ -2575,6 +2577,15 @@ class QueryBuilder {
 					ctx.mergedJoinAttachmentExprs.append(", ");
 				ctx.mergedJoinAttachmentExprs.append(branchJoinAttachmentExpr);
 			}
+			final String branchMergedJoinAttachmentExprs =
+				branch.getMergedJoinAttachmentExpressions();
+			if ((branchMergedJoinAttachmentExprs != null)
+					&& !branchMergedJoinAttachmentExprs.isEmpty()) {
+				if (ctx.mergedJoinAttachmentExprs.length() > 0)
+					ctx.mergedJoinAttachmentExprs.append(", ");
+				ctx.mergedJoinAttachmentExprs.append(
+						branchMergedJoinAttachmentExprs);
+			}
 		}
 
 		// merge properties
@@ -2709,6 +2720,7 @@ class QueryBuilder {
 					ctx.parentAnchorColExpr,
 					ctx.parentJoinExpr,
 					ctx.parentJoinAttachmentExpr,
+					ctx.mergedJoinAttachmentExprs.toString(),
 					branchPropPath,
 					branch.getAttachmentChain()));
 		}

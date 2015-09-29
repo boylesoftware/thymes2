@@ -35,6 +35,11 @@ class QueryBranch {
 	private final String joinAttachmentExpr;
 
 	/**
+	 * Merged branches join attachment expressions.
+	 */
+	private final String mergedJoinAttachmentExprs;
+
+	/**
 	 * Node property path.
 	 */
 	private final String propPath;
@@ -61,6 +66,8 @@ class QueryBranch {
 	 * @param joinAttachmentExpr Attachment expression in the join expression,
 	 * which is the value expression for the column in the joined table that is
 	 * used to attach it to the parent table.
+	 * @param mergedJoinAttachmentExprs Comma-separated list of attachment
+	 * expressions of all branches merged into this branch.
 	 * @param propPath Branch property path, or empty string if root branch.
 	 * @param attachmentChain Attachment chain with the last element being the
 	 * handler of the property that is the branch root, or empty list if the
@@ -68,13 +75,14 @@ class QueryBranch {
 	 */
 	QueryBranch(final QueryBuilder qb, final String anchorColExpr,
 			final String joinExpr, final String joinAttachmentExpr,
-			final String propPath,
+			final String mergedJoinAttachmentExprs, final String propPath,
 			final List<ResourcePropertyHandler> attachmentChain) {
 
 		this.qb = qb;
 		this.anchorColExpr = anchorColExpr;
 		this.joinExpr = joinExpr;
 		this.joinAttachmentExpr = joinAttachmentExpr;
+		this.mergedJoinAttachmentExprs = mergedJoinAttachmentExprs;
 		this.propPath = propPath;
 		final int chainLen = attachmentChain.size();
 		this.nodeProp = (chainLen == 0 ? null :
@@ -126,6 +134,18 @@ class QueryBranch {
 	String getJoinAttachmentExpression() {
 
 		return this.joinAttachmentExpr;
+	}
+
+	/**
+	 * Get comma-separated list of join expressions of all branches merged into
+	 * this branch.
+	 *
+	 * @return Comma-separated list of attachment expressions, or empty string
+	 * or {@code null} if none.
+	 */
+	String getMergedJoinAttachmentExpressions() {
+
+		return this.mergedJoinAttachmentExprs;
 	}
 
 	/**

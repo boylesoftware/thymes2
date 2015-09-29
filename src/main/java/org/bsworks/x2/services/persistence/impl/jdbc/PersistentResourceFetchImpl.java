@@ -439,8 +439,9 @@ class PersistentResourceFetchImpl<R>
 			this.tx.getParameterValuesFactory();
 
 		// get "WHERE" and "ORDER BY" clauses
-		final WhereClause whereClause = (this.filter == null ? null :
-			qb.buildWhereClause(params));
+		final WhereClause whereClause = (
+				(this.filter == null) || this.filter.isEmpty() ?
+						null : qb.buildWhereClause(params));
 		final OrderByClause orderByClause = (this.order == null ? null :
 			qb.buildOrderByClause(params));
 
