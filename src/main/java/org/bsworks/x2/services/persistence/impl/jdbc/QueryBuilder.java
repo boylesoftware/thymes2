@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -170,7 +171,7 @@ class QueryBuilder {
 		/**
 		 * Tells if outer joins must be forced.
 		 */
-		final boolean forceOuter;
+		private final boolean forceOuter;
 
 		/**
 		 * Select list for single-valued properties.
@@ -420,6 +421,19 @@ class QueryBuilder {
 
 
 		/**
+		 * Tell if outer joins must be forced.
+		 *
+		 * @return {@code true} if only outer joins should be used.
+		 */
+		boolean isForceOuter() {
+
+			if (this.aggregationBranchLevel >= 0)
+				return true;
+
+			return this.forceOuter;
+		}
+
+		/**
 		 * Add single-valued property column expression to the select list.
 		 *
 		 * @param propName Property name.
@@ -437,6 +451,12 @@ class QueryBuilder {
 					if (propName.equals(this.aggregationKeyPropName))
 						this.aggregationValueExprs.put(propName + "/key",
 								pureValExpr);
+				} else if (this.parentPropPath.startsWith(
+						this.aggregatedCollectionPropPath + ".")) {
+					this.aggregationValueExprs.put(
+							this.parentPropPath.substring(
+								this.aggregatedCollectionPropPath.length() + 1)
+							+ "." + propName, valExpr);
 				}
 
 				return;
@@ -687,9 +707,9 @@ class QueryBuilder {
 			for (final AggregatePropertyHandler ph : aggregatedPropHandlers) {
 
 				// add aggregated properties to the fetch
-				for (final String propName : ph.getAggregatedPropertyNames())
+				for (final String propPath : ph.getAggregatedPropertyPaths())
 					this.aggregationPropsFetch.include(
-							this.aggregatedCollectionPropPath + "." + propName);
+							this.aggregatedCollectionPropPath + "." + propPath);
 
 				// add intermediate references to the fetch
 				final String refPath = ph.getLastIntermediateRefPath();
@@ -1116,7 +1136,7 @@ class QueryBuilder {
 		final IdPropertyHandler idPropHandler = container.getIdProperty();
 
 		// determine if outer joins must be forced
-		final boolean forceOuter = (parentCtx.forceOuter || optional);
+		final boolean forceOuter = (parentCtx.isForceOuter() || optional);
 
 		// create parent join expression
 		final String joinExpr;
@@ -1238,20 +1258,56 @@ class QueryBuilder {
 					prsrcHandler.getAggregateProperties()) {
 				final String propPath =
 					ctx.getPropertyPath(propHandler.getName());
-				if (ctx.isSelected(propPath, propHandler)) {
-					final String branchKey = (
-						propHandler.getKeyPropertyName() == null ?
-							propHandler.getAggregatedCollectionPropertyPath() :
-							propHandler.getAggregatedCollectionPropertyPath()
-								+ "/" + (branchKeyDisc++));
-					List<AggregatePropertyHandler> phList =
-						aggregatePropHandlers.get(branchKey);
+				if (!ctx.isSelected(propPath, propHandler))
+					continue;
+				List<AggregatePropertyHandler> phList = null;
+				if (propHandler.getKeyPropertyName() != null) {
+					final String branchKey =
+						propHandler.getAggregatedCollectionPropertyPath()
+						+ "/" + (branchKeyDisc++);
+					phList = aggregatePropHandlers.get(branchKey);
 					if (phList == null) {
 						phList = new ArrayList<>();
 						aggregatePropHandlers.put(branchKey, phList);
 					}
-					phList.add(propHandler);
+				} else {
+					final Deque<? extends ResourcePropertyHandler> propChain =
+						prsrcHandler.getPersistentPropertyChain(propHandler
+								.getDeepAggregatedResourcePropertyPath());
+					final StringBuilder subPath = new StringBuilder(
+						propHandler.getDeepAggregatedResourcePropertyPath());
+					for (final Iterator<? extends ResourcePropertyHandler> i =
+						propChain.descendingIterator(); i.hasNext();) {
+						final ResourcePropertyHandler ph = i.next();
+						phList = aggregatePropHandlers.get(subPath.toString());
+						if (phList != null)
+							break;
+						if (!ph.isSingleValued())
+							break;
+						if (i.hasNext())
+							subPath.setLength(subPath.length()
+									- ph.getName().length() - 1);
+					}
+					if (phList == null) {
+						phList = new ArrayList<>();
+						subPath.setLength(0);
+						subPath.append(propHandler
+								.getDeepAggregatedResourcePropertyPath());
+						for (final Iterator<? extends ResourcePropertyHandler>
+						i =
+							propChain.descendingIterator(); i.hasNext();) {
+							final ResourcePropertyHandler ph = i.next();
+							final String key = subPath.toString();
+							if (aggregatePropHandlers.containsKey(key))
+								break;
+							aggregatePropHandlers.put(key, phList);
+							if (i.hasNext())
+								subPath.setLength(subPath.length()
+										- ph.getName().length() - 1);
+						}
+					}
 				}
+				phList.add(propHandler);
 			}
 
 			// add aggregate properties if any
@@ -1317,7 +1373,7 @@ class QueryBuilder {
 			final String propJoinCondition, final String propAttachmentExpr) {
 
 		final String propJoinExpr =
-				(optional || ctx.forceOuter ?
+				(optional || ctx.isForceOuter() ?
 						" LEFT OUTER JOIN " : " INNER JOIN ")
 					+ propTableName + " AS " + ctx.propTableAlias
 					+ " ON " + propJoinCondition;
@@ -2336,7 +2392,8 @@ class QueryBuilder {
 	}
 
 	/**
-	 * Add aggregate properties that use same aggregation collection.
+	 * Add aggregate properties that use same aggregation collection and
+	 * grouping.
 	 *
 	 * @param ctx Query builder context.
 	 * @param prsrcHandler Handler of the persistent resource containing the

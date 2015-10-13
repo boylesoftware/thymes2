@@ -75,7 +75,10 @@ public @interface AggregateProperty {
 	 * the final aggregated property result. The expression is a simple
 	 * arithmetic expression that can use names of properties of the aggregated
 	 * object (specified by the {@link #collection} annotation attribute), four
-	 * arithmetic operators (+, -, * and /) and parenthesis.
+	 * arithmetic operators (+, -, * and /) and parenthesis. The property
+	 * references can also be dot-separated paths traversing references and
+	 * nested objects. All of them must be in the same chain of nested
+	 * properties though.
 	 *
 	 * <p>If the {@link #func} is {@link AggregationFunction#COUNT}, the value
 	 * expression may be left unspecified, in which case the number of the

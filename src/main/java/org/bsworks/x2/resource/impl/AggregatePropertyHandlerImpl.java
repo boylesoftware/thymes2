@@ -1,9 +1,12 @@
 package org.bsworks.x2.resource.impl;
 
 import java.beans.PropertyDescriptor;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -34,10 +37,10 @@ class AggregatePropertyHandlerImpl
 	implements AggregatePropertyHandler {
 
 	/**
-	 * Pattern for property names in the value expression.
+	 * Pattern for property references in the value expression.
 	 */
-	private static final Pattern PROPNAME_PATTERN =
-		Pattern.compile("[a-z]\\w*");
+	private static final Pattern PROPREF_PATTERN =
+		Pattern.compile("[a-z]\\w*(?:\\.[a-z]\\w*)*");
 
 
 	/**
@@ -49,6 +52,16 @@ class AggregatePropertyHandlerImpl
 	 * Aggregated collection property path.
 	 */
 	private final String aggregatedCollectionPropertyPath;
+
+	/**
+	 * Deep aggregated resource property path.
+	 */
+	private String deepAggregatedResourcePropertyPath;
+
+	/**
+	 * Aggregation depth.
+	 */
+	private int aggregationDepth;
 
 	/**
 	 * Referred persistent resource classes.
@@ -83,15 +96,15 @@ class AggregatePropertyHandlerImpl
 	private final String aggregationValueExpression;
 
 	/**
-	 * Aggregated property names.
+	 * Aggregated property paths.
 	 */
-	private final Set<String> aggregatedPropertyNames = new HashSet<>();
+	private final Set<String> aggregatedPropertyPaths = new HashSet<>();
 
 	/**
-	 * Read-only view of aggregated property names.
+	 * Read-only view of aggregated property paths.
 	 */
-	private final Set<String> aggregatedPropertyNamesRO =
-		Collections.unmodifiableSet(this.aggregatedPropertyNames);
+	private final Set<String> aggregatedPropertyPathsRO =
+		Collections.unmodifiableSet(this.aggregatedPropertyPaths);
 
 	/**
 	 * Map key property name, or {@code null} if not a map.
@@ -248,19 +261,74 @@ class AggregatePropertyHandlerImpl
 					+ " persistent resource.");
 
 		// parse and validate the value expression
+		final StringBuilder deepAggregatedResourcePropertyPath =
+			new StringBuilder(128);
+		deepAggregatedResourcePropertyPath.append(
+				this.aggregatedCollectionPropertyPath);
+		this.aggregationDepth = 0;
 		if (this.aggregationValueExpression != null) {
-			final Matcher m = PROPNAME_PATTERN.matcher(
+			final Matcher m = PROPREF_PATTERN.matcher(
 					this.aggregationValueExpression);
+			final List<String> deepPath = new ArrayList<>();
 			while (m.find()) {
-				final String propName = m.group();
-				if (this.aggregatedPropertyNames.add(propName)) {
-					final ResourcePropertyHandler ph =
-						this.aggregatedCollectionHandler.getProperties().get(
-								propName);
-					if ((ph == null) || !ph.isSingleValued()
-							|| (!(ph instanceof SimplePropertyHandler)
-									&& !(ph instanceof IdPropertyHandler)
-									&& !(ph instanceof RefPropertyHandler)))
+				final String propPath = m.group();
+				if (this.aggregatedPropertyPaths.add(propPath)) {
+					final Deque<? extends ResourcePropertyHandler> propChain;
+					try {
+						propChain = this.aggregatedCollectionHandler
+								.getPersistentPropertyChain(propPath);
+					} catch (final IllegalArgumentException e) {
+						throw new InitializationException("Property "
+								+ this.getName() + " of "
+								+ this.containerClass.getName()
+								+ " has aggregation value expression that"
+								+ " contains references to non-existent"
+								+ " or not persistent properties.", e);
+					}
+					int depth = 0;
+					for (final Iterator<? extends ResourcePropertyHandler> i =
+							propChain.iterator(); true; depth++) {
+						final ResourcePropertyHandler ph = i.next();
+						if (!i.hasNext())
+							break;
+						if (depth < deepPath.size()) {
+							if (!ph.getName().equals(deepPath.get(depth)))
+								throw new InitializationException("Property "
+										+ this.getName() + " of "
+										+ this.containerClass.getName()
+										+ " has aggregation value expression"
+										+ " that contains references to nested"
+										+ " properties that are not in the same"
+										+ " chain of nested objects.");
+						} else {
+							deepPath.add(ph.getName());
+						}
+						deepAggregatedResourcePropertyPath.append(".").append(
+								ph.getName());
+						if (ph instanceof RefPropertyHandler) {
+							this.usedPersistentResourceClasses.add(
+									((RefPropertyHandler) ph)
+										.getReferredResourceClass());
+							this.lastIntermediateRefPath =
+								deepAggregatedResourcePropertyPath.toString();
+						} else if (ph instanceof DependentRefPropertyHandler) {
+							this.usedPersistentResourceClasses.add(
+									((DependentRefPropertyHandler) ph)
+										.getReferredResourceClass());
+							this.lastIntermediateRefPath =
+								deepAggregatedResourcePropertyPath.toString();
+						} else if (ph instanceof ObjectPropertyHandler) {
+							if (((ObjectPropertyHandler) ph).isBorrowed())
+								this.usedPersistentResourceClasses.add(
+									((ObjectPropertyHandler) ph)
+										.getOwningPersistentResourceClass());
+						}
+					}
+					final ResourcePropertyHandler leafPH = propChain.getLast();
+					if (!leafPH.isSingleValued()
+							|| (!(leafPH instanceof SimplePropertyHandler)
+									&& !(leafPH instanceof IdPropertyHandler)
+									&& !(leafPH instanceof RefPropertyHandler)))
 						throw new InitializationException("Property "
 								+ this.getName() + " of "
 								+ this.containerClass.getName()
@@ -271,14 +339,16 @@ class AggregatePropertyHandlerImpl
 				}
 			}
 		} else {
-			this.aggregatedPropertyNames.add(
+			this.aggregatedPropertyPaths.add(
 					this.aggregatedCollectionHandler.getIdProperty().getName());
 		}
+		this.deepAggregatedResourcePropertyPath =
+			deepAggregatedResourcePropertyPath.toString();
 
 		// validate key property
 		if (this.keyPropertyName != null) {
 
-			this.aggregatedPropertyNames.add(this.keyPropertyName);
+			this.aggregatedPropertyPaths.add(this.keyPropertyName);
 
 			final ResourcePropertyHandler ph =
 				this.aggregatedCollectionHandler.getProperties().get(
@@ -302,6 +372,24 @@ class AggregatePropertyHandlerImpl
 	public String getAggregatedCollectionPropertyPath() {
 
 		return this.aggregatedCollectionPropertyPath;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public String getDeepAggregatedResourcePropertyPath() {
+
+		return this.deepAggregatedResourcePropertyPath;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public int getAggregationDepth() {
+
+		return this.aggregationDepth;
 	}
 
 	/* (non-Javadoc)
@@ -358,7 +446,7 @@ class AggregatePropertyHandlerImpl
 		if (this.aggregationValueExpression == null)
 			return null;
 
-		return PROPNAME_PATTERN.matcher(this.aggregationValueExpression);
+		return PROPREF_PATTERN.matcher(this.aggregationValueExpression);
 	}
 
 	/* (non-Javadoc)
@@ -374,8 +462,8 @@ class AggregatePropertyHandlerImpl
 	 * See overridden method.
 	 */
 	@Override
-	public Set<String> getAggregatedPropertyNames() {
+	public Set<String> getAggregatedPropertyPaths() {
 
-		return this.aggregatedPropertyNamesRO;
+		return this.aggregatedPropertyPathsRO;
 	}
 }

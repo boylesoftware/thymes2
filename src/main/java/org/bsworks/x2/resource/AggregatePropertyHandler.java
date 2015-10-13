@@ -22,6 +22,29 @@ public interface AggregatePropertyHandler
 	String getAggregatedCollectionPropertyPath();
 
 	/**
+	 * Get the longest property path used in the aggregated value expression.
+	 * The path includes the aggregated collection property path (the path
+	 * returned by the {@link #getAggregatedCollectionPropertyPath()}
+	 * method) and is equal to it if the value expression is empty or uses no
+	 * nested properties.
+	 *
+	 * @return Aggregated resource property path.
+	 */
+	String getDeepAggregatedResourcePropertyPath();
+
+	/**
+	 * Get level of the deepest aggregated resource used in the aggregation
+	 * value expression. If path returned by
+	 * {@link #getDeepAggregatedResourcePropertyPath()} is the same as the path
+	 * returned by {@link #getAggregatedCollectionPropertyPath()}, that is no
+	 * value expression or the value expression uses only direct properties of
+	 * the aggregated collection resource, the depth value is zero.
+	 *
+	 * @return Aggregated depth.
+	 */
+	int getAggregationDepth();
+
+	/**
 	 * Get classes of persistent resources that participate in the calculation
 	 * of the aggregate property value, excluding the persistent resource, which
 	 * contains the aggregate property.
@@ -34,10 +57,12 @@ public interface AggregatePropertyHandler
 
 	/**
 	 * Get path of the last (the longest path) intermediate reference or
-	 * dependent resource reference property in the aggregated collection path.
+	 * dependent resource reference property in the path returned by the
+	 * {@link #getDeepAggregatedResourcePropertyPath()} method.
 	 *
-	 * @return Reference property path, or {@code null} if the collection
-	 * property can be reached without fetching any intermediate references.
+	 * @return Reference property path, or {@code null} if the deepest
+	 * aggregated resource can be reached without fetching any intermediate
+	 * references.
 	 */
 	String getLastIntermediateRefPath();
 
@@ -66,8 +91,8 @@ public interface AggregatePropertyHandler
 	String getAggregationValueExpression();
 
 	/**
-	 * Get regular expression matcher for all property names in the aggregation
-	 * value expression.
+	 * Get regular expression matcher for all property references in the
+	 * aggregation value expression.
 	 *
 	 * @return Initialized property references matcher, or {@code null} if no
 	 * value expression.
@@ -83,10 +108,11 @@ public interface AggregatePropertyHandler
 	String getKeyPropertyName();
 
 	/**
-	 * Get names of properties used in the aggregation value expression plus the
+	 * Get paths of properties used in the aggregation value expression plus the
 	 * key property, if any.
 	 *
-	 * @return Unmodifiable set of property names.
+	 * @return Unmodifiable set of property paths relative to the aggregated
+	 * collection.
 	 */
-	Set<String> getAggregatedPropertyNames();
+	Set<String> getAggregatedPropertyPaths();
 }
