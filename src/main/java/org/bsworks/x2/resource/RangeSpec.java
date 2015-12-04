@@ -29,10 +29,10 @@ public class RangeSpec {
 	public RangeSpec(final int firstRecord, final int maxRecords) {
 
 		if (firstRecord < 0)
-			throw new IllegalArgumentException(
+			throw new InvalidSpecificationException(
 					"First record index must not be negative.");
 		if (maxRecords <= 0)
-			throw new IllegalArgumentException(
+			throw new InvalidSpecificationException(
 					"Maximum number of records must be greater than zero.");
 
 		this.firstRecord = firstRecord;

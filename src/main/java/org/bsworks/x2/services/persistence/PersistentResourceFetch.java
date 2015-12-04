@@ -1,14 +1,9 @@
 package org.bsworks.x2.services.persistence;
 
-import java.util.List;
-
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.OrderSpec;
 import org.bsworks.x2.resource.PropertiesFetchSpec;
-import org.bsworks.x2.resource.RangeResult;
 import org.bsworks.x2.resource.RangeSpec;
-import org.bsworks.x2.resource.RefsFetchResult;
-import org.bsworks.x2.resource.RefsFetchSpec;
 
 
 /**
@@ -23,7 +18,9 @@ public interface PersistentResourceFetch<R> {
 
 	/**
 	 * Specify what persistent resource properties to include in or exclude from
-	 * the fetch. By default, all properties are fetched.
+	 * the fetch as well as what referred resources to include in the fetch. If
+	 * left unset, all properties that are fetched by default are included and
+	 * no referred resources are fetched.
 	 *
 	 * @param propsFetch The properties fetch specification.
 	 *
@@ -34,7 +31,7 @@ public interface PersistentResourceFetch<R> {
 
 	/**
 	 * Set condition for restricting the resource selection. By default, all
-	 * records are returned.
+	 * records are fetched.
 	 *
 	 * @param filter The filter specification.
 	 *
@@ -53,30 +50,23 @@ public interface PersistentResourceFetch<R> {
 
 	/**
 	 * Set range for limiting the resource selection. By default, all records
-	 * are returned.
+	 * are fetched.
 	 *
 	 * @param range The range specification.
-	 * @param rangeResult Object that receives meta-data about the records
-	 * collection upon the fetch execution. May be {@code null} if no such data
-	 * is needed.
 	 *
 	 * @return This fetch builder.
 	 */
-	PersistentResourceFetch<R> setRange(RangeSpec range,
-			RangeResult rangeResult);
+	PersistentResourceFetch<R> setRange(RangeSpec range);
 
 	/**
-	 * Specify what other referred persistent resource records need to be
-	 * fetched. By default, no references are resolved.
-	 *
-	 * @param refsFetch The references specification.
-	 * @param refsResult Object that receives the fetched referred persistent
-	 * resource records.
+	 * Tell the fetch to include the total count of matched records in the fetch
+	 * result. It makes sense only if range is specified using
+	 * {@link #setRange(RangeSpec)} method. Otherwise, the total count will
+	 * always be the number of fetched records in the fetch result.
 	 *
 	 * @return This fetch builder.
 	 */
-	PersistentResourceFetch<R> setRefsFetch(RefsFetchSpec<R> refsFetch,
-			RefsFetchResult refsResult);
+	PersistentResourceFetch<R> includeTotalCount();
 
 	/**
 	 * Tell the fetch to lock the fetched persistent resource records. The lock
@@ -93,25 +83,24 @@ public interface PersistentResourceFetch<R> {
 	PersistentResourceFetch<R> lockResult(LockType lockType);
 
 	/**
-	 * Get number of records that would be returned by the
-	 * {@link #getResultList()} method. Note, that the range, if set, is not
-	 * taken into the account.
+	 * Get number of records that would be returned by the {@link #getResult()}
+	 * method. Note, that the range, if set, is not taken into the account.
 	 *
 	 * @return Number of records.
 	 */
 	long getCount();
 
 	/**
-	 * Execute the fetch and get the result list.
+	 * Execute the fetch and get the result.
 	 *
-	 * @return Unmodifiable result list. Never {@code null}, but may be empty.
+	 * @return The fetch result.
 	 */
-	List<R> getResultList();
+	PersistentResourceFetchResult<R> getResult();
 
 	/**
-	 * Execute the fetch and return the first fetched result.
+	 * Execute the fetch and get the first fetched record.
 	 *
-	 * @return The result, or {@code null} if none.
+	 * @return The first fetched record, or {@code null} if none.
 	 */
-	R getFirstResult();
+	R getSingleRecord();
 }

@@ -27,8 +27,8 @@ import org.bsworks.x2.resource.ObjectPropertyHandler;
 import org.bsworks.x2.resource.OrderSpec;
 import org.bsworks.x2.resource.PersistentResourceHandler;
 import org.bsworks.x2.resource.PropertiesFetchSpec;
+import org.bsworks.x2.resource.PropertiesFetchSpecBuilder;
 import org.bsworks.x2.resource.RefPropertyHandler;
-import org.bsworks.x2.resource.RefsFetchSpec;
 import org.bsworks.x2.resource.ResourcePropertiesContainer;
 import org.bsworks.x2.resource.ResourcePropertyAccess;
 import org.bsworks.x2.resource.ResourcePropertyHandler;
@@ -94,11 +94,6 @@ class QueryBuilder {
 		 * Properties fetch specification.
 		 */
 		private final PropertiesFetchSpec<?> propsFetch;
-
-		/**
-		 * References fetch specification.
-		 */
-		private final RefsFetchSpec<?> refsFetch;
 
 		/**
 		 * Filter specification.
@@ -292,12 +287,7 @@ class QueryBuilder {
 		/**
 		 * Properties fetch specification.
 		 */
-		private PropertiesFetchSpec<?> aggregationPropsFetch;
-
-		/**
-		 * References fetch specification.
-		 */
-		private RefsFetchSpec<?> aggregationRefsFetch;
+		private PropertiesFetchSpecBuilder<?> aggregationPropsFetch;
 
 		/**
 		 * Aggregation value expressions by property names.
@@ -315,7 +305,6 @@ class QueryBuilder {
 		 * @param actor Data consumer.
 		 * @param prsrcHandler Persistent resource handler.
 		 * @param propsFetch Properties fetch specification, or {@code null}.
-		 * @param refsFetch References fetch specification, or {@code null}.
 		 * @param filter Filter specification, or {@code null}.
 		 * @param order Order specification, or {@code null}.
 		 */
@@ -324,8 +313,7 @@ class QueryBuilder {
 				final Actor actor,
 				final PersistentResourceHandler<?> prsrcHandler,
 				final PropertiesFetchSpec<?> propsFetch,
-				final RefsFetchSpec<?> refsFetch, final FilterSpec<?> filter,
-				final OrderSpec<?> order) {
+				final FilterSpec<?> filter, final OrderSpec<?> order) {
 
 			this.parentCtx = null;
 			this.prsrcHandler = prsrcHandler;
@@ -334,7 +322,6 @@ class QueryBuilder {
 			this.paramsFactory = paramsFactory;
 			this.actor = actor;
 			this.propsFetch = propsFetch;
-			this.refsFetch = refsFetch;
 			this.filter = filter;
 			this.order = order;
 			this.parentPropPath = null;
@@ -389,7 +376,6 @@ class QueryBuilder {
 			this.paramsFactory = parentCtx.paramsFactory;
 			this.actor = parentCtx.actor;
 			this.propsFetch = parentCtx.propsFetch;
-			this.refsFetch = parentCtx.refsFetch;
 			this.filter = parentCtx.filter;
 			this.order = parentCtx.order;
 			this.parentPropPath = parentPropPath;
@@ -415,7 +401,6 @@ class QueryBuilder {
 				parentCtx.aggregatedCollectionPropPath;
 			this.aggregationKeyPropName = parentCtx.aggregationKeyPropName;
 			this.aggregationPropsFetch = parentCtx.aggregationPropsFetch;
-			this.aggregationRefsFetch = parentCtx.aggregationRefsFetch;
 			this.aggregationValueExprs = parentCtx.aggregationValueExprs;
 		}
 
@@ -642,12 +627,12 @@ class QueryBuilder {
 		 */
 		boolean isFetchRequested(final String propPath) {
 
-			final RefsFetchSpec<?> refsFetch =
-				(this.aggregationBranchLevel < 0 ? this.refsFetch :
-					this.aggregationRefsFetch);
+			final PropertiesFetchSpec<?> propsFetch =
+				(this.aggregationBranchLevel < 0 ? this.propsFetch :
+					this.aggregationPropsFetch);
 
-			return ((refsFetch != null)
-					&& refsFetch.isFetchRequested(propPath));
+			return ((propsFetch != null)
+					&& propsFetch.isFetchRequested(propPath));
 		}
 
 		/**
@@ -701,9 +686,6 @@ class QueryBuilder {
 			this.aggregationPropsFetch =
 				this.resources.getPropertiesFetchSpec(
 						this.prsrcHandler.getResourceClass());
-			this.aggregationRefsFetch =
-				this.resources.getRefsFetchSpec(
-						this.prsrcHandler.getResourceClass());
 			for (final AggregatePropertyHandler ph : aggregatedPropHandlers) {
 
 				// add aggregated properties to the fetch
@@ -714,7 +696,7 @@ class QueryBuilder {
 				// add intermediate references to the fetch
 				final String refPath = ph.getLastIntermediateRefPath();
 				if (refPath != null)
-					this.aggregationRefsFetch.add(propPathsPrefix + refPath);
+					this.aggregationPropsFetch.fetch(propPathsPrefix + refPath);
 			}
 		}
 
@@ -729,7 +711,6 @@ class QueryBuilder {
 			this.aggregationKeyPropName = null;
 			this.aggregatedPropHandlers = null;
 			this.aggregationPropsFetch = null;
-			this.aggregationRefsFetch = null;
 
 			this.aggregationValueExprs.clear();
 		}
@@ -984,7 +965,6 @@ class QueryBuilder {
 	 * @param actor Data consumer.
 	 * @param prsrcHandler Persistent resource handler.
 	 * @param propsFetch Properties fetch specification, or {@code null}.
-	 * @param refsFetch References fetch specification, or {@code null}.
 	 * @param filter Filter specification, or {@code null}.
 	 * @param order Order specification, or {@code null}.
 	 *
@@ -994,8 +974,7 @@ class QueryBuilder {
 			final SQLDialect dialect,
 			final ParameterValuesFactoryImpl paramsFactory, final Actor actor,
 			final PersistentResourceHandler<?> prsrcHandler,
-			final PropertiesFetchSpec<?> propsFetch,
-			final RefsFetchSpec<?> refsFetch, final FilterSpec<?> filter,
+			final PropertiesFetchSpec<?> propsFetch, final FilterSpec<?> filter,
 			final OrderSpec<?> order) {
 
 		final QueryBranch b = createBranch(
@@ -1006,7 +985,6 @@ class QueryBuilder {
 						actor,
 						prsrcHandler,
 						propsFetch,
-						refsFetch,
 						filter,
 						order),
 				"",

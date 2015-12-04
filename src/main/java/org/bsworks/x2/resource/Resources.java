@@ -93,17 +93,6 @@ public interface Resources {
 	PersistentResourceHandler<?> getPersistentResourceHandler(String prsrcType);
 
 	/**
-	 * Get empty referred resources fetch specification object.
-	 *
-	 * @param <R> Persistent application resource type.
-	 * @param prsrcClass Persistent application resource class, whose reference
-	 * properties need to be fetched.
-	 *
-	 * @return Referred resources fetch specification object.
-	 */
-	<R> RefsFetchSpec<R> getRefsFetchSpec(Class<R> prsrcClass);
-
-	/**
 	 * Get empty properties fetch specification object.
 	 *
 	 * @param <R> Persistent application resource type.
@@ -113,7 +102,8 @@ public interface Resources {
 	 * @return Properties fetch specification object initially in "exclude by
 	 * default" mode.
 	 */
-	<R> PropertiesFetchSpec<R> getPropertiesFetchSpec(Class<R> prsrcClass);
+	<R> PropertiesFetchSpecBuilder<R> getPropertiesFetchSpec(
+			Class<R> prsrcClass);
 
 	/**
 	 * Get empty filter specification object.
@@ -125,7 +115,7 @@ public interface Resources {
 	 * @return Filter specification. The returned filter specification is always
 	 * a conjunction (logical "AND").
 	 */
-	<R> FilterSpec<R> getFilterSpec(Class<R> prsrcClass);
+	<R> FilterSpecBuilder<R> getFilterSpec(Class<R> prsrcClass);
 
 	/**
 	 * Get empty order specification object.
@@ -136,7 +126,7 @@ public interface Resources {
 	 *
 	 * @return Order specification object.
 	 */
-	<R> OrderSpec<R> getOrderSpec(Class<R> prsrcClass);
+	<R> OrderSpecBuilder<R> getOrderSpec(Class<R> prsrcClass);
 
 	/**
 	 * Parse reference string.

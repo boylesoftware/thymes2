@@ -1,11 +1,16 @@
 package org.bsworks.x2.resource.impl;
 
+import java.util.Collections;
 import java.util.Deque;
+import java.util.SortedMap;
 import java.util.SortedSet;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
+import org.bsworks.x2.resource.DependentRefPropertyHandler;
 import org.bsworks.x2.resource.ObjectPropertyHandler;
-import org.bsworks.x2.resource.PropertiesFetchSpec;
+import org.bsworks.x2.resource.PropertiesFetchSpecBuilder;
+import org.bsworks.x2.resource.RefPropertyHandler;
 import org.bsworks.x2.resource.ResourcePropertyHandler;
 
 
@@ -17,7 +22,7 @@ import org.bsworks.x2.resource.ResourcePropertyHandler;
  * @author Lev Himmelfarb
  */
 class PropertiesFetchSpecImpl<R>
-	implements PropertiesFetchSpec<R> {
+	implements PropertiesFetchSpecBuilder<R> {
 
 	/**
 	 * Persistent resource handler.
@@ -38,6 +43,17 @@ class PropertiesFetchSpecImpl<R>
 	 * Excluded property paths.
 	 */
 	private final SortedSet<String> excludePaths = new TreeSet<>();
+
+	/**
+	 * Fetched referred persistent resource classes by reference property paths.
+	 */
+	private final SortedMap<String, Class<?>> fetchedRefProps = new TreeMap<>();
+
+	/**
+	 * Read-only view of fetched reference properties.
+	 */
+	private final SortedMap<String, Class<?>> fetchedRefPropsRO =
+		Collections.unmodifiableSortedMap(this.fetchedRefProps);
 
 
 	/**
@@ -66,7 +82,7 @@ class PropertiesFetchSpecImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public PropertiesFetchSpec<R> include(final String propPath) {
+	public PropertiesFetchSpecBuilder<R> include(final String propPath) {
 
 		final Deque<? extends ResourcePropertyHandler> propChain =
 			this.prsrcHandler.getPersistentPropertyChain(propPath);
@@ -84,7 +100,7 @@ class PropertiesFetchSpecImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public PropertiesFetchSpec<R> includeByDefault() {
+	public PropertiesFetchSpecBuilder<R> includeByDefault() {
 
 		if (this.includeByDefault)
 			throw new IllegalStateException("In include by default mode.");
@@ -102,7 +118,7 @@ class PropertiesFetchSpecImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public PropertiesFetchSpec<R> exclude(final String propPath) {
+	public PropertiesFetchSpecBuilder<R> exclude(final String propPath) {
 
 		if (!this.includeByDefault)
 			throw new IllegalStateException("In exclude by default mode.");
@@ -159,5 +175,62 @@ class PropertiesFetchSpecImpl<R>
 
 		// default mode, tell if explicitly included
 		return included;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public PropertiesFetchSpecImpl<R> fetch(final String propPath) {
+
+		final Deque<? extends ResourcePropertyHandler> propChain =
+			this.prsrcHandler.getPersistentPropertyChain(propPath);
+
+		boolean lastWasRef = false;
+		for (final ResourcePropertyHandler prop : propChain) {
+			if (prop instanceof RefPropertyHandler) {
+				lastWasRef = true;
+				this.fetchedRefProps.put(
+						ResourcesImpl.chainToPath(propChain, prop),
+						((RefPropertyHandler) prop).getReferredResourceClass());
+			} else if (prop instanceof DependentRefPropertyHandler) {
+				lastWasRef = true;
+				this.fetchedRefProps.put(
+						ResourcesImpl.chainToPath(propChain, prop),
+						((DependentRefPropertyHandler) prop)
+							.getReferredResourceClass());
+			} else {
+				lastWasRef = false;
+			}
+		}
+		if (!lastWasRef)
+			throw new IllegalArgumentException("The property " + propPath
+					+ " is not a reference.");
+
+		return this;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public boolean isFetchRequested(final String propPath) {
+
+		if (propPath.endsWith(".*"))
+			return !this.fetchedRefProps
+					.subMap(propPath,
+							propPath.substring(0, propPath.length() - 2) + "/")
+					.isEmpty();
+
+		return this.fetchedRefProps.containsKey(propPath);
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public SortedMap<String, Class<?>> getFetchedRefProperties() {
+
+		return this.fetchedRefPropsRO;
 	}
 }

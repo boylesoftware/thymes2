@@ -15,11 +15,10 @@ import org.bsworks.x2.EndpointCallErrorException;
 import org.bsworks.x2.EndpointCallHttpResponseHook;
 import org.bsworks.x2.HttpMethod;
 import org.bsworks.x2.RequestEntityPart;
-import org.bsworks.x2.resource.FilterSpec;
-import org.bsworks.x2.resource.OrderSpec;
-import org.bsworks.x2.resource.PropertiesFetchSpec;
+import org.bsworks.x2.resource.FilterSpecBuilder;
+import org.bsworks.x2.resource.OrderSpecBuilder;
+import org.bsworks.x2.resource.PropertiesFetchSpecBuilder;
 import org.bsworks.x2.resource.Ref;
-import org.bsworks.x2.resource.RefsFetchSpec;
 import org.bsworks.x2.services.persistence.PersistenceTransaction;
 import org.bsworks.x2.services.persistence.PersistenceTransactionHandler;
 
@@ -61,6 +60,11 @@ class EndpointCallContextImpl
 	 * The HTTP request.
 	 */
 	private final HttpServletRequest httpRequest;
+
+	/**
+	 * Read-only collection of parameter names.
+	 */
+	private Collection<String> requestParamNamesRO = null;
 
 	/**
 	 * HTTP response hooks.
@@ -237,6 +241,24 @@ class EndpointCallContextImpl
 			return this.uriParams.get(this.uriParams.size() + pos);
 
 		return this.uriParams.get(pos);
+	}
+
+	/* (non-Javadoc)
+	 * @see org.bsworks.x2.EndpointCallContext#getRequestParamNames()
+	 */
+	@Override
+	public Collection<String> getRequestParamNames() {
+
+		if (this.requestParamNamesRO == null) {
+			final Collection<String> requestParamNames = new ArrayList<>();
+			for (final Enumeration<String> en =
+					this.httpRequest.getParameterNames(); en.hasMoreElements();)
+				requestParamNames.add(en.nextElement());
+			this.requestParamNamesRO =
+				Collections.unmodifiableCollection(requestParamNames);
+		}
+
+		return this.requestParamNamesRO;
 	}
 
 	/* (non-Javadoc)
@@ -511,16 +533,7 @@ class EndpointCallContextImpl
 	 * See overridden method.
 	 */
 	@Override
-	public <R> RefsFetchSpec<R> getRefsFetchSpec(final Class<R> prsrcClass) {
-
-		return this.runtimeCtx.getResources().getRefsFetchSpec(prsrcClass);
-	}
-
-	/* (non-Javadoc)
-	 * See overridden method.
-	 */
-	@Override
-	public <R> PropertiesFetchSpec<R> getPropertiesFetchSpec(
+	public <R> PropertiesFetchSpecBuilder<R> getPropertiesFetchSpec(
 			final Class<R> prsrcClass) {
 
 		return this.runtimeCtx.getResources().getPropertiesFetchSpec(
@@ -531,7 +544,7 @@ class EndpointCallContextImpl
 	 * See overridden method.
 	 */
 	@Override
-	public <R> FilterSpec<R> getFilterSpec(final Class<R> prsrcClass) {
+	public <R> FilterSpecBuilder<R> getFilterSpec(final Class<R> prsrcClass) {
 
 		return this.runtimeCtx.getResources().getFilterSpec(prsrcClass);
 	}
@@ -540,7 +553,7 @@ class EndpointCallContextImpl
 	 * See overridden method.
 	 */
 	@Override
-	public <R> OrderSpec<R> getOrderSpec(final Class<R> prsrcClass) {
+	public <R> OrderSpecBuilder<R> getOrderSpec(final Class<R> prsrcClass) {
 
 		return this.runtimeCtx.getResources().getOrderSpec(prsrcClass);
 	}

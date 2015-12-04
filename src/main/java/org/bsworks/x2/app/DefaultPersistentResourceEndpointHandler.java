@@ -11,18 +11,17 @@ import org.bsworks.x2.EndpointCallHandler;
 import org.bsworks.x2.HttpMethod;
 import org.bsworks.x2.resource.FilterConditionType;
 import org.bsworks.x2.resource.FilterSpec;
+import org.bsworks.x2.resource.FilterSpecBuilder;
 import org.bsworks.x2.resource.IdPropertyHandler;
-import org.bsworks.x2.resource.OrderSpec;
+import org.bsworks.x2.resource.OrderSpecBuilder;
 import org.bsworks.x2.resource.PersistentResourceHandler;
-import org.bsworks.x2.resource.PropertiesFetchSpec;
-import org.bsworks.x2.resource.RangeResult;
+import org.bsworks.x2.resource.PropertiesFetchSpecBuilder;
 import org.bsworks.x2.resource.RangeSpec;
-import org.bsworks.x2.resource.RefsFetchResult;
-import org.bsworks.x2.resource.RefsFetchSpec;
 import org.bsworks.x2.resource.ResourcePropertyAccess;
 import org.bsworks.x2.services.persistence.LockType;
 import org.bsworks.x2.services.persistence.PersistenceTransaction;
 import org.bsworks.x2.services.persistence.PersistentResourceFetch;
+import org.bsworks.x2.services.persistence.PersistentResourceFetchResult;
 
 
 /**
@@ -169,11 +168,11 @@ public class DefaultPersistentResourceEndpointHandler<R>
 	 */
 	@SuppressWarnings("unused")
 	@Override
-	public List<R> search(final EndpointCallContext ctx,
-			final PropertiesFetchSpec<R> propsFetch, final FilterSpec<R> filter,
-			final OrderSpec<R> order, final RangeSpec range,
-			final RangeResult rangeResult, final RefsFetchSpec<R> refsFetch,
-			final RefsFetchResult refsResult)
+	public PersistentResourceFetchResult<R> search(
+			final EndpointCallContext ctx,
+			final PropertiesFetchSpecBuilder<R> propsFetch,
+			final FilterSpecBuilder<R> filter, final OrderSpecBuilder<R> order,
+			final RangeSpec range, final boolean includeTotalCount)
 		throws EndpointCallErrorException {
 
 		final PersistentResourceFetch<R> fetch =
@@ -185,12 +184,13 @@ public class DefaultPersistentResourceEndpointHandler<R>
 			fetch.setFilter(filter);
 		if (order != null)
 			fetch.setOrder(order);
-		if (range != null)
-			fetch.setRange(range, rangeResult);
-		if (refsFetch != null)
-			fetch.setRefsFetch(refsFetch, refsResult);
+		if (range != null) {
+			fetch.setRange(range);
+			if (includeTotalCount)
+				fetch.includeTotalCount();
+		}
 
-		return fetch.getResultList();
+		return fetch.getResult();
 	}
 
 	/**
@@ -199,7 +199,7 @@ public class DefaultPersistentResourceEndpointHandler<R>
 	 */
 	@SuppressWarnings("unused")
 	@Override
-	public FilterSpec<R> getRecordFilter(final EndpointCallContext ctx,
+	public FilterSpecBuilder<R> getRecordFilter(final EndpointCallContext ctx,
 			final Object recId)
 		throws EndpointCallErrorException {
 
@@ -216,8 +216,8 @@ public class DefaultPersistentResourceEndpointHandler<R>
 	@SuppressWarnings("unused")
 	@Override
 	public R get(final EndpointCallContext ctx, final Object recId,
-			final FilterSpec<R> recFilter,
-			final PropertiesFetchSpec<R> propsFetch, final boolean lock)
+			final FilterSpecBuilder<R> recFilter,
+			final PropertiesFetchSpecBuilder<R> propsFetch, final boolean lock)
 		throws EndpointCallErrorException {
 
 		final PersistentResourceFetch<R> fetch = ctx
@@ -229,7 +229,7 @@ public class DefaultPersistentResourceEndpointHandler<R>
 		if (propsFetch != null)
 			fetch.setPropertiesFetch(propsFetch);
 
-		return fetch.getFirstResult();
+		return fetch.getSingleRecord();
 	}
 
 	/**
@@ -269,7 +269,7 @@ public class DefaultPersistentResourceEndpointHandler<R>
 	@SuppressWarnings("unused")
 	@Override
 	public Set<Class<?>> delete(final EndpointCallContext ctx,
-			final Object recId, final FilterSpec<R> recFilter)
+			final Object recId, final FilterSpecBuilder<R> recFilter)
 		throws EndpointCallErrorException {
 
 		final Set<Class<?>> affectedResources = new HashSet<>();

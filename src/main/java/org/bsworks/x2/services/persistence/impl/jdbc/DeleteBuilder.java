@@ -166,7 +166,6 @@ class DeleteBuilder {
 					resources
 						.getPropertiesFetchSpec(prsrcClass)
 						.include(idPropHandler.getName()),
-					null,
 					filter,
 					null);
 

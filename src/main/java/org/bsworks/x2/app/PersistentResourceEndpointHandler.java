@@ -10,15 +10,13 @@ import org.bsworks.x2.EndpointCallContext;
 import org.bsworks.x2.EndpointCallErrorException;
 import org.bsworks.x2.EndpointCallHandler;
 import org.bsworks.x2.HttpMethod;
-import org.bsworks.x2.resource.FilterSpec;
-import org.bsworks.x2.resource.OrderSpec;
+import org.bsworks.x2.resource.FilterSpecBuilder;
+import org.bsworks.x2.resource.OrderSpecBuilder;
 import org.bsworks.x2.resource.PersistentResourceHandler;
-import org.bsworks.x2.resource.PropertiesFetchSpec;
-import org.bsworks.x2.resource.RangeResult;
+import org.bsworks.x2.resource.PropertiesFetchSpecBuilder;
 import org.bsworks.x2.resource.RangeSpec;
-import org.bsworks.x2.resource.RefsFetchResult;
-import org.bsworks.x2.resource.RefsFetchSpec;
 import org.bsworks.x2.resource.Resources;
+import org.bsworks.x2.services.persistence.PersistentResourceFetchResult;
 
 
 /**
@@ -85,22 +83,18 @@ public interface PersistentResourceEndpointHandler<R> {
 	 * particular order.
 	 * @param range Collection range specification, or {@code null} for all
 	 * records.
-	 * @param rangeResult Object to receive range meta-data after the method
-	 * call, or {@code null} if no range meta-data is needed.
-	 * @param refsFetch Referred persistent resources fetch specification, or
-	 * {@code null} for no referred resources need to be fetched.
-	 * @param refsResult Object to received fetched referred resources, or
-	 * {@code null} if the {@code refsFetch} argument is {@code null}.
+	 * @param includeTotalCount {@code true} to include total count in the fetch
+	 * result. Taken into account only if "range" parameter is not {@code null}.
 	 *
-	 * @return The records, or empty list if none found.
+	 * @return The search result.
 	 *
 	 * @throws EndpointCallErrorException To send an error response back to the
 	 * client.
 	 */
-	List<R> search(EndpointCallContext ctx, PropertiesFetchSpec<R> propsFetch,
-			FilterSpec<R> filter, OrderSpec<R> order, RangeSpec range,
-			RangeResult rangeResult, RefsFetchSpec<R> refsFetch,
-			RefsFetchResult refsResult)
+	PersistentResourceFetchResult<R> search(EndpointCallContext ctx,
+			PropertiesFetchSpecBuilder<R> propsFetch,
+			FilterSpecBuilder<R> filter, OrderSpecBuilder<R> order,
+			RangeSpec range, boolean includeTotalCount)
 		throws EndpointCallErrorException;
 
 	/**
@@ -116,7 +110,7 @@ public interface PersistentResourceEndpointHandler<R> {
 	 * @throws EndpointCallErrorException To send an error response back to the
 	 * client.
 	 */
-	FilterSpec<R> getRecordFilter(EndpointCallContext ctx, Object recId)
+	FilterSpecBuilder<R> getRecordFilter(EndpointCallContext ctx, Object recId)
 		throws EndpointCallErrorException;
 
 	/**
@@ -136,8 +130,8 @@ public interface PersistentResourceEndpointHandler<R> {
 	 * @throws EndpointCallErrorException To send an error response back to the
 	 * client.
 	 */
-	R get(EndpointCallContext ctx, Object recId, FilterSpec<R> recFilter,
-			PropertiesFetchSpec<R> propsFetch, boolean lock)
+	R get(EndpointCallContext ctx, Object recId, FilterSpecBuilder<R> recFilter,
+			PropertiesFetchSpecBuilder<R> propsFetch, boolean lock)
 		throws EndpointCallErrorException;
 
 	/**
@@ -192,6 +186,6 @@ public interface PersistentResourceEndpointHandler<R> {
 	 * client.
 	 */
 	Set<Class<?>> delete(EndpointCallContext ctx, Object recId,
-			FilterSpec<R> recFilter)
+			FilterSpecBuilder<R> recFilter)
 		throws EndpointCallErrorException;
 }

@@ -6,11 +6,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.bsworks.x2.resource.FilterSpec;
-import org.bsworks.x2.resource.OrderSpec;
-import org.bsworks.x2.resource.PropertiesFetchSpec;
+import org.bsworks.x2.resource.FilterSpecBuilder;
+import org.bsworks.x2.resource.OrderSpecBuilder;
+import org.bsworks.x2.resource.PropertiesFetchSpecBuilder;
 import org.bsworks.x2.resource.Ref;
-import org.bsworks.x2.resource.RefsFetchSpec;
 import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.services.auth.ActorAuthenticationService;
 import org.bsworks.x2.services.persistence.PersistenceTransaction;
@@ -75,12 +74,22 @@ public interface EndpointCallContext {
 	String getRequestURIParam(int pos);
 
 	/**
+	 * Get names of all HTTP request parameters.
+	 *
+	 * @return Unmodifiable collection containing parameter names. Can be empty,
+	 * but never {@code null}.
+	 */
+	Collection<String> getRequestParamNames();
+
+	/**
 	 * Get names of all HTTP request parameters that match the given regular
 	 * expression.
 	 *
 	 * @param pattern Patter for the parameter names.
 	 *
 	 * @return Parameter names collection. Can be empty, but never {@code null}.
+	 * A new collection instance is created for each call so that it can be
+	 * modified by the caller without consequences.
 	 */
 	Collection<String> getRequestParamNames(Pattern pattern);
 
@@ -313,18 +322,6 @@ public interface EndpointCallContext {
 	void lockPersistentResourceCollections(Class<?>... prsrcClasses);
 
 	/**
-	 * Get empty referred persistent resource records fetch specification
-	 * object. This is a convenience shortcut method for
-	 * {@link Resources#getRefsFetchSpec(Class)}.
-	 *
-	 * @param <R> Persistent application resource type.
-	 * @param prsrcClass Persistent application resource class.
-	 *
-	 * @return References fetch specification object.
-	 */
-	<R> RefsFetchSpec<R> getRefsFetchSpec(Class<R> prsrcClass);
-
-	/**
 	 * Get empty persistent resource properties fetch specification object. This
 	 * is a convenience shortcut method for
 	 * {@link Resources#getPropertiesFetchSpec(Class)}.
@@ -335,7 +332,8 @@ public interface EndpointCallContext {
 	 * @return Properties fetch specification object initially in "exclude by
 	 * default" mode.
 	 */
-	<R> PropertiesFetchSpec<R> getPropertiesFetchSpec(Class<R> prsrcClass);
+	<R> PropertiesFetchSpecBuilder<R> getPropertiesFetchSpec(
+			Class<R> prsrcClass);
 
 	/**
 	 * Get empty persistent resource fetch filter specification object. This is
@@ -346,7 +344,7 @@ public interface EndpointCallContext {
 	 *
 	 * @return Filter specification object.
 	 */
-	<R> FilterSpec<R> getFilterSpec(Class<R> prsrcClass);
+	<R> FilterSpecBuilder<R> getFilterSpec(Class<R> prsrcClass);
 
 	/**
 	 * Get empty persistent resource fetch order specification object. This is a
@@ -357,5 +355,5 @@ public interface EndpointCallContext {
 	 *
 	 * @return Order specification object.
 	 */
-	<R> OrderSpec<R> getOrderSpec(Class<R> prsrcClass);
+	<R> OrderSpecBuilder<R> getOrderSpec(Class<R> prsrcClass);
 }

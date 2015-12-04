@@ -7,7 +7,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.bsworks.x2.EndpointCallContext;
 import org.bsworks.x2.EndpointCallErrorException;
 import org.bsworks.x2.EndpointCallResponse;
-import org.bsworks.x2.resource.FilterSpec;
+import org.bsworks.x2.resource.FilterSpecBuilder;
 import org.bsworks.x2.responses.NoContentResponse;
 import org.bsworks.x2.services.versioning.PersistentResourceVersionInfo;
 
@@ -95,7 +95,7 @@ public class DefaultDeletePersistentResourceEndpointCallHandler<R>
 					"No record id in the URL.");
 
 		// get the record filter
-		final FilterSpec<R> recFilter =
+		final FilterSpecBuilder<R> recFilter =
 			this.endpointHandler.getRecordFilter(ctx, recId);
 
 		// check if conditional request

@@ -9,14 +9,12 @@ import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.OrderSpec;
 import org.bsworks.x2.resource.PersistentResourceHandler;
 import org.bsworks.x2.resource.PropertiesFetchSpec;
-import org.bsworks.x2.resource.RangeResult;
 import org.bsworks.x2.resource.RangeSpec;
-import org.bsworks.x2.resource.RefsFetchResult;
-import org.bsworks.x2.resource.RefsFetchSpec;
 import org.bsworks.x2.resource.ResourceReadSessionCache;
 import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.services.persistence.LockType;
 import org.bsworks.x2.services.persistence.PersistentResourceFetch;
+import org.bsworks.x2.services.persistence.PersistentResourceFetchResult;
 import org.bsworks.x2.util.sql.dialect.SQLDialect;
 
 
@@ -96,44 +94,34 @@ class PersistentResourceFetchImpl<R>
 	private final PersistentResourceHandler<R> prsrcHandler;
 
 	/**
-	 * Properties fetch specification.
+	 * Properties fetch specification, or {@code null} for default.
 	 */
-	private PropertiesFetchSpec<R> propsFetch;
+	private PropertiesFetchSpec<R> propsFetch = null;
 
 	/**
-	 * Filter.
+	 * Filter, or {@code null} for no filter.
 	 */
-	private FilterSpec<R> filter;
+	private FilterSpec<R> filter = null;
 
 	/**
-	 * Order.
+	 * Order, or {@code null} for unspecified order.
 	 */
-	private OrderSpec<R> order;
+	private OrderSpec<R> order = null;
 
 	/**
-	 * Range.
+	 * Range, or {@code null} for no range.
 	 */
-	private RangeSpec range;
+	private RangeSpec range = null;
 
 	/**
-	 * Range result.
+	 * Tell if total count needs to be included in the ranged fetch result.
 	 */
-	private RangeResult rangeResult;
-
-	/**
-	 * References fetch.
-	 */
-	private RefsFetchSpec<R> refsFetch;
-
-	/**
-	 * References fetch result.
-	 */
-	private RefsFetchResult refsFetchResult;
+	private boolean includeTotalCount = false;
 
 	/**
 	 Lock type for the result, or {@code null} if none requested.
 	 */
-	private LockType lockType;
+	private LockType lockType = null;
 
 	/**
 	 * Name of the temporary table used to anchor multi-query fetches.
@@ -198,35 +186,20 @@ class PersistentResourceFetchImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public PersistentResourceFetch<R> setRange(final RangeSpec range,
-			final RangeResult rangeResult) {
-
-		if ((range == null) && (rangeResult != null))
-			throw new IllegalArgumentException("Range result object must be"
-					+ " specified together with a range specification.");
+	public PersistentResourceFetch<R> setRange(final RangeSpec range) {
 
 		this.range = range;
-		this.rangeResult = rangeResult;
 
 		return this;
 	}
 
 	/* (non-Javadoc)
-	 * See overridden method.
+	 * @see org.bsworks.x2.services.persistence.PersistentResourceFetch#includeTotalCount()
 	 */
 	@Override
-	public PersistentResourceFetch<R> setRefsFetch(
-			final RefsFetchSpec<R> refsFetch,
-			final RefsFetchResult refsResult) {
+	public PersistentResourceFetch<R> includeTotalCount() {
 
-		if (((refsFetch == null) && (refsResult != null))
-				|| ((refsFetch != null) && (refsResult == null)))
-			throw new IllegalArgumentException("References fetch must be"
-					+ " specified together with referneces fetch result"
-					+ " object.");
-
-		this.refsFetch = refsFetch;
-		this.refsFetchResult = refsResult;
+		this.includeTotalCount = true;
 
 		return this;
 	}
@@ -277,14 +250,15 @@ class PersistentResourceFetchImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public List<R> getResultList() {
+	public PersistentResourceFetchResult<R> getResult() {
 
 		// build the query
 		final QueryBuilder qb = this.buildQuery();
 
-		// setup references fetch result
+		// references fetch result map and the count
 		final Map<String, Object> refsFetchResultMap =
 			this.getRefsFetchResultMap();
+		long totalCount = -1;
 
 		// get the main query
 		final MainQuery mainQuery = this.getMainQuery(qb, false);
@@ -297,27 +271,26 @@ class PersistentResourceFetchImpl<R>
 
 			// get the records count if requested
 			if (mainQuery.countQuery != null)
-				this.rangeResult.setTotalCount(
-						mainQuery.countQuery.getFirstResult(null).longValue());
+				totalCount =
+					mainQuery.countQuery.getFirstResult(null).longValue();
 
 			// execute the main query
 			final List<R> mainResult =
 				mainQuery.dataQuery.getResultList(refsFetchResultMap);
 
-			// check if nothing
-			if (mainResult.isEmpty())
-				return mainResult;
-
 			// execute branch queries
-			for (final QueryBranch branch : qb.getBranches()) {
-				mainQuery.dataQuery.setQueryText(
-						branch.getQueryBuilder().buildAnchoredSelectQuery(
-								this.anchorTableName, null))
-					.getResultList(refsFetchResultMap);
+			if (!mainResult.isEmpty()) {
+				for (final QueryBranch branch : qb.getBranches()) {
+					mainQuery.dataQuery.setQueryText(
+							branch.getQueryBuilder().buildAnchoredSelectQuery(
+									this.anchorTableName, null))
+						.getResultList(refsFetchResultMap);
+				}
 			}
 
 			// return the result
-			return mainResult;
+			return new PersistentResourceFetchResult<>(mainResult, totalCount,
+					refsFetchResultMap);
 
 		} finally {
 
@@ -333,14 +306,10 @@ class PersistentResourceFetchImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public R getFirstResult() {
+	public R getSingleRecord() {
 
 		// build the query
 		final QueryBuilder qb = this.buildQuery();
-
-		// setup references fetch result
-		final Map<String, Object> refsFetchResultMap =
-			this.getRefsFetchResultMap();
 
 		// get the main query
 		final MainQuery mainQuery = this.getMainQuery(qb, false);
@@ -351,11 +320,6 @@ class PersistentResourceFetchImpl<R>
 				stmt.execute();
 		try {
 
-			// get the records count if requested
-			if (mainQuery.countQuery != null)
-				this.rangeResult.setTotalCount(
-						mainQuery.countQuery.getFirstResult(null).longValue());
-
 			// execute the main query
 			final R mainResult =
 				mainQuery.dataQuery.getFirstResult(refsFetchResultMap);
@@ -365,11 +329,13 @@ class PersistentResourceFetchImpl<R>
 				return null;
 
 			// execute branch queries
-			for (final QueryBranch branch : qb.getBranches()) {
-				mainQuery.dataQuery.setQueryText(
-						branch.getQueryBuilder().buildAnchoredSelectQuery(
-								this.anchorTableName, null))
-					.getFirstResult(refsFetchResultMap);
+			if (mainResult != null) {
+				for (final QueryBranch branch : qb.getBranches()) {
+					mainQuery.dataQuery.setQueryText(
+							branch.getQueryBuilder().buildAnchoredSelectQuery(
+									this.anchorTableName, null))
+						.getFirstResult(refsFetchResultMap);
+				}
 			}
 
 			// return the result
@@ -394,8 +360,8 @@ class PersistentResourceFetchImpl<R>
 
 		return QueryBuilder.createQueryBuilder(this.resources,
 				this.tx.getSQLDialect(), this.tx.getParameterValuesFactory(),
-				this.tx.getActor(), this.prsrcHandler,
-				this.propsFetch, this.refsFetch, this.filter, this.order);
+				this.tx.getActor(), this.prsrcHandler, this.propsFetch,
+				this.filter, this.order);
 	}
 
 	/**
@@ -411,7 +377,7 @@ class PersistentResourceFetchImpl<R>
 				this.tx.getActor(), this.prsrcHandler,
 				this.resources.getPropertiesFetchSpec(
 						this.prsrcHandler.getResourceClass()),
-				this.refsFetch, this.filter, this.order);
+				this.filter, this.order);
 	}
 
 	/**
@@ -586,7 +552,7 @@ class PersistentResourceFetchImpl<R>
 		query.setSessionCache(new ResourceReadSessionCache());
 
 		// create records count query
-		if ((this.rangeResult != null) || forceCount)
+		if (this.includeTotalCount || forceCount)
 			countQueryText = qb.buildCountQuery(whereClause);
 		else
 			countQueryText = null;

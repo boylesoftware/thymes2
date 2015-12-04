@@ -13,19 +13,21 @@ import org.bsworks.x2.resource.AggregatePropertyHandler;
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
 import org.bsworks.x2.resource.FilterConditionType;
 import org.bsworks.x2.resource.FilterSpec;
+import org.bsworks.x2.resource.FilterSpecBuilder;
+import org.bsworks.x2.resource.InvalidSpecificationException;
 import org.bsworks.x2.resource.ObjectPropertyHandler;
 import org.bsworks.x2.resource.OrderSpec;
+import org.bsworks.x2.resource.OrderSpecBuilder;
 import org.bsworks.x2.resource.PersistentResourceHandler;
 import org.bsworks.x2.resource.PropertiesFetchSpec;
+import org.bsworks.x2.resource.PropertiesFetchSpecBuilder;
 import org.bsworks.x2.resource.PropertyValueFunction;
-import org.bsworks.x2.resource.RangeResult;
 import org.bsworks.x2.resource.RangeSpec;
-import org.bsworks.x2.resource.RefsFetchResult;
-import org.bsworks.x2.resource.RefsFetchSpec;
 import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.resource.SortDirection;
 import org.bsworks.x2.responses.NotModifiedResponse;
 import org.bsworks.x2.responses.OKResponse;
+import org.bsworks.x2.services.persistence.PersistentResourceFetchResult;
 import org.bsworks.x2.services.versioning.PersistentResourceVersionInfo;
 import org.bsworks.x2.services.versioning.PersistentResourceVersioningService;
 import org.bsworks.x2.util.StringUtils;
@@ -282,23 +284,33 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 		throws EndpointCallErrorException {
 
 		// get fetch configuration from the request parameters
-		final PropertiesFetchSpec<R> propsFetch =
-			this.getPropertiesFetchSpec(ctx);
-		final FilterSpec<R> filter = this.getFilterSpec(ctx);
-		final OrderSpec<R> order = this.getOrderSpec(ctx);
-		final RangeSpec range = this.getRangeSpec(ctx);
-		final RefsFetchSpec<R> refsFetch = this.getRefsFetchSpec(ctx);
+		PropertiesFetchSpecBuilder<R> propsFetch = null;
+		FilterSpecBuilder<R> filter = null;
+		OrderSpecBuilder<R> order = null;
+		RangeSpec range = null;
+		for (final String paramName : ctx.getRequestParamNames()) {
+			;//...
+		}
+
+		// get fetch configuration using deprecated method
+		if (propsFetch == null)
+			propsFetch = this.getDeprecatedPropertiesFetchSpec(ctx);
+		if (filter == null)
+			filter = this.getDeprecatedFilterSpec(ctx);
+		if (order == null)
+			order = this.getDeprecatedOrderSpec(ctx);
+		if (range == null)
+			range = this.getDeprecatedRangeSpec(ctx);
 
 		// get requested record id
 		final Object recId = this.getAddressedRecordId(ctx);
 
 		// handle different types of calls
 		if (recId == null)
-			return this.handleSearchCall(ctx, propsFetch, filter, order, range,
-					refsFetch);
-		if (refsFetch != null)
-			return this.handleGetWithRefsCall(ctx, recId, propsFetch,
-					refsFetch);
+			return this.handleSearchCall(ctx, propsFetch, filter, order, range);
+		if ((propsFetch != null)
+				&& !propsFetch.getFetchedRefProperties().isEmpty())
+			return this.handleGetWithRefsCall(ctx, recId, propsFetch);
 		return this.handleSimpleGetCall(ctx, recId, propsFetch);
 	}
 
@@ -316,16 +328,16 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 */
 	protected EndpointCallResponse handleSimpleGetCall(
 			final EndpointCallContext ctx, final Object recId,
-			final PropertiesFetchSpec<R> propsFetch)
+			final PropertiesFetchSpecBuilder<R> propsFetch)
 		throws EndpointCallErrorException {
 
 		// get the record filter
-		final FilterSpec<R> recFilter =
+		final FilterSpecBuilder<R> recFilter =
 			this.endpointHandler.getRecordFilter(ctx, recId);
 
 		// get referred dependent resource collections versions
 		final Set<Class<?>> prsrcClasses = new HashSet<>();
-		this.addReferredResources(ctx, propsFetch, null, prsrcClasses);
+		this.addReferredResources(ctx, propsFetch, prsrcClasses);
 		final PersistentResourceVersionInfo colsVerInfo;
 		if (!prsrcClasses.isEmpty())
 			colsVerInfo = ctx
@@ -372,7 +384,6 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 * @param ctx Call context.
 	 * @param recId Record id.
 	 * @param propsFetch Properties fetch specification, or {@code null}.
-	 * @param refsFetch References fetch specification (not empty).
 	 *
 	 * @return The response.
 	 *
@@ -381,17 +392,16 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 */
 	protected EndpointCallResponse handleGetWithRefsCall(
 			final EndpointCallContext ctx, final Object recId,
-			final PropertiesFetchSpec<R> propsFetch,
-			final RefsFetchSpec<R> refsFetch)
+			final PropertiesFetchSpecBuilder<R> propsFetch)
 		throws EndpointCallErrorException {
 
 		// get the record filter
-		final FilterSpec<R> recFilter =
+		final FilterSpecBuilder<R> recFilter =
 			this.endpointHandler.getRecordFilter(ctx, recId);
 
 		// get referred dependent and fetched resource collections versions
 		final Set<Class<?>> prsrcClasses = new HashSet<>();
-		this.addReferredResources(ctx, propsFetch, refsFetch, prsrcClasses);
+		this.addReferredResources(ctx, propsFetch, prsrcClasses);
 		final PersistentResourceVersionInfo colsVerInfo = ctx
 				.getRuntimeContext()
 				.getPersistentResourceVersioningService()
@@ -421,16 +431,12 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 					"No resource record with this id.");
 
 		// get the record
-		final RefsFetchResult refsFetchResult = new RefsFetchResult();
-		final List<R> records = this.endpointHandler.search(ctx, propsFetch,
-				recFilter, null, new RangeSpec(0, 1), null, refsFetch,
-				refsFetchResult);
+		final PersistentResourceFetchResult<R> res =
+			this.endpointHandler.search(ctx, propsFetch, recFilter, null,
+					new RangeSpec(0, 1), false);
 
 		// return the record in the response
-		return new OKResponse(
-				new PersistentResourceFetchResult(records, -1,
-						refsFetchResult.getRefs()),
-				eTag, lastModTS);
+		return new OKResponse(res, eTag, lastModTS);
 	}
 
 	/**
@@ -441,7 +447,6 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 * @param filter Filter specification, or {@code null}.
 	 * @param order Order specification, or {@code null}.
 	 * @param range Range specification, or {@code null}.
-	 * @param refsFetch References fetch specification, or {@code null}.
 	 *
 	 * @return The response.
 	 *
@@ -450,15 +455,15 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 */
 	protected EndpointCallResponse handleSearchCall(
 			final EndpointCallContext ctx,
-			final PropertiesFetchSpec<R> propsFetch, final FilterSpec<R> filter,
-			final OrderSpec<R> order, final RangeSpec range,
-			final RefsFetchSpec<R> refsFetch)
+			final PropertiesFetchSpecBuilder<R> propsFetch,
+			final FilterSpecBuilder<R> filter, final OrderSpecBuilder<R> order,
+			final RangeSpec range)
 		throws EndpointCallErrorException {
 
 		// get all involved resource collections versions
 		final Set<Class<?>> prsrcClasses = new HashSet<>();
 		prsrcClasses.add(this.prsrcClass);
-		this.addReferredResources(ctx, propsFetch, refsFetch, prsrcClasses);
+		this.addReferredResources(ctx, propsFetch, prsrcClasses);
 		if (filter != null)
 			prsrcClasses.addAll(filter.getParticipatingPersistentResources());
 		if (order != null)
@@ -481,22 +486,12 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			return new NotModifiedResponse(eTag, lastModTS);
 
 		// get matching records
-		final RefsFetchResult refsFetchResult = (refsFetch == null ? null :
-			new RefsFetchResult());
-		final RangeResult rangeResult = (range == null ? null :
-			new RangeResult());
-		final List<R> records = this.endpointHandler.search(ctx, propsFetch,
-				filter, order, range, rangeResult, refsFetch,
-				refsFetchResult);
+		final PersistentResourceFetchResult<R> res =
+			this.endpointHandler.search(ctx, propsFetch, filter, order, range,
+					true);
 
 		// return the records in the response
-		return new OKResponse(
-				new PersistentResourceFetchResult(records,
-						(rangeResult == null ? -1 :
-							rangeResult.getTotalCount()),
-						(refsFetchResult == null ? null :
-							refsFetchResult.getRefs())),
-				eTag, lastModTS);
+		return new OKResponse(res, eTag, lastModTS);
 	}
 
 	/**
@@ -508,14 +503,11 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 * @param ctx Call context.
 	 * @param propsFetch Properties fetch specification, or {@code null} if
 	 * none.
-	 * @param refsFetch Referred resources fetch specification, or {@code null}
-	 * if none.
 	 * @param prsrcClasses Set of persistent resource classes, to which to add
 	 * the resource classes.
 	 */
 	private void addReferredResources(final EndpointCallContext ctx,
 			final PropertiesFetchSpec<R> propsFetch,
-			final RefsFetchSpec<R> refsFetch,
 			final Set<Class<?>> prsrcClasses) {
 
 		// add requested dependent resources
@@ -544,17 +536,17 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 		}
 
 		// done if no references are requested to be fetched
-		if (refsFetch == null)
+		if (propsFetch == null)
 			return;
 
 		// add fetched references
 		final Resources resources = ctx.getRuntimeContext().getResources();
 		for (final Map.Entry<String, Class<?>> entry :
-				refsFetch.getFetchedRefProperties().entrySet()) {
+				propsFetch.getFetchedRefProperties().entrySet()) {
 			final String refPropPath = entry.getKey();
 
 			// skip if explicitly excluded by the properties fetch specification
-			if ((propsFetch != null) && !propsFetch.isIncluded(refPropPath))
+			if (!propsFetch.isIncluded(refPropPath))
 				continue;
 
 			// get referred resource class
@@ -569,24 +561,22 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 				resources.getPersistentResourceHandler(refTargetClass);
 			for (final DependentRefPropertyHandler ph :
 					refPrsrcHandler.getDependentRefProperties()) {
-				if (((propsFetch != null) && propsFetch.isIncluded(
-						refPropPath + "." + ph.getName()))
-					|| ((propsFetch == null) && ph.isFetchedByDefault()))
+				if (propsFetch.isIncluded(refPropPath + "." + ph.getName()))
 					prsrcClasses.add(ph.getReferredResourceClass());
 			}
 
 			// add requested aggregate properties of the referred resource
 			for (final AggregatePropertyHandler ph :
 					refPrsrcHandler.getAggregateProperties()) {
-				if ((propsFetch != null) && propsFetch.isIncluded(
-						refPropPath + "." + ph.getName()))
+				if (propsFetch.isIncluded(refPropPath + "." + ph.getName()))
 					prsrcClasses.addAll(ph.getUsedPersistentResourceClasses());
 			}
 		}
 	}
 
 	/**
-	 * Get properties fetch specification from the request parameters.
+	 * Get properties fetch specification from the request parameters using
+	 * deprecated method.
 	 *
 	 * @param ctx Call context.
 	 *
@@ -594,7 +584,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 *
 	 * @throws EndpointCallErrorException If request parameters are invalid.
 	 */
-	private PropertiesFetchSpec<R> getPropertiesFetchSpec(
+	private PropertiesFetchSpecBuilder<R> getDeprecatedPropertiesFetchSpec(
 			final EndpointCallContext ctx)
 		throws EndpointCallErrorException {
 
@@ -602,9 +592,12 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 				ctx.getRequestParam(INCLUDE_PROPS_FETCH_PARAM));
 		final String excludePropsFetchParam = StringUtils.nullIfEmpty(
 				ctx.getRequestParam(EXCLUDE_PROPS_FETCH_PARAM));
+		final String refsFetchParam = StringUtils.nullIfEmpty(
+				ctx.getRequestParam(REFS_FETCH_PARAM));
 
 		if ((includePropsFetchParam == null)
-				&& (excludePropsFetchParam == null))
+				&& (excludePropsFetchParam == null)
+				&& (refsFetchParam == null))
 			return null;
 
 		final boolean includeWithPlus = ((includePropsFetchParam != null)
@@ -625,7 +618,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 					"Conflicting \"" + INCLUDE_PROPS_FETCH_PARAM + "\" and  \""
 					+ EXCLUDE_PROPS_FETCH_PARAM + "\" request parameters.");
 
-		final PropertiesFetchSpec<R> propsFetch =
+		final PropertiesFetchSpecBuilder<R> propsFetch =
 			ctx.getPropertiesFetchSpec(this.prsrcClass);
 		try {
 			if ((includePropsFetchParam != null) && !includeWithPlus) {
@@ -642,7 +635,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 							excludePropsFetchParam.split(","))
 						propsFetch.exclude(propPath);
 			}
-		} catch (final IllegalArgumentException e) {
+		} catch (final InvalidSpecificationException e) {
 			if (this.log.isDebugEnabled())
 				this.log.debug("invalid parameter", e);
 			throw new EndpointCallErrorException(
@@ -650,11 +643,24 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 					"Invalid properties fetch specification parameter.");
 		}
 
+		for (final String propPath : refsFetchParam.split(",")) {
+			try {
+				propsFetch.fetch(propPath);
+			} catch (final InvalidSpecificationException e) {
+				if (this.log.isDebugEnabled())
+					this.log.debug("invalid parameter", e);
+				throw new EndpointCallErrorException(
+						HttpServletResponse.SC_BAD_REQUEST, null,
+						"Invalid references fetch specification parameter.");
+			}
+		}
+
 		return propsFetch;
 	}
 
 	/**
-	 * Get filter specification from the request parameters.
+	 * Get filter specification from the request parameters using deprecated
+	 * method.
 	 *
 	 * @param ctx Call context.
 	 *
@@ -662,7 +668,8 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 *
 	 * @throws EndpointCallErrorException If request parameters are invalid.
 	 */
-	private FilterSpec<R> getFilterSpec(final EndpointCallContext ctx)
+	private FilterSpecBuilder<R> getDeprecatedFilterSpec(
+			final EndpointCallContext ctx)
 		throws EndpointCallErrorException {
 
 		final Collection<String> filterParamNames =
@@ -674,7 +681,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			"or".equalsIgnoreCase(ctx.getRequestParam(FILTER_COMB_PARAM));
 
 
-		final FilterSpec<R> filter = ctx.getFilterSpec(this.prsrcClass);
+		final FilterSpecBuilder<R> filter = ctx.getFilterSpec(this.prsrcClass);
 
 		final Matcher m = FILTER_COND_PATTERN.matcher("");
 
@@ -683,7 +690,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 					(useDisjunction ? filter.addDisjunction() : filter),
 					filterParamNames.iterator().next(), m);
 		} else { // multiple groups
-			final FilterSpec<R> j =
+			final FilterSpecBuilder<R> j =
 				(useDisjunction ? filter : filter.addDisjunction());
 			for (final String filterParamName : filterParamNames) {
 				this.addFilterConditions(ctx,
@@ -708,7 +715,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 * @throws EndpointCallErrorException If request parameters are invalid.
 	 */
 	private void addFilterConditions(final EndpointCallContext ctx,
-			final FilterSpec<R> filter, final String filterParamName,
+			final FilterSpecBuilder<R> filter, final String filterParamName,
 			final Matcher m)
 		throws EndpointCallErrorException {
 
@@ -727,7 +734,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 *
 	 * @throws EndpointCallErrorException If condition expression is invalid.
 	 */
-	private void addFilterCondition(final FilterSpec<R> filter,
+	private void addFilterCondition(final FilterSpecBuilder<R> filter,
 			final String paramName, final String condExpr, final Matcher m)
 		throws EndpointCallErrorException {
 
@@ -772,7 +779,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 		try {
 			final String[] propPaths = m.group(1).split(",");
 			if (propPaths.length > 1) {
-				final FilterSpec<R> junc = filter.addDisjunction();
+				final FilterSpecBuilder<R> junc = filter.addDisjunction();
 				for (final String propPath : propPaths)
 					junc.addCondition(propPath, condType, negated,
 							operands);
@@ -780,7 +787,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 				filter.addCondition(propPaths[0], condType, negated,
 						operands);
 			}
-		} catch (final IllegalArgumentException e) {
+		} catch (final InvalidSpecificationException e) {
 			if (this.log.isDebugEnabled())
 				this.log.debug("invalid parameter", e);
 			throw new EndpointCallErrorException(
@@ -791,7 +798,8 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	}
 
 	/**
-	 * Get order specification from the request parameters.
+	 * Get order specification from the request parameters using deprecated
+	 * method.
 	 *
 	 * @param ctx Call context.
 	 *
@@ -799,10 +807,11 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 *
 	 * @throws EndpointCallErrorException If request parameters are invalid.
 	 */
-	private OrderSpec<R> getOrderSpec(final EndpointCallContext ctx)
+	private OrderSpecBuilder<R> getDeprecatedOrderSpec(
+			final EndpointCallContext ctx)
 		throws EndpointCallErrorException {
 
-		OrderSpec<R> order = null;
+		OrderSpecBuilder<R> order = null;
 
 		final String[] segmentParams = ctx.getRequestParamValues(SPLIT_PARAM);
 		if ((segmentParams != null) && (segmentParams.length > 0)) {
@@ -812,7 +821,8 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			final Matcher m = FILTER_COND_PATTERN.matcher("");
 
 			for (final String condExpr : segmentParams) {
-				final FilterSpec<R> split = ctx.getFilterSpec(this.prsrcClass);
+				final FilterSpecBuilder<R> split =
+					ctx.getFilterSpec(this.prsrcClass);
 				this.addFilterCondition(split, SPLIT_PARAM, condExpr, m);
 				order.addSegment(split);
 			}
@@ -877,7 +887,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 
 				try {
 					order.add(dir, propPath, func, funcParams);
-				} catch (final IllegalArgumentException e) {
+				} catch (final InvalidSpecificationException e) {
 					if (this.log.isDebugEnabled())
 						this.log.debug("invalid parameter", e);
 					throw new EndpointCallErrorException(
@@ -892,7 +902,8 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	}
 
 	/**
-	 * Get range specification from the request parameters.
+	 * Get range specification from the request parameters using deprecated
+	 * method.
 	 *
 	 * @param ctx Call context.
 	 *
@@ -900,7 +911,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 *
 	 * @throws EndpointCallErrorException If request parameters are invalid.
 	 */
-	private RangeSpec getRangeSpec(final EndpointCallContext ctx)
+	private RangeSpec getDeprecatedRangeSpec(final EndpointCallContext ctx)
 		throws EndpointCallErrorException {
 
 		final String rangeParam = StringUtils.nullIfEmpty(
@@ -914,7 +925,8 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			range = new RangeSpec(
 					Integer.parseInt(rangeParam.substring(0, commaInd)),
 					Integer.parseInt(rangeParam.substring(commaInd + 1)));
-		} catch (final IllegalArgumentException | IndexOutOfBoundsException e) {
+		} catch (final InvalidSpecificationException | NumberFormatException
+				| IndexOutOfBoundsException e) {
 			if (this.log.isDebugEnabled())
 				this.log.debug("invalid parameter", e);
 			throw new EndpointCallErrorException(
@@ -923,42 +935,5 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 		}
 
 		return range;
-	}
-
-	/**
-	 * Get references fetch specification from the request parameters.
-	 *
-	 * @param ctx Call context.
-	 *
-	 * @return References fetch specification, or {@code null} if none.
-	 *
-	 * @throws EndpointCallErrorException If request parameters are invalid.
-	 */
-	private RefsFetchSpec<R> getRefsFetchSpec(final EndpointCallContext ctx)
-		throws EndpointCallErrorException {
-
-		final String refsFetchParam = StringUtils.nullIfEmpty(
-				ctx.getRequestParam(REFS_FETCH_PARAM));
-		if (refsFetchParam == null)
-			return null;
-
-		final RefsFetchSpec<R> refsFetch =
-			ctx.getRefsFetchSpec(this.prsrcClass);
-		for (final String propPath : refsFetchParam.split(",")) {
-			try {
-				refsFetch.add(propPath);
-			} catch (final IllegalArgumentException e) {
-				if (this.log.isDebugEnabled())
-					this.log.debug("invalid parameter", e);
-				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_BAD_REQUEST, null,
-						"Invalid references fetch specification parameter.");
-			}
-		}
-
-		if (refsFetch.getFetchedRefProperties().isEmpty())
-			return null;
-
-		return refsFetch;
 	}
 }

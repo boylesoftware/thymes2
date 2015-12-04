@@ -10,6 +10,7 @@ import java.util.TreeSet;
 
 import org.bsworks.x2.resource.FilterConditionType;
 import org.bsworks.x2.resource.FilterSpec;
+import org.bsworks.x2.resource.FilterSpecBuilder;
 
 
 /**
@@ -20,7 +21,7 @@ import org.bsworks.x2.resource.FilterSpec;
  * @author Lev Himmelfarb
  */
 class FilterSpecImpl<R>
-	implements FilterSpec<R> {
+	implements FilterSpecBuilder<R> {
 
 	/**
 	 * Application resources manager.
@@ -35,7 +36,7 @@ class FilterSpecImpl<R>
 	/**
 	 * Tells if disjunction.
 	 */
-	private final boolean disjunction;
+	private boolean disjunction;
 
 	/**
 	 * Parent, or {@code null}.
@@ -56,7 +57,8 @@ class FilterSpecImpl<R>
 	/**
 	 * Filter conditions.
 	 */
-	private final Collection<FilterConditionImpl> conditions = new ArrayList<>();
+	private final Collection<FilterConditionImpl> conditions =
+		new ArrayList<>();
 
 	/**
 	 * Read-only view of the filter conditions.
@@ -141,6 +143,17 @@ class FilterSpecImpl<R>
 	}
 
 	/* (non-Javadoc)
+	 * @see org.bsworks.x2.resource.FilterSpec#makeDisjunction()
+	 */
+	@Override
+	public FilterSpecBuilder<R> makeDisjunction() {
+
+		this.disjunction = true;
+
+		return this;
+	}
+
+	/* (non-Javadoc)
 	 * See overridden method.
 	 */
 	@Override
@@ -201,7 +214,7 @@ class FilterSpecImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public FilterSpec<R> addTrueCondition(final String propPath,
+	public FilterSpecBuilder<R> addTrueCondition(final String propPath,
 			final FilterConditionType type, final Object... operands) {
 
 		return this.addCondition(propPath, type, false, operands);

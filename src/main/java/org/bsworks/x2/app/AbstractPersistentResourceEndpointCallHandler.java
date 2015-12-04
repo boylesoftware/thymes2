@@ -23,7 +23,7 @@ import org.bsworks.x2.resource.InvalidResourceDataException;
 import org.bsworks.x2.resource.MetaPropertyHandler;
 import org.bsworks.x2.resource.MetaPropertyType;
 import org.bsworks.x2.resource.PersistentResourceHandler;
-import org.bsworks.x2.resource.PropertiesFetchSpec;
+import org.bsworks.x2.resource.PropertiesFetchSpecBuilder;
 import org.bsworks.x2.resource.RangeSpec;
 import org.bsworks.x2.services.persistence.LockType;
 import org.bsworks.x2.services.versioning.PersistentResourceVersionInfo;
@@ -170,7 +170,7 @@ public abstract class AbstractPersistentResourceEndpointCallHandler<R, E>
 	protected final R getRecordVersioningMetaProperties(
 			final EndpointCallContext ctx, final FilterSpec<R> recFilter) {
 
-		final PropertiesFetchSpec<R> propsFetch =
+		final PropertiesFetchSpecBuilder<R> propsFetch =
 			ctx.getPropertiesFetchSpec(this.prsrcClass);
 		if (this.versionPropHandler != null)
 			propsFetch.include(this.versionPropHandler.getName());
@@ -181,10 +181,10 @@ public abstract class AbstractPersistentResourceEndpointCallHandler<R, E>
 				.getPersistenceTransaction()
 				.createPersistentResourceFetch(this.prsrcClass)
 				.setFilter(recFilter)
-				.setRange(new RangeSpec(0, 1), null)
+				.setRange(new RangeSpec(0, 1))
 				.setPropertiesFetch(propsFetch)
 				.lockResult(LockType.SHARED) // prevent record modification
-				.getFirstResult();
+				.getSingleRecord();
 	}
 
 	/**

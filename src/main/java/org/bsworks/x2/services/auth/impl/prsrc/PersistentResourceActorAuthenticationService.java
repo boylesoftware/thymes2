@@ -9,11 +9,11 @@ import org.bsworks.x2.Actor;
 import org.bsworks.x2.EndpointCallContext;
 import org.bsworks.x2.RuntimeContext;
 import org.bsworks.x2.resource.FilterConditionType;
-import org.bsworks.x2.resource.FilterSpec;
+import org.bsworks.x2.resource.FilterSpecBuilder;
 import org.bsworks.x2.resource.IdPropertyHandler;
 import org.bsworks.x2.resource.InvalidResourceDataException;
 import org.bsworks.x2.resource.PersistentResourceHandler;
-import org.bsworks.x2.resource.PropertiesFetchSpec;
+import org.bsworks.x2.resource.PropertiesFetchSpecBuilder;
 import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.services.auth.impl.PasswordActorAuthenticationService;
 import org.bsworks.x2.services.persistence.PersistenceTransactionHandler;
@@ -92,7 +92,7 @@ public class PersistentResourceActorAuthenticationService<A extends Actor>
 		final IdPropertyHandler idPropHandler =
 			actorPRsrcHandler.getIdProperty();
 
-		final PropertiesFetchSpec<A> propsFetch =
+		final PropertiesFetchSpecBuilder<A> propsFetch =
 			resources.getPropertiesFetchSpec(this.actorPRsrcClass);
 		propsFetch.include(this.loginNamePropPath);
 		for (final String propPath : this.otherPropPaths)
@@ -112,7 +112,7 @@ public class PersistentResourceActorAuthenticationService<A extends Actor>
 									FilterConditionType.EQ,
 									idPropHandler.getValueHandler().valueOf(
 											actorId)))
-					.getFirstResult();
+					.getSingleRecord();
 
 			txh.commitTransaction();
 
@@ -131,7 +131,7 @@ public class PersistentResourceActorAuthenticationService<A extends Actor>
 			final String loginName, final String password,
 			final String opaque) {
 
-		final FilterSpec<A> filter =
+		final FilterSpecBuilder<A> filter =
 			this.runtimeCtx.getResources().getFilterSpec(this.actorPRsrcClass);
 		this.addAuthenticationFilter(filter, loginName, opaque);
 
@@ -139,7 +139,7 @@ public class PersistentResourceActorAuthenticationService<A extends Actor>
 				.getPersistenceTransaction()
 				.createPersistentResourceFetch(this.actorPRsrcClass)
 				.setFilter(filter)
-				.getFirstResult();
+				.getSingleRecord();
 
 		if (actor == null)
 			return null;
@@ -173,7 +173,7 @@ public class PersistentResourceActorAuthenticationService<A extends Actor>
 	 * @param loginName Supplied login name.
 	 * @param opaque Supplied opaque value.
 	 */
-	protected void addAuthenticationFilter(final FilterSpec<A> filter,
+	protected void addAuthenticationFilter(final FilterSpecBuilder<A> filter,
 			final String loginName,
 			@SuppressWarnings("unused") final String opaque) {
 

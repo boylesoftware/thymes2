@@ -20,7 +20,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.bsworks.x2.InitializationException;
 import org.bsworks.x2.resource.InvalidResourceDataException;
-import org.bsworks.x2.resource.OrderSpec;
 import org.bsworks.x2.resource.Ref;
 import org.bsworks.x2.resource.ResourcePropertyHandler;
 import org.bsworks.x2.resource.Resources;
@@ -353,16 +352,6 @@ public class ResourcesImpl
 	 * See overridden method.
 	 */
 	@Override
-	public <R> RefsFetchSpecImpl<R> getRefsFetchSpec(
-			final Class<R> prsrcClass) {
-
-		return new RefsFetchSpecImpl<>(this, prsrcClass);
-	}
-
-	/* (non-Javadoc)
-	 * See overridden method.
-	 */
-	@Override
 	public <R> PropertiesFetchSpecImpl<R> getPropertiesFetchSpec(
 			final Class<R> prsrcClass) {
 
@@ -383,7 +372,7 @@ public class ResourcesImpl
 	 * See overridden method.
 	 */
 	@Override
-	public <R> OrderSpec<R> getOrderSpec(final Class<R> prsrcClass) {
+	public <R> OrderSpecImpl<R> getOrderSpec(final Class<R> prsrcClass) {
 
 		return new OrderSpecImpl<>(
 				this.getPersistentResourceHandler(prsrcClass));

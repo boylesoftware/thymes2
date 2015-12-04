@@ -9,7 +9,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 
 import org.bsworks.x2.resource.FilterSpec;
-import org.bsworks.x2.resource.OrderSpec;
+import org.bsworks.x2.resource.OrderSpecBuilder;
 import org.bsworks.x2.resource.PropertyValueFunction;
 import org.bsworks.x2.resource.SortDirection;
 
@@ -22,7 +22,7 @@ import org.bsworks.x2.resource.SortDirection;
  * @author Lev Himmelfarb
  */
 class OrderSpecImpl<R>
-	implements OrderSpec<R> {
+	implements OrderSpecBuilder<R> {
 
 	/**
 	 * Persistent resource handler.
@@ -92,7 +92,8 @@ class OrderSpecImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public OrderSpec<R> add(final SortDirection dir, final String propPath) {
+	public OrderSpecBuilder<R> add(final SortDirection dir,
+			final String propPath) {
 
 		return this.add(dir, propPath, PropertyValueFunction.PLAIN);
 	}
@@ -101,8 +102,9 @@ class OrderSpecImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public OrderSpec<R> add(final SortDirection dir, final String propPath,
-			final PropertyValueFunction func, final Object... funcParams) {
+	public OrderSpecBuilder<R> add(final SortDirection dir,
+			final String propPath, final PropertyValueFunction func,
+			final Object... funcParams) {
 
 		this.elements.add(new OrderSpecElementImpl(dir, this.prsrcHandler,
 				propPath, func, funcParams, this.prsrcClasses));
@@ -116,7 +118,7 @@ class OrderSpecImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public OrderSpec<R> addSegment(final FilterSpec<R> split) {
+	public OrderSpecBuilder<R> addSegment(final FilterSpec<R> split) {
 
 		this.segments.add(split);
 
