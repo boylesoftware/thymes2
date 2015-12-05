@@ -306,7 +306,7 @@ class PersistentResourceFetchImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public R getSingleRecord() {
+	public R getSingleResult() {
 
 		// build the query
 		final QueryBuilder qb = this.buildQuery();
@@ -366,7 +366,7 @@ class PersistentResourceFetchImpl<R>
 
 	/**
 	 * Build query for count only. Same query query builder as returned by
-	 * {@link #buildQuery()}, but with empty properties fetch.
+	 * {@link #buildQuery()}, but with empty properties fetch and no order.
 	 *
 	 * @return The count only query builder.
 	 */
@@ -432,7 +432,7 @@ class PersistentResourceFetchImpl<R>
 							q, qb.getRootTableAlias());
 					break;
 				default: // cannot happen
-					throw new RuntimeException("Unknown lock type.");
+					throw new AssertionError("Unknown lock type.");
 				}
 
 			} else { // ranged query

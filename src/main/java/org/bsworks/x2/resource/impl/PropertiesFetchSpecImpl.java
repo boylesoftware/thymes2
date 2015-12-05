@@ -8,6 +8,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
+import org.bsworks.x2.resource.InvalidSpecificationException;
 import org.bsworks.x2.resource.ObjectPropertyHandler;
 import org.bsworks.x2.resource.PropertiesFetchSpecBuilder;
 import org.bsworks.x2.resource.RefPropertyHandler;
@@ -88,8 +89,8 @@ class PropertiesFetchSpecImpl<R>
 			this.prsrcHandler.getPersistentPropertyChain(propPath);
 
 		if (propChain.getLast() instanceof ObjectPropertyHandler)
-			throw new IllegalArgumentException("Included property cannot be a"
-					+ " nested object itself.");
+			throw new InvalidSpecificationException("Included property cannot"
+					+ " be a nested object itself.");
 
 		this.includePaths.add(propPath);
 
@@ -204,7 +205,7 @@ class PropertiesFetchSpecImpl<R>
 			}
 		}
 		if (!lastWasRef)
-			throw new IllegalArgumentException("The property " + propPath
+			throw new InvalidSpecificationException("The property " + propPath
 					+ " is not a reference.");
 
 		return this;

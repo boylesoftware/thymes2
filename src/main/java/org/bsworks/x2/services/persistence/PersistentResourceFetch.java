@@ -102,5 +102,5 @@ public interface PersistentResourceFetch<R> {
 	 *
 	 * @return The first fetched record, or {@code null} if none.
 	 */
-	R getSingleRecord();
+	R getSingleResult();
 }

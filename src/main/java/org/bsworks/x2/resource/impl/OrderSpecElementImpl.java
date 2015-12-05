@@ -6,6 +6,7 @@ import java.util.Set;
 
 import org.bsworks.x2.resource.AggregatePropertyHandler;
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
+import org.bsworks.x2.resource.InvalidSpecificationException;
 import org.bsworks.x2.resource.ObjectPropertyHandler;
 import org.bsworks.x2.resource.OrderSpecElement;
 import org.bsworks.x2.resource.PropertyValueFunction;
@@ -65,6 +66,8 @@ class OrderSpecElementImpl
 	 * @param func Value transformation function.
 	 * @param funcParams Value transformation function parameters. May be
 	 * {@code null} for no parameters.
+	 *
+	 * @throws InvalidSpecificationException If the specification is invalid.
 	 */
 	OrderSpecElementImpl(final SortDirection dir,
 			final PersistentResourceHandlerImpl<?> prsrcHandler,
@@ -84,12 +87,12 @@ class OrderSpecElementImpl
 		this.funcParams = (funcParams != null ? funcParams : NO_PARAMS);
 		final Class<?>[] funcParamTypes = this.func.paramTypes();
 		if (funcParamTypes.length != this.funcParams.length)
-			throw new IllegalArgumentException("Invalid \"" + this.func
+			throw new InvalidSpecificationException("Invalid \"" + this.func
 					+ "\" value transformation function parameters number.");
 		for (int i = 0; i < this.funcParams.length; i++)
 			if ((this.funcParams[i] == null)
 					|| !this.funcParams[i].getClass().equals(funcParamTypes[i]))
-				throw new IllegalArgumentException("Invalid \"" + this.func
+				throw new InvalidSpecificationException("Invalid \"" + this.func
 						+ "\" value transformation function parameter " + i
 						+ " type.");
 
@@ -98,7 +101,7 @@ class OrderSpecElementImpl
 		final ResourcePropertyHandler lastProp = this.propChain.getLast();
 
 		if (lastProp instanceof AggregatePropertyHandler)
-			throw new IllegalArgumentException(
+			throw new InvalidSpecificationException(
 					"Cannot order by aggregate property.");
 
 		for (final Iterator<? extends ResourcePropertyHandler> i =
@@ -106,7 +109,7 @@ class OrderSpecElementImpl
 			final ResourcePropertyHandler prop = i.next();
 
 			if (!prop.isSingleValued())
-				throw new IllegalArgumentException(
+				throw new InvalidSpecificationException(
 						"Cannot order by collection property.");
 
 			if ((prop instanceof RefPropertyHandler) && i.hasNext())
@@ -118,18 +121,18 @@ class OrderSpecElementImpl
 		}
 
 		if (lastProp instanceof ObjectPropertyHandler)
-			throw new IllegalArgumentException(
+			throw new InvalidSpecificationException(
 					"Cannot order by nested object property.");
 
 		if ((lastProp instanceof RefPropertyHandler)
 				|| (lastProp instanceof DependentRefPropertyHandler)) {
 			if (!refId)
-				throw new IllegalArgumentException(
+				throw new InvalidSpecificationException(
 						"Cannot order by reference property.");
 		} else {
 			if (refId)
-				throw new IllegalArgumentException("Cannot use /id qualifier"
-						+ " unless the property is a reference.");
+				throw new InvalidSpecificationException("Cannot use /id"
+						+ " qualifier unless the property is a reference.");
 		}
 	}
 

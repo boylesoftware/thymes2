@@ -112,7 +112,7 @@ public class PersistentResourceActorAuthenticationService<A extends Actor>
 									FilterConditionType.EQ,
 									idPropHandler.getValueHandler().valueOf(
 											actorId)))
-					.getSingleRecord();
+					.getSingleResult();
 
 			txh.commitTransaction();
 
@@ -139,7 +139,7 @@ public class PersistentResourceActorAuthenticationService<A extends Actor>
 				.getPersistenceTransaction()
 				.createPersistentResourceFetch(this.actorPRsrcClass)
 				.setFilter(filter)
-				.getSingleRecord();
+				.getSingleResult();
 
 		if (actor == null)
 			return null;

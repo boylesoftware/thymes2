@@ -63,9 +63,6 @@ public interface OrderSpecBuilder<R>
 	 * excluded by the filter.
 	 *
 	 * @return This order specification object (for chaining).
-	 *
-	 * @throws InvalidSpecificationException If the specified property path is
-	 * invalid.
 	 */
 	OrderSpecBuilder<R> addSegment(FilterSpec<R> split);
 }

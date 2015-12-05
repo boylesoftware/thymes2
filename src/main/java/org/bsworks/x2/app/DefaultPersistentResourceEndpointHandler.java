@@ -229,7 +229,7 @@ public class DefaultPersistentResourceEndpointHandler<R>
 		if (propsFetch != null)
 			fetch.setPropertiesFetch(propsFetch);
 
-		return fetch.getSingleRecord();
+		return fetch.getSingleResult();
 	}
 
 	/**

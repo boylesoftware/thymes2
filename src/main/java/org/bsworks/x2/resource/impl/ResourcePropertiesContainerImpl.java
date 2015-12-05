@@ -29,6 +29,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.bsworks.x2.resource.AggregatePropertyHandler;
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
+import org.bsworks.x2.resource.InvalidSpecificationException;
 import org.bsworks.x2.resource.ObjectPropertyHandler;
 import org.bsworks.x2.resource.Ref;
 import org.bsworks.x2.resource.RefPropertyHandler;
@@ -776,8 +777,8 @@ class ResourcePropertiesContainerImpl<O>
 
 		// split path to parts
 		if (!PROP_PATH_PATTERN.matcher(propPath).matches())
-			throw new IllegalArgumentException("Invalid resource property path "
-					+ propPath + ".");
+			throw new InvalidSpecificationException(
+					"Invalid resource property path " + propPath + ".");
 		final String[] propPathParts = propPath.split("\\.");
 
 		// process the path and build the chain
@@ -788,7 +789,7 @@ class ResourcePropertiesContainerImpl<O>
 
 			// was last property a container?
 			if (curContainer == null)
-				throw new IllegalArgumentException(
+				throw new InvalidSpecificationException(
 						"Invalid resource property path " + propPath + ": "
 							+ ResourcesImpl.chainToPath(res, null)
 							+ " does not contain properties.");
@@ -807,7 +808,7 @@ class ResourcePropertiesContainerImpl<O>
 							&& (lastPropHandler.getPersistence() == null)
 							&& !(lastPropHandler
 									instanceof AggregatePropertyHandler)))
-				throw new IllegalArgumentException(
+				throw new InvalidSpecificationException(
 						"Invalid resource property path " + propPath + ": "
 							+ ResourcesImpl.chainToPath(res, null)
 							+ " does not contain persistent property "

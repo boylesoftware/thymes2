@@ -184,7 +184,7 @@ public abstract class AbstractPersistentResourceEndpointCallHandler<R, E>
 				.setRange(new RangeSpec(0, 1))
 				.setPropertiesFetch(propsFetch)
 				.lockResult(LockType.SHARED) // prevent record modification
-				.getSingleRecord();
+				.getSingleResult();
 	}
 
 	/**

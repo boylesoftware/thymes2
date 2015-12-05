@@ -32,8 +32,8 @@ public interface ResourcePropertiesContainer {
 	 * handler for one of this container's property. The last element is handler
 	 * for the property identified by the path.
 	 *
-	 * @throws IllegalArgumentException If the path is invalid or any of the
-	 * properties in the chain is not persistent.
+	 * @throws InvalidSpecificationException If the path is invalid or any of
+	 * the properties in the chain is not persistent.
 	 */
 	Deque<? extends ResourcePropertyHandler> getPersistentPropertyChain(
 			String propPath);

@@ -13,6 +13,7 @@ import org.bsworks.x2.resource.FilterCondition;
 import org.bsworks.x2.resource.FilterConditionOperandType;
 import org.bsworks.x2.resource.FilterConditionType;
 import org.bsworks.x2.resource.InvalidResourceDataException;
+import org.bsworks.x2.resource.InvalidSpecificationException;
 import org.bsworks.x2.resource.RefPropertyHandler;
 import org.bsworks.x2.resource.ResourcePropertyHandler;
 import org.bsworks.x2.resource.ResourcePropertyValueHandler;
@@ -69,6 +70,9 @@ class FilterConditionImpl
 	 * empty.
 	 * @param prsrcClasses Set, to which to add any participating persistent
 	 * resource classes.
+	 *
+	 * @throws InvalidSpecificationException If condition specification is
+	 * invalid.
 	 */
 	FilterConditionImpl(final ResourcesImpl resources,
 			final FilterConditionType type, final boolean negated,
@@ -102,7 +106,7 @@ class FilterConditionImpl
 
 		// cannot use aggregates in filters
 		if (propHandler instanceof AggregatePropertyHandler)
-			throw new IllegalArgumentException(
+			throw new InvalidSpecificationException(
 					"Cannot use aggregate properties in filters.");
 
 		// get property value handlers (top and leaf)
@@ -115,10 +119,10 @@ class FilterConditionImpl
 		final boolean presenceCheck = ((this.type == FilterConditionType.EMPTY)
 				|| (this.type == FilterConditionType.NOT_EMPTY));
 		if (presenceCheck && (operands.length > 0))
-			throw new IllegalArgumentException("This type of filter"
+			throw new InvalidSpecificationException("This type of filter"
 					+ " condition does not use operands.");
 		if (!presenceCheck && (operands.length == 0))
-			throw new IllegalArgumentException("This type of filter"
+			throw new InvalidSpecificationException("This type of filter"
 					+ " condition requires at least one operand.");
 
 		// get value handler for the operand
@@ -129,7 +133,7 @@ class FilterConditionImpl
 
 			// make sure the property is a reference
 			if (!propLeafValueHandler.isRef())
-				throw new IllegalArgumentException("Property " + propPath
+				throw new InvalidSpecificationException("Property " + propPath
 						+ " is not a reference and its id cannot be tested.");
 
 			// use target resource id property value handler for operand values
@@ -144,7 +148,7 @@ class FilterConditionImpl
 
 			// make sure the property is a map
 			if (propTopValueHandler.getType() != ResourcePropertyValueType.MAP)
-				throw new IllegalArgumentException("Property " + propPath
+				throw new InvalidSpecificationException("Property " + propPath
 						+ " is not a map and does not have a key.");
 
 			// use key value handler for operand values
@@ -157,7 +161,7 @@ class FilterConditionImpl
 			// make sure the property has simple value to test
 			if (!(propLeafValueHandler
 					instanceof SimpleResourcePropertyValueHandler))
-				throw new IllegalArgumentException("Property " + propPath
+				throw new InvalidSpecificationException("Property " + propPath
 						+ " does not have simple value.");
 
 			// use property value handler for operand values
@@ -170,7 +174,7 @@ class FilterConditionImpl
 				new ArrayList<>(operands.length > 10 ? operands.length : 10);
 			for (final Object op : operands) {
 				if (op == null)
-					throw new IllegalArgumentException(
+					throw new InvalidSpecificationException(
 							"Filter condition operands may not be null.");
 				operandsCol.add(new FilterConditionOperandImpl(
 						op instanceof String ?
@@ -178,7 +182,8 @@ class FilterConditionImpl
 			}
 			this.operands = Collections.unmodifiableCollection(operandsCol);
 		} catch (final InvalidResourceDataException e) {
-			throw new IllegalArgumentException("Invalid operand value.", e);
+			throw new InvalidSpecificationException("Invalid operand value.",
+					e);
 		}
 
 		// save participating persistent resource classes from the chain
