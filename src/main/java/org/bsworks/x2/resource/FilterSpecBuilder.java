@@ -2,7 +2,11 @@ package org.bsworks.x2.resource;
 
 
 /**
- * Builder of a filter specification.
+ * Builder for a {@link FilterSpec}. The builder extends the {@link FilterSpec}
+ * and can be used as such.
+ *
+ * <p><em>Note, that builder instances must not be assumed to be
+ * thread-safe!</em>
  *
  * @param <R> Fetch persistent resource type.
  *

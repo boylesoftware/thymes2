@@ -5,7 +5,7 @@ import java.util.Set;
 
 
 /**
- * Specification of a filter for a persistent resource records fetch.
+ * Specification for a persistent resource records fetch filter.
  *
  * @param <R> Fetch persistent resource type.
  *

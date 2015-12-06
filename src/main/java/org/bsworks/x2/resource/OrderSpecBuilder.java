@@ -2,8 +2,11 @@ package org.bsworks.x2.resource;
 
 
 /**
- * Builder of a specification of sorting order for a persistent resource records
- * fetch.
+ * Builder for an {@link OrderSpec}. The builder extends the {@link OrderSpec}
+ * and can be used as such.
+ *
+ * <p><em>Note, that builder instances must not be assumed to be
+ * thread-safe!</em>
  *
  * @param <R> Fetch persistent resource type.
  *

@@ -2,6 +2,8 @@ package org.bsworks.x2.resource.impl;
 
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
@@ -36,14 +38,24 @@ class PropertiesFetchSpecImpl<R>
 	private boolean includeByDefault = false;
 
 	/**
+	 * All explicitly included property paths (including intermediate paths).
+	 */
+	private final Set<String> includedPaths = new HashSet<>();
+
+	/**
+	 * All explicitly excluded property paths (including intermediate paths).
+	 */
+	private final Set<String> excludedPaths = new HashSet<>();
+
+	/**
 	 * Included property paths.
 	 */
-	private final SortedSet<String> includePaths = new TreeSet<>();
+	private final SortedSet<String> includePathsTree = new TreeSet<>();
 
 	/**
 	 * Excluded property paths.
 	 */
-	private final SortedSet<String> excludePaths = new TreeSet<>();
+	private final SortedSet<String> excludePathsTree = new TreeSet<>();
 
 	/**
 	 * Fetched referred persistent resource classes by reference property paths.
@@ -79,67 +91,25 @@ class PropertiesFetchSpecImpl<R>
 		return this.prsrcHandler.getResourceClass();
 	}
 
-	/* (non-Javadoc)
-	 * See overridden method.
-	 */
-	@Override
-	public PropertiesFetchSpecBuilder<R> include(final String propPath) {
-
-		final Deque<? extends ResourcePropertyHandler> propChain =
-			this.prsrcHandler.getPersistentPropertyChain(propPath);
-
-		if (propChain.getLast() instanceof ObjectPropertyHandler)
-			throw new InvalidSpecificationException("Included property cannot"
-					+ " be a nested object itself.");
-
-		this.includePaths.add(propPath);
-
-		return this;
-	}
 
 	/* (non-Javadoc)
-	 * See overridden method.
-	 */
-	@Override
-	public PropertiesFetchSpecBuilder<R> includeByDefault() {
-
-		if (this.includeByDefault)
-			throw new IllegalStateException("In include by default mode.");
-
-		if (!this.includePaths.isEmpty() || !this.excludePaths.isEmpty())
-			throw new IllegalStateException(
-					"Must be called before adding properties.");
-
-		this.includeByDefault = true;
-
-		return this;
-	}
-
-	/* (non-Javadoc)
-	 * See overridden method.
-	 */
-	@Override
-	public PropertiesFetchSpecBuilder<R> exclude(final String propPath) {
-
-		if (!this.includeByDefault)
-			throw new IllegalStateException("In exclude by default mode.");
-
-		this.prsrcHandler.getPersistentPropertyChain(propPath);
-
-		this.excludePaths.add(propPath);
-
-		return this;
-	}
-
-	/* (non-Javadoc)
-	 * See overridden method.
+	 * @see org.bsworks.x2.resource.PropertiesFetchSpec#isIncluded(java.lang.String)
 	 */
 	@Override
 	public boolean isIncluded(final String propPath) {
 
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	private boolean isIncluded1(final String propPath) {
+
 		// check if explicitly included
-		final boolean included = (this.includePaths.contains(propPath)
-				|| !this.includePaths.subSet(propPath + ".", propPath + "/")
+		final boolean included = (this.includePathsTree.contains(propPath)
+				|| !this.includePathsTree.subSet(propPath + ".", propPath + "/")
 				.isEmpty());
 
 		// check for exclusion
@@ -150,7 +120,7 @@ class PropertiesFetchSpecImpl<R>
 			int dotInd = propPathBuf.length();
 			do {
 				propPathBuf.setLength(dotInd);
-				if (this.excludePaths.contains(propPathBuf.toString()))
+				if (this.excludePathsTree.contains(propPathBuf.toString()))
 					return false;
 			} while ((dotInd = propPathBuf.lastIndexOf(".")) > 0);
 
@@ -166,7 +136,7 @@ class PropertiesFetchSpecImpl<R>
 					propPathBuf.append('.');
 				propPathBuf.append(ph.getName());
 				if (!ph.isFetchedByDefault()
-						&& !this.includePaths.contains(propPathBuf.toString()))
+						&& !this.includePathsTree.contains(propPathBuf.toString()))
 					return false;
 			}
 
@@ -176,6 +146,72 @@ class PropertiesFetchSpecImpl<R>
 
 		// default mode, tell if explicitly included
 		return included;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public boolean isFetchRequested(final String propPath) {
+
+		if (propPath.endsWith(".*"))
+			return !this.fetchedRefProps
+					.subMap(propPath,
+							propPath.substring(0, propPath.length() - 2) + "/")
+					.isEmpty();
+
+		return this.fetchedRefProps.containsKey(propPath);
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public SortedMap<String, Class<?>> getFetchedRefProperties() {
+
+		return this.fetchedRefPropsRO;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public PropertiesFetchSpecBuilder<R> includeByDefault() {
+
+		if (this.includeByDefault)
+			throw new IllegalStateException(
+					"Already in include by default mode.");
+
+		this.includeByDefault = true;
+
+		return this;
+	}
+
+	/* (non-Javadoc)
+	 * @see org.bsworks.x2.resource.PropertiesFetchSpecBuilder#include(java.lang.String)
+	 */
+	@Override
+	public PropertiesFetchSpecBuilder<R> include(final String propPath) {
+
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	private PropertiesFetchSpecBuilder<R> include1(final String propPath) {
+
+		final Deque<? extends ResourcePropertyHandler> propChain =
+			this.prsrcHandler.getPersistentPropertyChain(propPath);
+
+		if (propChain.getLast() instanceof ObjectPropertyHandler)
+			throw new InvalidSpecificationException("Included property cannot"
+					+ " be a nested object itself.");
+
+		this.includePathsTree.add(propPath);
+
+		return this;
 	}
 
 	/* (non-Javadoc)
@@ -212,26 +248,27 @@ class PropertiesFetchSpecImpl<R>
 	}
 
 	/* (non-Javadoc)
-	 * See overridden method.
+	 * @see org.bsworks.x2.resource.PropertiesFetchSpecBuilder#exclude(java.lang.String)
 	 */
 	@Override
-	public boolean isFetchRequested(final String propPath) {
+	public PropertiesFetchSpecBuilder<R> exclude(final String propPath) {
 
-		if (propPath.endsWith(".*"))
-			return !this.fetchedRefProps
-					.subMap(propPath,
-							propPath.substring(0, propPath.length() - 2) + "/")
-					.isEmpty();
-
-		return this.fetchedRefProps.containsKey(propPath);
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 	/* (non-Javadoc)
 	 * See overridden method.
 	 */
-	@Override
-	public SortedMap<String, Class<?>> getFetchedRefProperties() {
+	private PropertiesFetchSpecBuilder<R> exclude1(final String propPath) {
 
-		return this.fetchedRefPropsRO;
+		if (!this.includeByDefault)
+			throw new IllegalStateException("In exclude by default mode.");
+
+		this.prsrcHandler.getPersistentPropertyChain(propPath);
+
+		this.excludePathsTree.add(propPath);
+
+		return this;
 	}
 }

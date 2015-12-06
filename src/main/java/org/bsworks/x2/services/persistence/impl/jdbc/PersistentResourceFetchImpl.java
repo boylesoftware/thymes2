@@ -1,9 +1,11 @@
 package org.bsworks.x2.services.persistence.impl.jdbc;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedMap;
 
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.OrderSpec;
@@ -222,7 +224,9 @@ class PersistentResourceFetchImpl<R>
 	public long getCount() {
 
 		// build the query
-		final QueryBuilder qb = this.buildQueryForCount();
+		final QueryBuilder qb = this.buildQuery(
+				this.resources.getPropertiesFetchSpec(
+						this.prsrcHandler.getResourceClass()));
 
 		// get the main query
 		final MainQuery mainQuery = this.getMainQuery(qb, true);
@@ -253,7 +257,7 @@ class PersistentResourceFetchImpl<R>
 	public PersistentResourceFetchResult<R> getResult() {
 
 		// build the query
-		final QueryBuilder qb = this.buildQuery();
+		final QueryBuilder qb = this.buildQuery(this.propsFetch);
 
 		// references fetch result map and the count
 		final Map<String, Object> refsFetchResultMap =
@@ -309,7 +313,25 @@ class PersistentResourceFetchImpl<R>
 	public R getSingleResult() {
 
 		// build the query
-		final QueryBuilder qb = this.buildQuery();
+		final PropertiesFetchSpec<R> propsFetch = this.propsFetch;
+		final QueryBuilder qb = this.buildQuery(new PropertiesFetchSpec<R>() {
+			@Override
+			public Class<R> getPersistentResourceClass() {
+				return propsFetch.getPersistentResourceClass();
+			}
+			@Override
+			public boolean isIncluded(final String propPath) {
+				return propsFetch.isIncluded(propPath);
+			}
+			@Override
+			public boolean isFetchRequested(final String propPath) {
+				return false;
+			}
+			@Override
+			public SortedMap<String, Class<?>> getFetchedRefProperties() {
+				return Collections.emptySortedMap();
+			}
+		});
 
 		// get the main query
 		final MainQuery mainQuery = this.getMainQuery(qb, false);
@@ -321,12 +343,7 @@ class PersistentResourceFetchImpl<R>
 		try {
 
 			// execute the main query
-			final R mainResult =
-				mainQuery.dataQuery.getFirstResult(refsFetchResultMap);
-
-			// check if nothing
-			if (mainResult == null)
-				return null;
+			final R mainResult = mainQuery.dataQuery.getFirstResult(null);
 
 			// execute branch queries
 			if (mainResult != null) {
@@ -334,7 +351,7 @@ class PersistentResourceFetchImpl<R>
 					mainQuery.dataQuery.setQueryText(
 							branch.getQueryBuilder().buildAnchoredSelectQuery(
 									this.anchorTableName, null))
-						.getFirstResult(refsFetchResultMap);
+						.getFirstResult(null);
 				}
 			}
 
@@ -354,30 +371,16 @@ class PersistentResourceFetchImpl<R>
 	/**
 	 * Build the query.
 	 *
+	 * @param propsFetch Properties fetch specification to use.
+	 *
 	 * @return The top query builder.
 	 */
-	private QueryBuilder buildQuery() {
+	private QueryBuilder buildQuery(final PropertiesFetchSpec<R> propsFetch) {
 
 		return QueryBuilder.createQueryBuilder(this.resources,
 				this.tx.getSQLDialect(), this.tx.getParameterValuesFactory(),
-				this.tx.getActor(), this.prsrcHandler, this.propsFetch,
-				this.filter, this.order);
-	}
-
-	/**
-	 * Build query for count only. Same query query builder as returned by
-	 * {@link #buildQuery()}, but with empty properties fetch and no order.
-	 *
-	 * @return The count only query builder.
-	 */
-	private QueryBuilder buildQueryForCount() {
-
-		return QueryBuilder.createQueryBuilder(this.resources,
-				this.tx.getSQLDialect(), this.tx.getParameterValuesFactory(),
-				this.tx.getActor(), this.prsrcHandler,
-				this.resources.getPropertiesFetchSpec(
-						this.prsrcHandler.getResourceClass()),
-				this.filter, this.order);
+				this.tx.getActor(), this.prsrcHandler, propsFetch, this.filter,
+				this.order);
 	}
 
 	/**
@@ -572,12 +575,10 @@ class PersistentResourceFetchImpl<R>
 	 */
 	private Map<String, Object> getRefsFetchResultMap() {
 
-		if (this.refsFetchResult == null)
+		if ((this.propsFetch == null)
+				|| this.propsFetch.getFetchedRefProperties().isEmpty())
 			return null;
 
-		final Map<String, Object> refsFetchResultMap = new HashMap<>();
-		this.refsFetchResult.setRefs(refsFetchResultMap);
-
-		return refsFetchResultMap;
+		return new HashMap<>();
 	}
 }

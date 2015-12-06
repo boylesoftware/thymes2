@@ -29,14 +29,14 @@ public interface PropertiesFetchSpec<R> {
 	boolean isIncluded(String propPath);
 
 	/**
-	 * Tell if the specified reference property is fetched by this
-	 * specification. If the property path is not a template (see "propPath"
-	 * parameter description), this is equivalent to calling
+	 * Tell if the specified reference property is requested to be fetched by
+	 * this specification. If the property path is not a template (see
+	 * "propPath" parameter description), this is equivalent to calling
 	 * {@code getFetchedRefProperties().containsKey(propPath)}.
 	 *
 	 * @param propPath Property path with nested properties separated with dots.
-	 * If ends with ".*", then checks if any nested properties of the specified
-	 * path are fetched.
+	 * If ends with ".*", then checks if any nested property of the specified
+	 * path is fetched.
 	 *
 	 * @return {@code true} if needs to be fetched.
 	 */
@@ -46,8 +46,9 @@ public interface PropertiesFetchSpec<R> {
 	 * Get all reference properties fetched by this specification with the
 	 * reference target classes.
 	 *
-	 * @return Unmodifiable map referred persistent resource classes by
-	 * reference property paths.
+	 * @return Unmodifiable map with referred persistent resource classes by
+	 * reference property paths. Never {@code null}, but can be empty if no
+	 * fetches have been requested.
 	 */
 	SortedMap<String, Class<?>> getFetchedRefProperties();
 }

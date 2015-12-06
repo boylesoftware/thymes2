@@ -5,7 +5,7 @@ import java.util.Set;
 
 
 /**
- * Specification of sorting order for a persistent resource records fetch.
+ * Specification for a persistent resource records fetch sorting order.
  *
  * @param <R> Fetch persistent resource type.
  *
