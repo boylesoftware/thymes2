@@ -619,6 +619,17 @@ class QueryBuilder {
 		}
 
 		/**
+		 * Get properties fetch specification to use.
+		 *
+		 * @return Properties fetch specification.
+		 */
+		private PropertiesFetchSpec<?> getPropertiesFetchSpec() {
+
+			return (this.aggregationBranchLevel < 0 ? this.propsFetch :
+				this.aggregationPropsFetch);
+		}
+
+		/**
 		 * Tell if the specified reference property is requested to be fetched.
 		 *
 		 * @param propPath Reference property path.
@@ -628,8 +639,7 @@ class QueryBuilder {
 		boolean isFetchRequested(final String propPath) {
 
 			final PropertiesFetchSpec<?> propsFetch =
-				(this.aggregationBranchLevel < 0 ? this.propsFetch :
-					this.aggregationPropsFetch);
+				this.getPropertiesFetchSpec();
 
 			return ((propsFetch != null)
 					&& propsFetch.isFetchRequested(propPath));
@@ -647,13 +657,30 @@ class QueryBuilder {
 				final ResourcePropertyHandler propHandler) {
 
 			final PropertiesFetchSpec<?> propsFetch =
-				(this.aggregationBranchLevel < 0 ? this.propsFetch :
-					this.aggregationPropsFetch);
+				this.getPropertiesFetchSpec();
 
 			return (((propsFetch != null)
 						&& propsFetch.isIncluded(propPath))
 					|| ((propsFetch == null)
 							&& propHandler.isFetchedByDefault()));
+		}
+
+		/**
+		 * Get aggregate property filter.
+		 *
+		 * @param propPath Aggregate property path.
+		 *
+		 * @return The filter, or {@code null} if none.
+		 */
+		FilterSpec<Object> getAggregateFilter(final String propPath) {
+
+			final PropertiesFetchSpec<?> propsFetch =
+				this.getPropertiesFetchSpec();
+
+			if (propsFetch == null)
+				return null;
+
+			return propsFetch.getAggregateFilter(propPath);
 		}
 
 		/**
@@ -664,11 +691,14 @@ class QueryBuilder {
 		 * @param aggregationKeyPropName Aggregation key property name, or
 		 * {@code null} if single-valued aggregate property.
 		 * @param aggregatedPropHandlers Aggregated property handlers.
+		 * @param aggFilter Aggregated collection filter, or {@code null} if
+		 * none.
 		 */
 		void setAggregationMode(
 				final String aggregatedCollectionPropPath,
 				final String aggregationKeyPropName,
-				final List<AggregatePropertyHandler> aggregatedPropHandlers) {
+				final List<AggregatePropertyHandler> aggregatedPropHandlers,
+				final FilterSpec<Object> aggFilter) {
 
 			this.aggregationBranchLevel = 0;
 
@@ -1192,13 +1222,16 @@ class QueryBuilder {
 					prsrcHandler.getMetaProperty(metaType);
 				if (metaHandler == null)
 					continue;
+				final String propPath =
+					ctx.getPropertyPath(metaHandler.getName());
+				if (!ctx.isSelected(propPath, metaHandler))
+					continue;
 				final String metaValExpr = ctx.rootTableAlias + "."
 						+ metaHandler.getPersistence().getFieldName();
 				ctx.appendSelectList(
 						metaValExpr + " AS " + ctx.dialect.quoteColumnLabel(
 								colLabelPrefix + metaHandler.getName()), false);
-				ctx.singlePropExprs.put(
-						ctx.getPropertyPath(metaHandler.getName()),
+				ctx.singlePropExprs.put(propPath,
 						new SingleValuedQueryProperty(metaValExpr,
 								metaHandler.getValueHandler()
 									.getPersistentValueType()));
@@ -1232,6 +1265,9 @@ class QueryBuilder {
 			final Map<String, List<AggregatePropertyHandler>>
 			aggregatePropHandlers = new HashMap<>();
 			int branchKeyDisc = 0;
+			final Map<FilterSpec<Object>, Integer> aggFilterDiscs =
+				new HashMap<>();
+			final Map<String, FilterSpec<Object>> aggFilters = new HashMap<>();
 			for (final AggregatePropertyHandler propHandler :
 					prsrcHandler.getAggregateProperties()) {
 				final String propPath =
@@ -1239,10 +1275,23 @@ class QueryBuilder {
 				if (!ctx.isSelected(propPath, propHandler))
 					continue;
 				List<AggregatePropertyHandler> phList = null;
+				final FilterSpec<Object> aggFilter =
+					ctx.getAggregateFilter(propPath);
 				if (propHandler.getKeyPropertyName() != null) {
 					final String branchKey =
 						propHandler.getAggregatedCollectionPropertyPath()
-						+ "/" + (branchKeyDisc++);
+						+ "/M" + (branchKeyDisc++);
+					aggregatePropHandlers.put(branchKey,
+							phList = new ArrayList<>());
+				} else if (aggFilter != null) {
+					Integer disc = aggFilterDiscs.get(aggFilter);
+					if (disc == null)
+						aggFilterDiscs.put(aggFilter,
+								disc = Integer.valueOf(branchKeyDisc++));
+					final String branchKey =
+						propHandler.getAggregatedCollectionPropertyPath()
+						+ "/F" + disc;
+					aggFilters.put(branchKey, aggFilter);
 					phList = aggregatePropHandlers.get(branchKey);
 					if (phList == null) {
 						phList = new ArrayList<>();
@@ -1291,7 +1340,8 @@ class QueryBuilder {
 			// add aggregate properties if any
 			for (final Map.Entry<String, List<AggregatePropertyHandler>> entry :
 					aggregatePropHandlers.entrySet())
-				addAggregateProperties(ctx, prsrcHandler, entry.getValue());
+				addAggregateProperties(ctx, prsrcHandler, entry.getValue(),
+						aggFilters.get(entry.getKey()));
 		}
 
 		// order by record id if has collections
@@ -2377,11 +2427,13 @@ class QueryBuilder {
 	 * @param prsrcHandler Handler of the persistent resource containing the
 	 * aggregates.
 	 * @param propHandlers Aggregate property handlers.
+	 * @param aggFilter Aggregated collection filter, or {@code null} if none.
 	 */
 	private static void addAggregateProperties(
 			final QueryBuilderContext ctx,
 			final PersistentResourceHandler<?> prsrcHandler,
-			final List<AggregatePropertyHandler> propHandlers) {
+			final List<AggregatePropertyHandler> propHandlers,
+			final FilterSpec<Object> aggFilter) {
 
 		// get collection property path
 		final String collectionPropPath =
@@ -2389,17 +2441,18 @@ class QueryBuilder {
 
 		// switch context into the aggregation mode
 		ctx.setAggregationMode(collectionPropPath,
-				propHandlers.get(0).getKeyPropertyName(), propHandlers);
+				propHandlers.get(0).getKeyPropertyName(), propHandlers,
+				aggFilter);
 
 		// get aggregated collection property chain
 		final Deque<? extends ResourcePropertyHandler> collectionPropChain =
 			prsrcHandler.getPersistentPropertyChain(collectionPropPath);
 
 		// get branch root property handler
-
-		// create branch depending on the root property kind
 		final ResourcePropertyHandler rootPropHandler =
 			collectionPropChain.getFirst();
+
+		// create branch depending on the root property kind
 		if (rootPropHandler instanceof ObjectPropertyHandler)
 			addObjectProperty(ctx, (ObjectPropertyHandler) rootPropHandler);
 		else if (rootPropHandler instanceof RefPropertyHandler)

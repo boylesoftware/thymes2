@@ -2,18 +2,20 @@ package org.bsworks.x2.resource.impl;
 
 import java.util.Collections;
 import java.util.Deque;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.SortedMap;
-import java.util.SortedSet;
 import java.util.TreeMap;
-import java.util.TreeSet;
 
+import org.bsworks.x2.resource.AggregatePropertyHandler;
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
+import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.InvalidSpecificationException;
 import org.bsworks.x2.resource.ObjectPropertyHandler;
 import org.bsworks.x2.resource.PropertiesFetchSpecBuilder;
 import org.bsworks.x2.resource.RefPropertyHandler;
+import org.bsworks.x2.resource.ResourceHandler;
 import org.bsworks.x2.resource.ResourcePropertyHandler;
 
 
@@ -28,6 +30,46 @@ class PropertiesFetchSpecImpl<R>
 	implements PropertiesFetchSpecBuilder<R> {
 
 	/**
+	 * An inclusion/exclusion rule.
+	 */
+	private static final class Rule {
+
+		/**
+		 * Handler of the property, with which the rule is associated/
+		 */
+		final ResourcePropertyHandler propHandler;
+
+		/**
+		 * Tell if the matching property is included, excluded, or unspecified
+		 * (if {@code null}).
+		 */
+		Boolean includeSelf;
+
+		/**
+		 * Tell if the children of matching property are included, excluded, or
+		 * unspecified (if {@code null}).
+		 */
+		Boolean includeChildren;
+
+
+		/**
+		 * Create new rule.
+		 *
+		 * @param propHandler Property handler.
+		 * @param includeSelf Include self flag, or {@code null}.
+		 * @param includeChildren Include children flag, or {@code null}.
+		 */
+		Rule(final ResourcePropertyHandler propHandler,
+				final Boolean includeSelf, final Boolean includeChildren) {
+
+			this.propHandler = propHandler;
+			this.includeSelf = includeSelf;
+			this.includeChildren = includeChildren;
+		}
+	}
+
+
+	/**
 	 * Persistent resource handler.
 	 */
 	private final PersistentResourceHandlerImpl<R> prsrcHandler;
@@ -38,24 +80,9 @@ class PropertiesFetchSpecImpl<R>
 	private boolean includeByDefault = false;
 
 	/**
-	 * All explicitly included property paths (including intermediate paths).
+	 * The rules by property paths.
 	 */
-	private final Set<String> includedPaths = new HashSet<>();
-
-	/**
-	 * All explicitly excluded property paths (including intermediate paths).
-	 */
-	private final Set<String> excludedPaths = new HashSet<>();
-
-	/**
-	 * Included property paths.
-	 */
-	private final SortedSet<String> includePathsTree = new TreeSet<>();
-
-	/**
-	 * Excluded property paths.
-	 */
-	private final SortedSet<String> excludePathsTree = new TreeSet<>();
+	private final Map<String, Rule> rules = new HashMap<>();
 
 	/**
 	 * Fetched referred persistent resource classes by reference property paths.
@@ -67,6 +94,12 @@ class PropertiesFetchSpecImpl<R>
 	 */
 	private final SortedMap<String, Class<?>> fetchedRefPropsRO =
 		Collections.unmodifiableSortedMap(this.fetchedRefProps);
+
+	/**
+	 * Aggregate property filters by property paths.
+	 */
+	private final Map<String, FilterSpec<Object>> aggergateFilters =
+		new HashMap<>();
 
 
 	/**
@@ -93,59 +126,57 @@ class PropertiesFetchSpecImpl<R>
 
 
 	/* (non-Javadoc)
-	 * @see org.bsworks.x2.resource.PropertiesFetchSpec#isIncluded(java.lang.String)
+	 * See overridden method.
 	 */
 	@Override
 	public boolean isIncluded(final String propPath) {
 
-		// TODO Auto-generated method stub
-		return false;
-	}
+		// get the property chain and validate the property path
+		final Deque<? extends ResourcePropertyHandler> propChain =
+			this.prsrcHandler.getPersistentPropertyChain(propPath);
 
-	/* (non-Javadoc)
-	 * See overridden method.
-	 */
-	private boolean isIncluded1(final String propPath) {
+		// find the longest matching rule
+		final StringBuilder curPropPath = new StringBuilder(propPath);
+		Rule rule = null;
+		final int propPathLen = propPath.length();
+		int dotInd = propPathLen;
+		do {
+			curPropPath.setLength(dotInd);
+			rule = this.rules.get(curPropPath.toString());
+		} while ((rule == null)
+				&& ((dotInd = curPropPath.lastIndexOf(".")) > 0));
 
-		// check if explicitly included
-		final boolean included = (this.includePathsTree.contains(propPath)
-				|| !this.includePathsTree.subSet(propPath + ".", propPath + "/")
-				.isEmpty());
+		// get the rule value
+		final Boolean include;
+		if (rule == null)
+			include = null;
+		else if (curPropPath.length() == propPathLen)
+			include = rule.includeSelf;
+		else
+			include = rule.includeChildren;
 
-		// check for exclusion
-		if (this.includeByDefault) {
+		// use the rule if has rule
+		if (include != null)
+			return include.booleanValue();
 
-			// check that it is not explicitly excluded
-			final StringBuilder propPathBuf = new StringBuilder(propPath);
-			int dotInd = propPathBuf.length();
-			do {
-				propPathBuf.setLength(dotInd);
-				if (this.excludePathsTree.contains(propPathBuf.toString()))
-					return false;
-			} while ((dotInd = propPathBuf.lastIndexOf(".")) > 0);
+		// no rule, default behavior:
 
-			// check if explicitly included
-			if (included)
-				return true;
+		// check if all excluded by default
+		if (!this.includeByDefault)
+			return false;
 
-			// check if all properties in the chain are fetched
-			propPathBuf.setLength(0);
-			for (final ResourcePropertyHandler ph :
-					this.prsrcHandler.getPersistentPropertyChain(propPath)) {
-				if (propPathBuf.length() > 0)
-					propPathBuf.append('.');
-				propPathBuf.append(ph.getName());
-				if (!ph.isFetchedByDefault()
-						&& !this.includePathsTree.contains(propPathBuf.toString()))
-					return false;
-			}
-
-			// OK, it's included
-			return true;
+		// check that the chain up to the rule is fetched by default
+		for (final Iterator<? extends ResourcePropertyHandler> phIterator =
+				propChain.descendingIterator(); phIterator.hasNext();) {
+			final ResourcePropertyHandler ph = phIterator.next();
+			if ((rule != null) && (rule.propHandler == ph))
+				break;
+			if (!ph.isFetchedByDefault())
+				return false;
 		}
 
-		// default mode, tell if explicitly included
-		return included;
+		// included by default
+		return true;
 	}
 
 	/* (non-Javadoc)
@@ -176,6 +207,15 @@ class PropertiesFetchSpecImpl<R>
 	 * See overridden method.
 	 */
 	@Override
+	public FilterSpec<Object> getAggregateFilter(final String propPath) {
+
+		return this.aggergateFilters.get(propPath);
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PropertiesFetchSpecBuilder<R> includeByDefault() {
 
 		if (this.includeByDefault)
@@ -188,29 +228,57 @@ class PropertiesFetchSpecImpl<R>
 	}
 
 	/* (non-Javadoc)
-	 * @see org.bsworks.x2.resource.PropertiesFetchSpecBuilder#include(java.lang.String)
+	 * See overridden method.
 	 */
 	@Override
 	public PropertiesFetchSpecBuilder<R> include(final String propPath) {
 
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	/* (non-Javadoc)
-	 * See overridden method.
-	 */
-	private PropertiesFetchSpecBuilder<R> include1(final String propPath) {
-
+		// get property chain and validate property path
 		final Deque<? extends ResourcePropertyHandler> propChain =
 			this.prsrcHandler.getPersistentPropertyChain(propPath);
 
+		// last property may not be an object
 		if (propChain.getLast() instanceof ObjectPropertyHandler)
-			throw new InvalidSpecificationException("Included property cannot"
-					+ " be a nested object itself.");
+			throw new InvalidSpecificationException("Property " + propPath
+					+ " is a nested object and cannot be explicitely"
+					+ " included.");
 
-		this.includePathsTree.add(propPath);
+		// create rules for each property in the path
+		final StringBuilder curPropPathBuf =
+			new StringBuilder(propPath.length());
+		for (final Iterator<? extends ResourcePropertyHandler> phIterator =
+				propChain.iterator(); phIterator.hasNext();) {
+			final ResourcePropertyHandler ph = phIterator.next();
 
+			// create current property path
+			if (curPropPathBuf.length() > 0)
+				curPropPathBuf.append('.');
+			curPropPathBuf.append(ph.getName());
+			final String curPropPath = curPropPathBuf.toString();
+
+			// create/update inclusion rule
+			Rule rule = this.rules.get(curPropPath);
+			if (rule == null) {
+				rule = new Rule(ph, Boolean.TRUE, null);
+				this.rules.put(curPropPath, rule);
+			} else if (rule.includeSelf == null) {
+				rule.includeSelf = Boolean.TRUE;
+			}
+
+			// add intermediate reference to fetch
+			if (phIterator.hasNext()) {
+				if (ph instanceof RefPropertyHandler)
+					this.fetchedRefProps.put(curPropPath,
+							((RefPropertyHandler) ph)
+								.getReferredResourceClass());
+				else if (ph instanceof DependentRefPropertyHandler)
+					this.fetchedRefProps.put(curPropPath,
+							((DependentRefPropertyHandler) ph)
+								.getReferredResourceClass());
+			}
+		}
+
+		// done
 		return this;
 	}
 
@@ -220,55 +288,151 @@ class PropertiesFetchSpecImpl<R>
 	@Override
 	public PropertiesFetchSpecImpl<R> fetch(final String propPath) {
 
+		// get property chain and validate property path
 		final Deque<? extends ResourcePropertyHandler> propChain =
 			this.prsrcHandler.getPersistentPropertyChain(propPath);
 
-		boolean lastWasRef = false;
-		for (final ResourcePropertyHandler prop : propChain) {
-			if (prop instanceof RefPropertyHandler) {
-				lastWasRef = true;
-				this.fetchedRefProps.put(
-						ResourcesImpl.chainToPath(propChain, prop),
-						((RefPropertyHandler) prop).getReferredResourceClass());
-			} else if (prop instanceof DependentRefPropertyHandler) {
-				lastWasRef = true;
-				this.fetchedRefProps.put(
-						ResourcesImpl.chainToPath(propChain, prop),
-						((DependentRefPropertyHandler) prop)
-							.getReferredResourceClass());
-			} else {
-				lastWasRef = false;
-			}
-		}
-		if (!lastWasRef)
-			throw new InvalidSpecificationException("The property " + propPath
+		// last property must be a reference
+		final ResourcePropertyHandler lastProp = propChain.getLast();
+		if (!(lastProp instanceof RefPropertyHandler)
+				&& !(lastProp instanceof DependentRefPropertyHandler))
+			throw new InvalidSpecificationException("Property " + propPath
 					+ " is not a reference.");
 
+		// create rules for each property in the path
+		final StringBuilder curPropPathBuf =
+			new StringBuilder(propPath.length());
+		for (final Iterator<? extends ResourcePropertyHandler> phIterator =
+				propChain.iterator(); phIterator.hasNext();) {
+			final ResourcePropertyHandler ph = phIterator.next();
+
+			// create current property path
+			if (curPropPathBuf.length() > 0)
+				curPropPathBuf.append('.');
+			curPropPathBuf.append(ph.getName());
+			final String curPropPath = curPropPathBuf.toString();
+
+			// create/update inclusion rule
+			Rule rule = this.rules.get(curPropPath);
+			if (rule == null) {
+				rule = new Rule(ph, Boolean.TRUE, null);
+				this.rules.put(curPropPath, rule);
+			} else if (rule.includeSelf == null) {
+				rule.includeSelf = Boolean.TRUE;
+			}
+
+			// add reference to fetch
+			if (ph instanceof RefPropertyHandler)
+				this.fetchedRefProps.put(curPropPath,
+						((RefPropertyHandler) ph)
+							.getReferredResourceClass());
+			else if (ph instanceof DependentRefPropertyHandler)
+				this.fetchedRefProps.put(curPropPath,
+						((DependentRefPropertyHandler) ph)
+							.getReferredResourceClass());
+		}
+
+		// done
 		return this;
-	}
-
-	/* (non-Javadoc)
-	 * @see org.bsworks.x2.resource.PropertiesFetchSpecBuilder#exclude(java.lang.String)
-	 */
-	@Override
-	public PropertiesFetchSpecBuilder<R> exclude(final String propPath) {
-
-		// TODO Auto-generated method stub
-		return null;
 	}
 
 	/* (non-Javadoc)
 	 * See overridden method.
 	 */
-	private PropertiesFetchSpecBuilder<R> exclude1(final String propPath) {
+	@Override
+	public PropertiesFetchSpecBuilder<R> exclude(final String propPath) {
 
-		if (!this.includeByDefault)
-			throw new IllegalStateException("In exclude by default mode.");
+		// get property chain and validate property path
+		final Deque<? extends ResourcePropertyHandler> propChain =
+			this.prsrcHandler.getPersistentPropertyChain(propPath);
 
-		this.prsrcHandler.getPersistentPropertyChain(propPath);
+		// create/update exclusion rule
+		Rule rule = this.rules.get(propPath);
+		if (rule == null) {
+			rule = new Rule(propChain.getLast(), Boolean.FALSE, Boolean.FALSE);
+			this.rules.put(propPath, rule);
+		} else {
+			rule.includeSelf = Boolean.FALSE;
+			rule.includeChildren = Boolean.FALSE;
+		}
 
-		this.excludePathsTree.add(propPath);
+		// done
+		return this;
+	}
 
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public PropertiesFetchSpecBuilder<R> includeFilteredAggregate(
+			final String propPath, final FilterSpec<Object> filter) {
+
+		// get property chain and validate property path
+		final Deque<? extends ResourcePropertyHandler> propChain =
+			this.prsrcHandler.getPersistentPropertyChain(propPath);
+
+		// last property must be an aggregate
+		final AggregatePropertyHandler propHandler;
+		try {
+			propHandler = (AggregatePropertyHandler) propChain.getLast();
+		} catch (final ClassCastException e) {
+			throw new InvalidSpecificationException("Property " + propPath
+					+ " is not an aggregate.");
+		}
+
+		// validate the filter root class
+		final ResourceHandler<?> aggregatedResourceHandler;
+		try {
+			aggregatedResourceHandler = (ResourceHandler<?>) propHandler
+					.getAggregatedCollectionHandler();
+		} catch (final ClassCastException e) {
+			throw new InvalidSpecificationException("Aggregate property "
+					+ propPath + " does not refer to a resource references"
+							+ " collection and cannot be filtered.");
+		}
+		if (!filter.getPersistentResourceClass().equals(
+				aggregatedResourceHandler.getResourceClass()))
+			throw new InvalidSpecificationException("The specified filter is"
+					+ " not for the aggregated resource type.");
+
+		// include the property
+		this.include(propPath);
+
+		// save the filter
+		this.aggergateFilters.put(propPath, filter);
+
+		// done
+		return this;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public PropertiesFetchSpecBuilder<R> excludeProperties(
+			final String propPath) {
+
+		// get property chain and validate property path
+		final Deque<? extends ResourcePropertyHandler> propChain =
+			this.prsrcHandler.getPersistentPropertyChain(propPath);
+
+		// last property must be a reference
+		final ResourcePropertyHandler lastProp = propChain.getLast();
+		if (!(lastProp instanceof RefPropertyHandler)
+				&& !(lastProp instanceof DependentRefPropertyHandler))
+			throw new InvalidSpecificationException("Property " + propPath
+					+ " is not a reference.");
+
+		// create/update exclusion rule
+		Rule rule = this.rules.get(propPath);
+		if (rule == null) {
+			rule = new Rule(lastProp, null, Boolean.FALSE);
+			this.rules.put(propPath, rule);
+		} else {
+			rule.includeChildren = Boolean.FALSE;
+		}
+
+		// done
 		return this;
 	}
 }

@@ -331,6 +331,11 @@ class PersistentResourceFetchImpl<R>
 			public SortedMap<String, Class<?>> getFetchedRefProperties() {
 				return Collections.emptySortedMap();
 			}
+			@Override
+			public FilterSpec<Object> getAggregateFilter(
+					final String propPath) {
+				return propsFetch.getAggregateFilter(propPath);
+			}
 		});
 
 		// get the main query

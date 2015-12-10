@@ -19,13 +19,14 @@ public interface PropertiesFetchSpecBuilder<R>
 	 * Switch the specification to "include by default" mode. Unless called,
 	 * any new specification is initially in "exclude by default" mode, that is
 	 * all properties are assumed to be excluded unless explicitly included by
-	 * calling the {@link #include(String)} method. In "include by default"
-	 * mode, all properties that are specified on the resource as fetched by
-	 * default (see {@link ResourcePropertyHandler#isFetchedByDefault()}) are
-	 * assumed to be included unless explicitly excluded by calling the
-	 * {@link #exclude(String)} method. In the "include by default" mode, a
-	 * property that is not fetched by default can be added to the fetch with
-	 * the {@link #include(String)}.
+	 * calling the {@link #include(String)} or {@link #fetch(String)} method. In
+	 * "include by default" mode, all properties that are specified on the
+	 * resource as fetched by default
+	 * (see {@link ResourcePropertyHandler#isFetchedByDefault()}) are assumed to
+	 * be included unless explicitly excluded by calling the
+	 * {@link #exclude(String)} or {@link #excludeProperties(String)} method. In
+	 * the "include by default" mode, a property that is not fetched by default
+	 * can be added to the fetch with the {@link #include(String)} method.
 	 *
 	 * @return This object (for chaining).
 	 *
@@ -35,19 +36,20 @@ public interface PropertiesFetchSpecBuilder<R>
 	PropertiesFetchSpecBuilder<R> includeByDefault();
 
 	/**
-	 * Include specified property.
+	 * Include specified property. Calling this method adds a rule to the
+	 * specification that requests to unconditionally include the specified
+	 * property and all parent properties in its path.
 	 *
 	 * <p>The specified property path may contain several intermediate
 	 * reference properties in it, in which case the referred resources are
 	 * automatically added to the fetch as if via the {@link #fetch(String)}
 	 * method. Note, that if the property at the end of the path is a reference,
-	 * the referred resource is <em>not</em> added to the fetch.
+	 * the referred resource is <em>not</em> added to the fetch. To request
+	 * fetching a referred resource record without specifying any inclusion
+	 * rules for its properties see {@link #fetch(String)} method.
 	 *
 	 * <p>The property at the end of the path must not be a nested object
 	 * property. If it is, an {@link InvalidSpecificationException} is thrown.
-	 *
-	 * <p>All intermediate properties in the path automatically become included
-	 * as well.
 	 *
 	 * @param propPath Property path with nested properties separated with dots.
 	 * The path starts at the class returned by
@@ -76,8 +78,8 @@ public interface PropertiesFetchSpecBuilder<R>
 	 * <p>All intermediate properties in the path become included as if via the
 	 * {@link #include(String)} method.
 	 *
-	 * @param propPath Property path with nested properties separated with dots.
-	 * The path starts at the class returned by
+	 * @param propPath Reference property path with nested properties separated
+	 * with dots. The path starts at the class returned by
 	 * {@link #getPersistentResourceClass()}.
 	 *
 	 * @return This object (for chaining).
@@ -88,27 +90,45 @@ public interface PropertiesFetchSpecBuilder<R>
 	PropertiesFetchSpecBuilder<R> fetch(String propPath);
 
 	/**
-	 * Exclude specified property.
+	 * Include an aggregate property and attach a filter for the aggregated
+	 * resource records that will participate in the aggregated property value
+	 * calculation.
 	 *
-	 * <p>Note, that since all properties are initially excluded in the default
-	 * "exclude by default" mode, the method makes sense only in the "include by
-	 * default" mode. If the specification is in the "exclude by default" mode,
-	 * any exclusion rule specified by this method is ignored (unless, of
-	 * course, there is an explicit inclusion, in which case the exclusion takes
-	 * precedence and the inclusion becomes ineffective).
+	 * <p>The specified aggregate property must refer to a resource references
+	 * collection so that the aggregated records are resource records. An
+	 * aggregate property referring a nested objects collection cannot be
+	 * filtered. If attempted, an {@link InvalidSpecificationException} is
+	 * thrown.
 	 *
-	 * <p>If, according to this specification, a property is both included and
-	 * excluded, the exclusion takes precedence.
+	 * <p>In all other aspects, similar to the {@link #include(String)} method.
 	 *
-	 * <p>If the excluded property is a nested object or a reference, all nested
-	 * properties are excluded as well.
+	 * @param propPath Aggregate property path with nested properties separated
+	 * with dots. The path starts at the class returned by
+	 * {@link #getPersistentResourceClass()}.
+	 * @param filter Filter for the aggregated resource records.
+	 *
+	 * @return This object (for chaining).
+	 *
+	 * @throws InvalidSpecificationException If the specified property path is
+	 * invalid.
+	 */
+	PropertiesFetchSpecBuilder<R> includeFilteredAggregate(String propPath,
+			FilterSpec<Object> filter);
+
+	/**
+	 * Exclude specified property. Calling this method adds a rule to the
+	 * specification that requests to exclude the specified property from the
+	 * fetch and, if the property is a reference or a nested object, exclude all
+	 * of its nested properties, unless explicitly included using
+	 * {@link #include(String)} or {@link #fetch(String)} method. The call does
+	 * not create any rules for the parent properties in the specified path.
 	 *
 	 * <p>The specified property path may contain several intermediate reference
 	 * properties in it. Note, that in such case the exclusion is effective only
 	 * if the references are fetched via explicit calls to the
 	 * {@link #include(String)} and/or {@link #fetch(String)} methods.
-	 * Otherwise, the exclusion is ignored because it asks the fetch to exclude
-	 * a property that is not fetched anyway.
+	 * Otherwise, the exclusion is ignored because it asks to exclude a
+	 * property that is not fetched anyway.
 	 *
 	 * @param propPath Property path with nested properties separated with dots.
 	 * The path starts at the class returned by
@@ -120,4 +140,27 @@ public interface PropertiesFetchSpecBuilder<R>
 	 * invalid.
 	 */
 	PropertiesFetchSpecBuilder<R> exclude(String propPath);
+
+	/**
+	 * Exclude nested properties of the specified reference property, but do not
+	 * create any rules for the reference property itself. This is similar to
+	 * the {@link #exclude(String)} method, but does not involve the specified
+	 * property itself.
+	 *
+	 * <p>The method may be useful in the "include by default" mode and allows
+	 * including only specific properties of fetched referred resource records.
+	 *
+	 * <p>The specified property path must be a reference, or an
+	 * {@link InvalidSpecificationException} is thrown.
+	 *
+	 * @param propPath Reference property path with nested properties separated
+	 * with dots. The path starts at the class returned by
+	 * {@link #getPersistentResourceClass()}.
+	 *
+	 * @return This object (for chaining).
+	 *
+	 * @throws InvalidSpecificationException If the specified property path is
+	 * invalid.
+	 */
+	PropertiesFetchSpecBuilder<R> excludeProperties(String propPath);
 }

@@ -25,6 +25,8 @@ public interface PropertiesFetchSpec<R> {
 	 * @param propPath Property path with nested properties separated with dots.
 	 *
 	 * @return {@code true} if needs to be included.
+	 *
+	 * @throws IllegalArgumentException If the property path is invalid.
 	 */
 	boolean isIncluded(String propPath);
 
@@ -34,9 +36,9 @@ public interface PropertiesFetchSpec<R> {
 	 * "propPath" parameter description), this is equivalent to calling
 	 * {@code getFetchedRefProperties().containsKey(propPath)}.
 	 *
-	 * @param propPath Property path with nested properties separated with dots.
-	 * If ends with ".*", then checks if any nested property of the specified
-	 * path is fetched.
+	 * @param propPath Reference property path with nested properties separated
+	 * with dots. If ends with ".*", then checks if any nested property of the
+	 * specified path is fetched.
 	 *
 	 * @return {@code true} if needs to be fetched.
 	 */
@@ -51,4 +53,15 @@ public interface PropertiesFetchSpec<R> {
 	 * fetches have been requested.
 	 */
 	SortedMap<String, Class<?>> getFetchedRefProperties();
+
+	/**
+	 * Get filter to use to limit resource records participating in the
+	 * calculation of the specified aggregate property value.
+	 *
+	 * @param propPath Aggregate property path with nested properties separated
+	 * with dots.
+	 *
+	 * @return Filter to use, or {@code null} if no filter.
+	 */
+	FilterSpec<Object> getAggregateFilter(String propPath);
 }
