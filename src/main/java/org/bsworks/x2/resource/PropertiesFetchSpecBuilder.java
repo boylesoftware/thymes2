@@ -113,7 +113,7 @@ public interface PropertiesFetchSpecBuilder<R>
 	 * invalid.
 	 */
 	PropertiesFetchSpecBuilder<R> includeFilteredAggregate(String propPath,
-			FilterSpec<Object> filter);
+			FilterSpec<? extends Object> filter);
 
 	/**
 	 * Exclude specified property. Calling this method adds a rule to the

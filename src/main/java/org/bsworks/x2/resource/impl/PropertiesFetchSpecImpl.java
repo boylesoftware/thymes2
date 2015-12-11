@@ -98,7 +98,7 @@ class PropertiesFetchSpecImpl<R>
 	/**
 	 * Aggregate property filters by property paths.
 	 */
-	private final Map<String, FilterSpec<Object>> aggergateFilters =
+	private final Map<String, FilterSpec<? extends Object>> aggergateFilters =
 		new HashMap<>();
 
 
@@ -207,7 +207,8 @@ class PropertiesFetchSpecImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public FilterSpec<Object> getAggregateFilter(final String propPath) {
+	public FilterSpec<? extends Object> getAggregateFilter(
+			final String propPath) {
 
 		return this.aggergateFilters.get(propPath);
 	}
@@ -365,7 +366,7 @@ class PropertiesFetchSpecImpl<R>
 	 */
 	@Override
 	public PropertiesFetchSpecBuilder<R> includeFilteredAggregate(
-			final String propPath, final FilterSpec<Object> filter) {
+			final String propPath, final FilterSpec<? extends Object> filter) {
 
 		// get property chain and validate property path
 		final Deque<? extends ResourcePropertyHandler> propChain =

@@ -672,7 +672,7 @@ class QueryBuilder {
 		 *
 		 * @return The filter, or {@code null} if none.
 		 */
-		FilterSpec<Object> getAggregateFilter(final String propPath) {
+		FilterSpec<? extends Object> getAggregateFilter(final String propPath) {
 
 			final PropertiesFetchSpec<?> propsFetch =
 				this.getPropertiesFetchSpec();
@@ -698,7 +698,7 @@ class QueryBuilder {
 				final String aggregatedCollectionPropPath,
 				final String aggregationKeyPropName,
 				final List<AggregatePropertyHandler> aggregatedPropHandlers,
-				final FilterSpec<Object> aggFilter) {
+				final FilterSpec<? extends Object> aggFilter) {
 
 			this.aggregationBranchLevel = 0;
 
@@ -1265,9 +1265,10 @@ class QueryBuilder {
 			final Map<String, List<AggregatePropertyHandler>>
 			aggregatePropHandlers = new HashMap<>();
 			int branchKeyDisc = 0;
-			final Map<FilterSpec<Object>, Integer> aggFilterDiscs =
+			final Map<FilterSpec<? extends Object>, Integer> aggFilterDiscs =
 				new HashMap<>();
-			final Map<String, FilterSpec<Object>> aggFilters = new HashMap<>();
+			final Map<String, FilterSpec<? extends Object>> aggFilters =
+				new HashMap<>();
 			for (final AggregatePropertyHandler propHandler :
 					prsrcHandler.getAggregateProperties()) {
 				final String propPath =
@@ -1275,7 +1276,7 @@ class QueryBuilder {
 				if (!ctx.isSelected(propPath, propHandler))
 					continue;
 				List<AggregatePropertyHandler> phList = null;
-				final FilterSpec<Object> aggFilter =
+				final FilterSpec<? extends Object> aggFilter =
 					ctx.getAggregateFilter(propPath);
 				if (propHandler.getKeyPropertyName() != null) {
 					final String branchKey =
@@ -2433,7 +2434,7 @@ class QueryBuilder {
 			final QueryBuilderContext ctx,
 			final PersistentResourceHandler<?> prsrcHandler,
 			final List<AggregatePropertyHandler> propHandlers,
-			final FilterSpec<Object> aggFilter) {
+			final FilterSpec<? extends Object> aggFilter) {
 
 		// get collection property path
 		final String collectionPropPath =

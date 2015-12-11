@@ -332,7 +332,7 @@ class PersistentResourceFetchImpl<R>
 				return Collections.emptySortedMap();
 			}
 			@Override
-			public FilterSpec<Object> getAggregateFilter(
+			public FilterSpec<? extends Object> getAggregateFilter(
 					final String propPath) {
 				return propsFetch.getAggregateFilter(propPath);
 			}

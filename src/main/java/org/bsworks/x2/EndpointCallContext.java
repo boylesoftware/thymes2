@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.regex.Pattern;
 
 import org.bsworks.x2.resource.FilterSpecBuilder;
@@ -110,6 +111,20 @@ public interface EndpointCallContext {
 	 * @return The parameter values, or {@code null} if not present.
 	 */
 	String[] getRequestParamValues(String name);
+
+	/**
+	 * Get all HTTP request parameters as a sorted map with parameter names as
+	 * keys sorted in natural string order.
+	 *
+	 * <p>The initial call to this method builds the tree and may be relatively
+	 * expensive. However, once built, the context caches the tree and
+	 * subsequent calls to this method simply return it.
+	 *
+	 * @return Unmodifiable map with parameter names as keys and parameter
+	 * values as values. The values are never {@code null} nor empty arrays.
+	 * That is the value arrays always have at least one element.
+	 */
+	SortedMap<String, String[]> getRequestParamsTree();
 
 	/**
 	 * Get HTTP request header value.

@@ -4,10 +4,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,6 +32,7 @@ import org.bsworks.x2.resource.PropertiesFetchSpec;
 import org.bsworks.x2.resource.PropertiesFetchSpecBuilder;
 import org.bsworks.x2.resource.PropertyValueFunction;
 import org.bsworks.x2.resource.RangeSpec;
+import org.bsworks.x2.resource.ResourceHandler;
 import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.resource.SortDirection;
 import org.bsworks.x2.responses.NotModifiedResponse;
@@ -150,49 +153,71 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	extends AbstractPersistentResourceEndpointCallHandler<R, Void> {
 
 	/**
-	 * Name of request parameter used to specify properties to include in
-	 * {@link PropertiesFetchSpec}.
+	 * Name of request parameter used to specify what resource properties to
+	 * include/exclude in the fetch.
 	 */
-	public static final String INCLUDE_PROPS_FETCH_PARAM = "i";
+	public static final String PROPS_FETCH_PARAM = "p";
 
 	/**
-	 * Name of request parameter used to specify properties to exclude from
-	 * {@link PropertiesFetchSpec}.
+	 * Regular expression used to parse properties fetch specification
+	 * parameter.
 	 */
-	public static final String EXCLUDE_PROPS_FETCH_PARAM = "x";
+	private static final Pattern PROPS_FETCH_PARAM_PATTERN = Pattern.compile(
+			"(?:^|\\G(?<!^),)"
+			+ "(\\*|-?([a-z]\\w*(?:\\.[a-z]\\w*)*)"
+			+ "(?:\\.\\*|/([a-z][a-z_0-9]*))?)");
+
+	/**
+	 * Name of request parameter used for the deprecated way of specifying
+	 * property inclusion rules.
+	 */
+	@Deprecated
+	private static final String INCLUDE_PROPS_FETCH_PARAM = "i";
+
+	/**
+	 * Name of request parameter used for the deprecated way of specifying
+	 * property exclusion rules.
+	 */
+	@Deprecated
+	private static final String EXCLUDE_PROPS_FETCH_PARAM = "x";
 
 	/**
 	 * Regular expression used to match names of request parameters used to
 	 * specify {@link FilterSpec}.
 	 */
-	public static final String FILTER_PARAM_RE = "f\\d*";
+	private static final String FILTER_PARAM_RE = "f\\d*";
 
 	/**
 	 * Name of request parameter used to specify the mode of combining filter
 	 * conditions in a group.
 	 */
-	public static final String FILTER_COMB_PARAM = "fj";
+	private static final String FILTER_COMB_PARAM = "fj";
 
 	/**
-	 * Name of request parameter used to specify {@link OrderSpec}.
+	 * Name of request parameter used to specify the search request result
+	 * sorting.
 	 */
 	public static final String ORDER_PARAM = "o";
 
 	/**
-	 * Name of request parameter used to specify segments in the
-	 * {@link OrderSpec}.
+	 * Name of request parameter used for the deprecated way of specifying
+	 * ordering segments.
 	 */
-	public static final String SPLIT_PARAM = "s";
+	@Deprecated
+	private static final String SPLIT_PARAM = "s";
 
 	/**
-	 * Name of request parameter used to specify {@link RangeSpec}.
+	 * Name of request parameter used to specify the search request result
+	 * range.
 	 */
 	public static final String RANGE_PARAM = "r";
 
 	/**
-	 * Name of request parameter used to specify {@link RefsFetchSpec}.
+	 * Name of request parameter used for the deprecated way of specifying
+	 * fetched referred resources.
 	 */
-	public static final String REFS_FETCH_PARAM = "e";
+	@Deprecated
+	private static final String REFS_FETCH_PARAM = "e";
 
 
 	/**
@@ -290,27 +315,77 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			final Void requestEntity)
 		throws EndpointCallErrorException {
 
+		// create collector for additional filters
+		final Map<String, FilterSpecBuilder<? extends Object>> addlFilters =
+			new HashMap<>();
+
+		// get properties fetch specification
+		final String propsFetchParam =
+			StringUtils.nullIfEmpty(ctx.getRequestParam(PROPS_FETCH_PARAM));
+		final PropertiesFetchSpecBuilder<R> propsFetch;
+		if (propsFetchParam != null) {
+			propsFetch = ctx.getPropertiesFetchSpec(this.prsrcClass);
+			try {
+				this.parsePropertiesFetchParam(ctx, propsFetch, propsFetchParam,
+						addlFilters);
+			} catch (final InvalidSpecificationException e) {
+				if (this.log.isDebugEnabled())
+					this.log.debug("invalid properties fetch specification"
+							+ " request parameter", e);
+				throw new EndpointCallErrorException(
+						HttpServletResponse.SC_BAD_REQUEST, null,
+						"Invalid \"" + PROPS_FETCH_PARAM
+						+ "\" request parameter.");
+			}
+		} else {
+			propsFetch = this.getDeprecatedPropertiesFetchSpec(ctx);
+		}
+
+		// get requested record id
+		final Object recId = this.getAddressedRecordId(ctx);
+
+		// record request?
+		if (recId != null) {
+
+			// parse any additional filters
+			this.parseAdditionalFilters(ctx, addlFilters);
+
+			// referred resource records requested?
+			if ((propsFetch != null)
+					&& !propsFetch.getFetchedRefProperties().isEmpty())
+				return this.handleGetWithRefsCall(ctx, recId, propsFetch);
+
+			// simple record request
+			return this.handleSimpleGetCall(ctx, recId, propsFetch);
+		}
+
+		// search request:
+
+		// get order specification
+		final String orderParam =
+			StringUtils.nullIfEmpty(ctx.getRequestParam(ORDER_PARAM));
+		final String deprecatedSplitParam =
+			StringUtils.nullIfEmpty(ctx.getRequestParam(SPLIT_PARAM));
+		final OrderSpecBuilder<R> order;
+		if ((orderParam != null) || (deprecatedSplitParam != null)) {
+			order = ctx.getOrderSpec(this.prsrcClass);
+			// TODO:...
+		} else {
+			order = null;
+		}
+
 		// get fetch configuration from the request parameters
-		PropertiesFetchSpecBuilder<R> propsFetch = null;
 		FilterSpecBuilder<R> filter = null;
-		OrderSpecBuilder<R> order = null;
 		RangeSpec range = null;
 		for (final String paramName : ctx.getRequestParamNames()) {
 			;//...
 		}
 
 		// get fetch configuration using deprecated method
-		if (propsFetch == null)
-			propsFetch = this.getDeprecatedPropertiesFetchSpec(ctx);
 		if (filter == null)
 			filter = this.getDeprecatedFilterSpec(ctx);
-		if (order == null)
-			order = this.getDeprecatedOrderSpec(ctx);
 		if (range == null)
 			range = this.getDeprecatedRangeSpec(ctx);
-
-		// get requested record id
-		final Object recId = this.getAddressedRecordId(ctx);
 
 		// handle different types of calls
 		if (recId == null)
@@ -502,6 +577,109 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	}
 
 	/**
+	 * Parse properties fetch parameter value.
+	 *
+	 * @param ctx Call context.
+	 * @param propsFetch Properties fetch specification builder.
+	 * @param paramValue The parameter value.
+	 * @param addlFilters Map, to which to add aggregate property filters if
+	 * any.
+	 */
+	private void parsePropertiesFetchParam(
+			final EndpointCallContext ctx,
+			final PropertiesFetchSpecBuilder<R> propsFetch,
+			final String paramValue,
+			final Map<String, FilterSpecBuilder<? extends Object>>
+			addlFilters) {
+
+		int lastMatchEnd = -1;
+		for (final Matcher m = PROPS_FETCH_PARAM_PATTERN.matcher(paramValue);
+				m.find(); lastMatchEnd = m.end()) {
+			final String fullMatch = m.group(1);
+			final String propPath = m.group(2);
+			final String filterKey = m.group(3);
+			if (fullMatch.equals("*")) {
+				propsFetch.includeByDefault();
+			} else if (fullMatch.startsWith("-")) {
+				if (filterKey != null)
+					throw new InvalidSpecificationException(
+							"Exclusion rule for filtered aggregate property.");
+				if (fullMatch.endsWith(".*"))
+					propsFetch.excludeProperties(propPath);
+				else
+					propsFetch.exclude(propPath);
+			} else {
+				if (filterKey != null) {
+					FilterSpecBuilder<? extends Object> filter =
+						addlFilters.get(filterKey);
+					if (filter == null) {
+						final Class<?> aggRsrcClass;
+						try {
+							aggRsrcClass = (
+								(ResourceHandler<?>)
+								(
+									(AggregatePropertyHandler)
+									this.prsrcHandler
+										.getPersistentPropertyChain(propPath)
+										.getLast()
+								).getAggregatedCollectionHandler()
+							).getResourceClass();
+						} catch (final ClassCastException e) {
+							throw new InvalidSpecificationException(
+									"Invalid filtered aggregate property path.",
+									e);
+						}
+						addlFilters.put(filterKey,
+								filter = ctx.getFilterSpec(aggRsrcClass));
+					}
+					propsFetch.includeFilteredAggregate(propPath, filter);
+				} else if (fullMatch.endsWith(".*"))
+					propsFetch.fetch(propPath);
+				else
+					propsFetch.include(propPath);
+			}
+		}
+		if (lastMatchEnd != paramValue.length())
+			throw new InvalidSpecificationException(
+					"Specification parsing error.");
+	}
+
+	private void parseOrderParam(
+			final EndpointCallContext ctx,
+			final OrderSpecBuilder<R> order,
+			final String paramValue,
+			final Map<String, FilterSpecBuilder<? extends Object>>
+			addlFilters) {
+	}
+
+	/**
+	 * Parse all additional filters in the request.
+	 *
+	 * @param ctx Call context.
+	 * @param addlFilters Map with additional filter builders by filter keys.
+	 */
+	private void parseAdditionalFilters(
+			final EndpointCallContext ctx,
+			final Map<String, FilterSpecBuilder<? extends Object>>
+			addlFilters) {
+
+		for (final Map.Entry<String, FilterSpecBuilder<? extends Object>> entry
+				: addlFilters.entrySet())
+			this.parseFilterParams(ctx, entry.getValue(), entry.getKey());
+	}
+
+	private void parseFilterParams(
+			final EndpointCallContext ctx,
+			final FilterSpecBuilder<? extends Object> filter,
+			final String filterKey) {
+
+		final SortedMap<String, String[]> paramsTree =
+			ctx.getRequestParamsTree();
+
+		//...
+	}
+
+	/**
 	 * Add all dependent resource classes, fetched reference classes and their
 	 * dependent resource classes, other persistent resources that own requested
 	 * nested object properties and all resource classes used for calculation
@@ -591,6 +769,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 *
 	 * @throws EndpointCallErrorException If request parameters are invalid.
 	 */
+	@Deprecated
 	private PropertiesFetchSpecBuilder<R> getDeprecatedPropertiesFetchSpec(
 			final EndpointCallContext ctx)
 		throws EndpointCallErrorException {

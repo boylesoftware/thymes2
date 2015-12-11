@@ -63,5 +63,5 @@ public interface PropertiesFetchSpec<R> {
 	 *
 	 * @return Filter to use, or {@code null} if no filter.
 	 */
-	FilterSpec<Object> getAggregateFilter(String propPath);
+	FilterSpec<? extends Object> getAggregateFilter(String propPath);
 }

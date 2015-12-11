@@ -67,6 +67,11 @@ class EndpointCallContextImpl
 	private Collection<String> requestParamNamesRO = null;
 
 	/**
+	 * Read-only tree of parameters.
+	 */
+	private SortedMap<String, String[]> requestParamsTreeRO = null;
+
+	/**
 	 * HTTP response hooks.
 	 */
 	private List<EndpointCallHttpResponseHook> httpResponseHooks;
@@ -295,6 +300,28 @@ class EndpointCallContextImpl
 	public String[] getRequestParamValues(final String name) {
 
 		return this.httpRequest.getParameterValues(name);
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public SortedMap<String, String[]> getRequestParamsTree() {
+
+		if (this.requestParamsTreeRO == null) {
+			final SortedMap<String, String[]> tree = new TreeMap<>();
+			final Map<String, String[]> params =
+				this.httpRequest.getParameterMap();
+			if (params != null) for (final Map.Entry<String, String[]> entry :
+				params.entrySet()) {
+				final String[] vals = entry.getValue();
+				if ((vals != null) && (vals.length > 0))
+					tree.put(entry.getKey(), vals);
+			}
+			this.requestParamsTreeRO = Collections.unmodifiableSortedMap(tree);
+		}
+
+		return this.requestParamsTreeRO;
 	}
 
 	/* (non-Javadoc)
