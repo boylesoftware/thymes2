@@ -10,6 +10,7 @@ import java.util.TreeSet;
 
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.OrderSpecBuilder;
+import org.bsworks.x2.resource.OrderSpecElement;
 import org.bsworks.x2.resource.PropertyValueFunction;
 import org.bsworks.x2.resource.SortDirection;
 
@@ -32,24 +33,18 @@ class OrderSpecImpl<R>
 	/**
 	 * Specification elements.
 	 */
-	private final List<OrderSpecElementImpl> elements = new ArrayList<>();
+	private final List<OrderSpecElement> elements = new ArrayList<>();
 
 	/**
 	 * Read-only view of the specification elements.
 	 */
-	private final List<OrderSpecElementImpl> elementsRO =
+	private final List<OrderSpecElement> elementsRO =
 		Collections.unmodifiableList(this.elements);
 
 	/**
 	 * Segments.
 	 */
 	private final List<FilterSpec<R>> segments = new ArrayList<>();
-
-	/**
-	 * Read-only view of the segments.
-	 */
-	private final List<FilterSpec<R>> segmentsRO =
-		Collections.unmodifiableList(this.segments);
 
 	/**
 	 * Used property paths.
@@ -92,57 +87,9 @@ class OrderSpecImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public OrderSpecBuilder<R> add(final SortDirection dir,
-			final String propPath) {
-
-		return this.add(dir, propPath, PropertyValueFunction.PLAIN);
-	}
-
-	/* (non-Javadoc)
-	 * See overridden method.
-	 */
-	@Override
-	public OrderSpecBuilder<R> add(final SortDirection dir,
-			final String propPath, final PropertyValueFunction func,
-			final Object... funcParams) {
-
-		this.elements.add(new OrderSpecElementImpl(dir, this.prsrcHandler,
-				propPath, func, funcParams, this.prsrcClasses));
-
-		this.usedProps.add(propPath);
-
-		return this;
-	}
-
-	/* (non-Javadoc)
-	 * See overridden method.
-	 */
-	@Override
-	public OrderSpecBuilder<R> addSegment(final FilterSpec<R> split) {
-
-		this.segments.add(split);
-
-		this.prsrcClasses.addAll(split.getParticipatingPersistentResources());
-
-		return this;
-	}
-
-	/* (non-Javadoc)
-	 * See overridden method.
-	 */
-	@Override
-	public List<OrderSpecElementImpl> getElements() {
+	public List<OrderSpecElement> getElements() {
 
 		return this.elementsRO;
-	}
-
-	/* (non-Javadoc)
-	 * See overridden method.
-	 */
-	@Override
-	public List<FilterSpec<R>> getSegments() {
-
-		return this.segmentsRO;
 	}
 
 	/* (non-Javadoc)
@@ -179,5 +126,48 @@ class OrderSpecImpl<R>
 	public Set<Class<?>> getParticipatingPersistentResources() {
 
 		return this.prsrcClassesRO;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public OrderSpecBuilder<R> add(final SortDirection dir,
+			final String propPath) {
+
+		return this.add(dir, propPath, PropertyValueFunction.PLAIN);
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public OrderSpecBuilder<R> add(final SortDirection dir,
+			final String propPath, final PropertyValueFunction func,
+			final Object... funcParams) {
+
+		this.elements.add(new PropertyOrderSpecElementImpl(dir,
+				this.prsrcHandler, propPath, func, funcParams,
+				this.prsrcClasses));
+
+		this.usedProps.add(propPath);
+
+		return this;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public OrderSpecBuilder<R> addSegment(final SortDirection dir,
+			final FilterSpec<R> split) {
+
+		this.elements.add(new SegmentOrderSpecElementImpl(dir, split));
+
+		this.segments.add(split);
+
+		this.prsrcClasses.addAll(split.getParticipatingPersistentResources());
+
+		return this;
 	}
 }

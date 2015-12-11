@@ -8,7 +8,7 @@ import org.bsworks.x2.resource.AggregatePropertyHandler;
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
 import org.bsworks.x2.resource.InvalidSpecificationException;
 import org.bsworks.x2.resource.ObjectPropertyHandler;
-import org.bsworks.x2.resource.OrderSpecElement;
+import org.bsworks.x2.resource.PropertyOrderSpecElement;
 import org.bsworks.x2.resource.PropertyValueFunction;
 import org.bsworks.x2.resource.RefPropertyHandler;
 import org.bsworks.x2.resource.ResourcePropertyHandler;
@@ -16,12 +16,12 @@ import org.bsworks.x2.resource.SortDirection;
 
 
 /**
- * Order specification element implementation.
+ * Property order specification element implementation.
  *
  * @author Lev Himmelfarb
  */
-class OrderSpecElementImpl
-	implements OrderSpecElement {
+class PropertyOrderSpecElementImpl
+	implements PropertyOrderSpecElement {
 
 	/**
 	 * Empty value transformation function parameters.
@@ -69,7 +69,7 @@ class OrderSpecElementImpl
 	 *
 	 * @throws InvalidSpecificationException If the specification is invalid.
 	 */
-	OrderSpecElementImpl(final SortDirection dir,
+	PropertyOrderSpecElementImpl(final SortDirection dir,
 			final PersistentResourceHandlerImpl<?> prsrcHandler,
 			final String propPath, final PropertyValueFunction func,
 			final Object[] funcParams, final Set<Class<?>> prsrcClasses) {

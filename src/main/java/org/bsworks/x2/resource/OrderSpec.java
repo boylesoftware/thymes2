@@ -26,15 +26,7 @@ public interface OrderSpec<R> {
 	 * @return Unmodifiable list of order specification elements. May be empty,
 	 * but never {@code null}.
 	 */
-	List<? extends OrderSpecElement> getElements();
-
-	/**
-	 * Get segments.
-	 *
-	 * @return Unmodifiable list of segment splits. May be empty, but never
-	 * {@code null}.
-	 */
-	List<FilterSpec<R>> getSegments();
+	List<OrderSpecElement> getElements();
 
 	/**
 	 * Tell if the order specification is empty, that is no ordering rule has

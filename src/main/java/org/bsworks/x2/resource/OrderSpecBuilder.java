@@ -52,20 +52,16 @@ public interface OrderSpecBuilder<R>
 			PropertyValueFunction func, Object... funcParams);
 
 	/**
-	 * Add segmentation by the specified condition. Adding a segment splits the
-	 * result list in two: all records, for which the condition is false appear
-	 * first, followed by all records, for which the condition is true. This is
-	 * achieved by including ordering by the result of the condition evaluation.
-	 * Multiple segments can be added to create sub-segmentation.
+	 * Add segmentation by the specified condition. Adding a segment sorts the
+	 * records around the filter split point: in ascending order, records that
+	 * are not included by the filter appear before the records that are
+	 * included.
 	 *
-	 * <p>Note, that segmentation is always performed before sorting specified
-	 * by the {@link #add(SortDirection, String)} method calls.
-	 *
-	 * @param split Filter specification that expresses the segment split
-	 * condition. Records included by the filter will appear after the records
-	 * excluded by the filter.
+	 * @param dir Sort direction.
+	 * @param split Filter specification that defines the segment split
+	 * condition.
 	 *
 	 * @return This order specification object (for chaining).
 	 */
-	OrderSpecBuilder<R> addSegment(FilterSpec<R> split);
+	OrderSpecBuilder<R> addSegment(SortDirection dir, FilterSpec<R> split);
 }
