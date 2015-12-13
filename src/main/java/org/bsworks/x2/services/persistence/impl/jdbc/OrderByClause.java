@@ -11,7 +11,6 @@ import org.bsworks.x2.resource.PropertyOrderSpecElement;
 import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.resource.SegmentOrderSpecElement;
 import org.bsworks.x2.resource.SortDirection;
-import org.bsworks.x2.services.persistence.PersistentValueType;
 import org.bsworks.x2.util.sql.dialect.SQLDialect;
 
 
@@ -124,32 +123,10 @@ class OrderByClause {
 				usedJoins.add(propPathPrefix);
 		} while ((dotInd = propPathBuf.lastIndexOf(".")) > 0);
 
-		// get value expression
-		final Object[] funcParams = orderEl.getValueFunctionParams();
-		switch (orderEl.getValueFunction()) {
-		case LENGTH:
-			return dialect.stringLength(
-					prop.getValueType() == PersistentValueType.STRING ?
-					prop.getValueExpression() :
-					dialect.castToString(prop.getValueExpression())
-			);
-		case SUBSTRING:
-			return dialect.stringSubstring(
-					(prop.getValueType() == PersistentValueType.STRING ?
-						prop.getValueExpression() :
-						dialect.castToString(prop.getValueExpression())),
-					((Integer) funcParams[0]).intValue(),
-					((Integer) funcParams[1]).intValue());
-		case LPAD:
-			return dialect.stringLeftPad(
-					(prop.getValueType() == PersistentValueType.STRING ?
-						prop.getValueExpression() :
-						dialect.castToString(prop.getValueExpression())),
-					((Integer) funcParams[0]).intValue(),
-					((Character) funcParams[1]).charValue());
-		default:
-			return prop.getValueExpression();
-		}
+		// get and return value expression
+		return Utils.getTransformedValueExpression(dialect,
+				prop.getValueExpression(), prop.getValueType(),
+				orderEl.getValueFunction(), orderEl.getValueFunctionParams());
 	}
 
 	/**

@@ -14,6 +14,11 @@ public enum PropertyValueFunction {
 	PLAIN(new Class<?>[] {}),
 
 	/**
+	 * Lower-case value string representation.
+	 */
+	LOWERCASE(new Class<?>[] {}),
+
+	/**
 	 * Value string representation length.
 	 */
 	LENGTH(new Class<?>[] {}),

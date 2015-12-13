@@ -19,7 +19,6 @@ import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.bsworks.x2.Actor;
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
 import org.bsworks.x2.resource.FilterConditionType;
@@ -28,6 +27,7 @@ import org.bsworks.x2.resource.MetaPropertyHandler;
 import org.bsworks.x2.resource.MetaPropertyType;
 import org.bsworks.x2.resource.ObjectPropertyHandler;
 import org.bsworks.x2.resource.PersistentResourceHandler;
+import org.bsworks.x2.resource.PropertyValueFunction;
 import org.bsworks.x2.resource.Ref;
 import org.bsworks.x2.resource.RefPropertyHandler;
 import org.bsworks.x2.resource.ResourcePropertiesContainer;
@@ -1002,8 +1002,8 @@ class UpdateBuilder {
 								.getFilterSpec(depRefClass)
 								.addCondition(
 										depRefHandler.getIdProperty().getName(),
-										FilterConditionType.EQ,
-										false,
+										PropertyValueFunction.PLAIN, null,
+										FilterConditionType.EQ, false,
 										ids.toArray(new Object[ids.size()])))));
 		}
 

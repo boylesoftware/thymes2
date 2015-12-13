@@ -21,6 +21,16 @@ public interface FilterCondition {
 	/**
 	 * Tell if the condition is negated.
 	 *
+	 * <p>There is an important difference between a negated condition and a
+	 * condition that uses an inverse condition type (see
+	 * {@link FilterConditionType#inverse()}). The difference only manifests
+	 * itself when the tested property path includes any collections. When a
+	 * negated condition is included, its meaning is interpreted as "records
+	 * with the collection that does not contain elements that satisfy the
+	 * condition". The a non-negated inverse condition is included, it is
+	 * interpreted as "records with the collection that contains elements that
+	 * do not satisfy the condition".
+	 *
 	 * @return {@code true} if negated.
 	 */
 	boolean isNegated();
@@ -39,6 +49,21 @@ public interface FilterCondition {
 	 * {@link FilterConditionOperandType#CONSTANT}.
 	 */
 	FilterConditionOperandType getPropertyValueType();
+
+	/**
+	 * Get function for the tested property value transformation.
+	 *
+	 * @return The value transformation function.
+	 */
+	PropertyValueFunction getValueFunction();
+
+	/**
+	 * Get tested property value transformation function parameters.
+	 *
+	 * @return The parameters, specific for the function returned by
+	 * {@link #getValueFunction()}. May be empty but never {@code null}.
+	 */
+	Object[] getValueFunctionParams();
 
 	/**
 	 * Get chain of property handlers leading to the property tested by the

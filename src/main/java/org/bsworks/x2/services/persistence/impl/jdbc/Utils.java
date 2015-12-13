@@ -8,8 +8,11 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.logging.Log;
 import org.bsworks.x2.resource.PersistentResourceHandler;
+import org.bsworks.x2.resource.PropertyValueFunction;
 import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.services.persistence.PersistenceException;
+import org.bsworks.x2.services.persistence.PersistentValueType;
+import org.bsworks.x2.util.sql.dialect.SQLDialect;
 
 
 /**
@@ -141,5 +144,73 @@ final class Utils {
 		m.appendTail(resBuf);
 
 		return resBuf.toString();
+	}
+
+	/**
+	 * Apply transformation function to the specified value expression.
+	 *
+	 * @param dialect SQL dialect.
+	 * @param valueExpr Value expression.
+	 * @param valueType Value expression type.
+	 * @param func Transformation function.
+	 * @param funcParams Transformation function parameters.
+	 *
+	 * @return Transformed value expression.
+	 */
+	static String getTransformedValueExpression(final SQLDialect dialect,
+			final String valueExpr, final PersistentValueType valueType,
+			final PropertyValueFunction func, final Object[] funcParams) {
+
+		switch (func) {
+		case LENGTH:
+			return dialect.stringLength(
+					valueType == PersistentValueType.STRING ?
+					valueExpr : dialect.castToString(valueExpr)
+			);
+		case LOWERCASE:
+			return dialect.stringLowercase(
+					valueType == PersistentValueType.STRING ?
+					valueExpr : dialect.castToString(valueExpr)
+			);
+		case SUBSTRING:
+			return dialect.stringSubstring(
+					(valueType == PersistentValueType.STRING ?
+						valueExpr : dialect.castToString(valueExpr)),
+					((Integer) funcParams[0]).intValue(),
+					((Integer) funcParams[1]).intValue());
+		case LPAD:
+			return dialect.stringLeftPad(
+					(valueType == PersistentValueType.STRING ?
+						valueExpr : dialect.castToString(valueExpr)),
+					((Integer) funcParams[0]).intValue(),
+					((Character) funcParams[1]).charValue());
+		default:
+			return valueExpr;
+		}
+	}
+
+	/**
+	 * Get resulting persistent value type after applying the specified value
+	 * transformation function to the input of the specified type.
+	 *
+	 * @param valueType The input type.
+	 * @param func The function.
+	 *
+	 * @return The result type.
+	 */
+	static PersistentValueType getTransformedValueType(
+			final PersistentValueType valueType,
+			final PropertyValueFunction func) {
+
+		switch (func) {
+		case LENGTH:
+			return PersistentValueType.NUMERIC;
+		case LOWERCASE:
+		case SUBSTRING:
+		case LPAD:
+			return PersistentValueType.STRING;
+		default:
+			return valueType;
+		}
 	}
 }

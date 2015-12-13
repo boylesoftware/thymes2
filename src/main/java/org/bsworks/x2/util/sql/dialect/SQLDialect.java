@@ -78,6 +78,18 @@ public interface SQLDialect {
 	String stringLength(String valExpr);
 
 	/**
+	 * Get SQL expression for getting the lower-case representation of the
+	 * specified string expression result.
+	 *
+	 * @param valExpr Value expression, must be usable by SQL string lower-case
+	 * function.
+	 *
+	 * @return SQL expression for the value expression's lower-case
+	 * representation.
+	 */
+	String stringLowercase(String valExpr);
+
+	/**
 	 * Get SQL expression that pads the result of the specified expression on
 	 * the left with the specified character to make it at least the specified
 	 * length.

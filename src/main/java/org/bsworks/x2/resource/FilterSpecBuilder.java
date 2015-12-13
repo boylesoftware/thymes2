@@ -67,9 +67,13 @@ public interface FilterSpecBuilder<R>
 	 * intermediate references. If the property at the end of the path is a map,
 	 * it can be suffixed with "/key" to use the element key as the value to
 	 * test.
+	 * @param func Property value transformation function.
+	 * @param funcParams Parameters for the value transformation function. May
+	 * be {@code null} if the function takes no parameters.
 	 * @param type The condition type.
 	 * @param negate {@code true} to negate the condition. Mostly useful if the
-	 * property path contains collections.
+	 * property path contains collections (see notes for
+	 * {@link FilterCondition#isNegated()}).
 	 * @param operands Operands, against which the condition tests the property
 	 * value. {@link FilterConditionType#EMPTY} and
 	 * {@link FilterConditionType#NOT_EMPTY} conditions do not take any
@@ -85,13 +89,15 @@ public interface FilterSpecBuilder<R>
 	 * @throws InvalidSpecificationException If something is wrong with the
 	 * condition specification.
 	 */
-	FilterSpecBuilder<R> addCondition(String propPath, FilterConditionType type,
-			boolean negate, Object... operands);
+	FilterSpecBuilder<R> addCondition(String propPath,
+			PropertyValueFunction func, Object[] funcParams,
+			FilterConditionType type, boolean negate, Object... operands);
 
 	/**
 	 * Shortcut for
-	 * {@link #addCondition(String, FilterConditionType, boolean, Object...)}
-	 * with "negate" parameter {@code false}.
+	 * {@link #addCondition(String, PropertyValueFunction, Object[], FilterConditionType, boolean, Object...)}
+	 * with value function {@link PropertyValueFunction#PLAIN} and "negate"
+	 * parameter {@code false}.
 	 *
 	 * @param propPath Property path.
 	 * @param type Condition type.

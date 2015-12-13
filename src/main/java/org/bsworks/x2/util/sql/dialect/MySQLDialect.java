@@ -68,6 +68,15 @@ class MySQLDialect
 	 * See overridden method.
 	 */
 	@Override
+	public String stringLowercase(final String valExpr) {
+
+		return "LOWER(" + valExpr + ")";
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public String stringLeftPad(final String valExpr, final int width,
 			final char paddingChar) {
 

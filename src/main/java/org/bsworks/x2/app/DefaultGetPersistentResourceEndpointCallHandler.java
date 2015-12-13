@@ -1,5 +1,6 @@
 package org.bsworks.x2.app;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -153,19 +154,95 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	extends AbstractPersistentResourceEndpointCallHandler<R, Void> {
 
 	/**
+	 * Property path regular expression.
+	 */
+	private static final String PROP_PATH_RE = "[a-z]\\w*(?:\\.[a-z]\\w*)*";
+
+	/**
+	 * Additional filter key regular expression.
+	 */
+	private static final String FILTER_KEY_RE = "[a-z][a-z_0-9]*";
+
+	/**
+	 * Property value function transformation specification regular expression.
+	 */
+	private static final String VALUE_FUNC_RE =
+			"(:len)"                             // +0. length
+			+ "|(:lc)"                           // +1. lower case
+			+ "|(:sub:(\\d+)(?::(\\d+))?)"       // +2. substring, from, length
+			+ "|(:lpad:(\\d+)(?::([^\\s,:]))?)"; // +5. left pad, width, char
+
+	/**
+	 * Number of groups in {@link #VALUE_FUNC_RE}.
+	 */
+	private static final int VALUE_FUNC_RE_NUM_GROUPS = 8;
+
+	/**
 	 * Name of request parameter used to specify what resource properties to
 	 * include/exclude in the fetch.
 	 */
 	public static final String PROPS_FETCH_PARAM = "p";
 
 	/**
-	 * Regular expression used to parse properties fetch specification
-	 * parameter.
+	 * Pattern used to parse properties fetch specification parameter.
 	 */
 	private static final Pattern PROPS_FETCH_PARAM_PATTERN = Pattern.compile(
 			"(?:^|\\G(?<!^),)"
-			+ "(\\*|-?([a-z]\\w*(?:\\.[a-z]\\w*)*)"
-			+ "(?:\\.\\*|/([a-z][a-z_0-9]*))?)");
+			+ "(\\*|-?"                             // 1. full element
+				+ "(" + PROP_PATH_RE + ")"          // 2. property path
+				+ "(?:"
+					+ "\\.\\*"
+					+ "|/(" + FILTER_KEY_RE + ")"   // 3. filter key
+				+ ")?"
+			+ ")");
+
+	/**
+	 * Name of request parameter used to specify the search request result
+	 * sorting.
+	 */
+	public static final String ORDER_PARAM = "o";
+
+	/**
+	 * Pattern used to parse order specification parameter.
+	 */
+	private static final Pattern ORDER_PARAM_PATTERN = Pattern.compile(
+			"(?:^|\\G(?<!^),)"
+			+ "(?:"
+				+ "\\$(" + FILTER_KEY_RE + ")"      // 1. segment filter key
+				+ "|(" + PROP_PATH_RE + "(?:/id)?)" // 2. property path
+					+ "(?:" + VALUE_FUNC_RE + ")?"  // 3-10. value function
+			+ ")"
+			+ "(?::(asc|desc))?");                  // 11. sort direction
+
+	/**
+	 * Main filter key.
+	 */
+	public static final String MAIN_FILTER_KEY = "f";
+
+	/**
+	 * Pattern used to parse filter specification element parameter name.
+	 */
+	private static final Pattern FILTER_PARAM_NAME_PATTERN = Pattern.compile(
+			"(" + FILTER_KEY_RE + "(?:\\.[a-z_0-9]+)*)\\$" // 1. group key
+			+ "(?:"
+				+ "(" + PROP_PATH_RE + "(?:/id|/key)?)"    // 2. property path
+				+ "(?: " + VALUE_FUNC_RE + ")"             // 3-10. value func
+				+ "("                                      // 11. test:
+					+ ":min"                               // minimum
+					+ "|:max"                              // maximum
+					+ "|:pat"                              // RE pattern match
+					+ "|:sub"                              // contains substring
+					+ "|:pre"                              // starts with
+					+ "|:alt"                              // one of
+				+ ")?"
+				+ "(!)?"                                   // 12. negation
+			+ ")?");
+
+	/**
+	 * Name of request parameter used to specify the search request result
+	 * range.
+	 */
+	public static final String RANGE_PARAM = "r";
 
 	/**
 	 * Name of request parameter used for the deprecated way of specifying
@@ -182,53 +259,30 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	private static final String EXCLUDE_PROPS_FETCH_PARAM = "x";
 
 	/**
-	 * Regular expression used to match names of request parameters used to
-	 * specify {@link FilterSpec}.
+	 * Regular expression used to match names of request parameters used the
+	 * deprecated way of specifying the filter.
 	 */
+	@Deprecated
 	private static final String FILTER_PARAM_RE = "f\\d*";
 
 	/**
-	 * Name of request parameter used to specify the mode of combining filter
-	 * conditions in a group.
-	 */
-	private static final String FILTER_COMB_PARAM = "fj";
-
-	/**
-	 * Name of request parameter used to specify the search request result
-	 * sorting.
-	 */
-	public static final String ORDER_PARAM = "o";
-
-	/**
-	 * Name of request parameter used for the deprecated way of specifying
-	 * ordering segments.
+	 * Pattern for deprecated filter condition parameter names.
 	 */
 	@Deprecated
-	private static final String SPLIT_PARAM = "s";
-
-	/**
-	 * Name of request parameter used to specify the search request result
-	 * range.
-	 */
-	public static final String RANGE_PARAM = "r";
-
-	/**
-	 * Name of request parameter used for the deprecated way of specifying
-	 * fetched referred resources.
-	 */
-	@Deprecated
-	private static final String REFS_FETCH_PARAM = "e";
-
-
-	/**
-	 * Pattern for filter condition parameter names.
-	 */
 	private static final Pattern FILTER_PARAM_PATTERN =
 		Pattern.compile(FILTER_PARAM_RE);
 
 	/**
-	 * Pattern for filter condition parameters.
+	 * Name of request parameter used to specify the mode of combining filter
+	 * conditions in a group in the deprecated way of specifying the filter.
 	 */
+	@Deprecated
+	private static final String FILTER_COMB_PARAM = "fj";
+
+	/**
+	 * Pattern for deprecated filter condition parameters.
+	 */
+	@Deprecated
 	private static final Pattern FILTER_COND_PATTERN = Pattern.compile(
 			// 1. property path(s)
 			"([a-z]\\w*(?:\\.[a-z]\\w*)*(?:/id|/key)?"
@@ -247,17 +301,18 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			+ ")", Pattern.CASE_INSENSITIVE);
 
 	/**
-	 * Pattern for order specification element.
+	 * Name of request parameter used for the deprecated way of specifying
+	 * ordering segments.
 	 */
-	private static final Pattern ORDER_SPEC_PATTERN = Pattern.compile(
-			"([a-z]\\w*(?:\\.[a-z]\\w*)*(?:/id)?)"  // 1. property path
-			+ "(?:"
-				+ "(:len)"                          // 2. length
-				+ "|(:sub:(\\d+)(?::(\\d+))?)"      // 3. sub, 4. from, 5. len
-				+ "|(:lpad:(\\d+)(?::([^\\s,:]))?)" // 6. lpad, 7. wdth, 8. char
-			+ ")?"
-			+ "(?::(asc|desc))?",                   // 9. sort direction
-			Pattern.CASE_INSENSITIVE);
+	@Deprecated
+	private static final String SPLIT_PARAM = "s";
+
+	/**
+	 * Name of request parameter used for the deprecated way of specifying
+	 * fetched referred resources.
+	 */
+	@Deprecated
+	private static final String REFS_FETCH_PARAM = "e";
 
 
 	/**
@@ -306,6 +361,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 
 		return true;
 	}
+
 
 	/* (non-Javadoc)
 	 * See overridden method.
@@ -364,36 +420,588 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 		// get order specification
 		final String orderParam =
 			StringUtils.nullIfEmpty(ctx.getRequestParam(ORDER_PARAM));
-		final String deprecatedSplitParam =
-			StringUtils.nullIfEmpty(ctx.getRequestParam(SPLIT_PARAM));
+		final String[] deprecatedSplitParams =
+			ctx.getRequestParamValues(SPLIT_PARAM);
 		final OrderSpecBuilder<R> order;
-		if ((orderParam != null) || (deprecatedSplitParam != null)) {
+		if ((orderParam != null)
+				|| ((deprecatedSplitParams != null)
+						&& (deprecatedSplitParams.length > 0))) {
 			order = ctx.getOrderSpec(this.prsrcClass);
-			// TODO:...
+			if ((deprecatedSplitParams != null)
+					&& (deprecatedSplitParams.length > 0))
+				this.parseDeprecatedSplitParam(ctx, order,
+						deprecatedSplitParams);
+			if (orderParam != null) {
+				try {
+					this.parseOrderParam(ctx, order, orderParam, addlFilters);
+				} catch (final InvalidSpecificationException e) {
+					if (this.log.isDebugEnabled())
+						this.log.debug("invalid order specification request"
+								+ " parameter", e);
+					throw new EndpointCallErrorException(
+							HttpServletResponse.SC_BAD_REQUEST, null,
+							"Invalid \"" + ORDER_PARAM
+							+ "\" request parameter.");
+				}
+			}
 		} else {
 			order = null;
 		}
 
-		// get fetch configuration from the request parameters
-		FilterSpecBuilder<R> filter = null;
-		RangeSpec range = null;
-		for (final String paramName : ctx.getRequestParamNames()) {
-			;//...
+		// parse any additional filters
+		this.parseAdditionalFilters(ctx, addlFilters);
+
+		// get main filter
+		FilterSpecBuilder<R> filter = ctx.getFilterSpec(this.prsrcClass);
+		try {
+			this.parseFilterParams(ctx, filter, MAIN_FILTER_KEY);
+			if (filter.isEmpty())
+				filter = null;
+		} catch (final InvalidSpecificationException e) {
+			if (this.log.isDebugEnabled())
+				this.log.debug("invalid main filter specification request"
+						+ " parameters", e);
+			throw new EndpointCallErrorException(
+					HttpServletResponse.SC_BAD_REQUEST, null,
+					"Invalid filter specification request parameters.");
 		}
 
-		// get fetch configuration using deprecated method
+		// see if there is a deprecated filter specification
 		if (filter == null)
 			filter = this.getDeprecatedFilterSpec(ctx);
-		if (range == null)
-			range = this.getDeprecatedRangeSpec(ctx);
 
-		// handle different types of calls
-		if (recId == null)
-			return this.handleSearchCall(ctx, propsFetch, filter, order, range);
-		if ((propsFetch != null)
-				&& !propsFetch.getFetchedRefProperties().isEmpty())
-			return this.handleGetWithRefsCall(ctx, recId, propsFetch);
-		return this.handleSimpleGetCall(ctx, recId, propsFetch);
+		// get range specification
+		final String rangeParam = StringUtils.nullIfEmpty(
+				ctx.getRequestParam(RANGE_PARAM));
+		final RangeSpec range;
+		if (rangeParam != null) {
+			final int commaInd = rangeParam.indexOf(',');
+			try {
+				range = new RangeSpec(
+						Integer.parseInt(rangeParam.substring(0, commaInd)),
+						Integer.parseInt(rangeParam.substring(commaInd + 1)));
+			} catch (final InvalidSpecificationException | NumberFormatException
+					| IndexOutOfBoundsException e) {
+				if (this.log.isDebugEnabled())
+					this.log.debug("invalid range specification parameter", e);
+				throw new EndpointCallErrorException(
+						HttpServletResponse.SC_BAD_REQUEST, null,
+						"Invalid \"" + RANGE_PARAM + "\" request parameter.");
+			}
+		} else {
+			range = null;
+		}
+
+		// handle the search request
+		return this.handleSearchCall(ctx, propsFetch, filter, order, range);
+	}
+
+	/**
+	 * Parse all additional filters in the request.
+	 *
+	 * @param ctx Call context.
+	 * @param addlFilters Map with additional filter builders by filter keys.
+	 *
+	 * @throws EndpointCallErrorException If any of the additional filter
+	 * specification parameters are invalid.
+	 */
+	private void parseAdditionalFilters(
+			final EndpointCallContext ctx,
+			final Map<String, FilterSpecBuilder<? extends Object>>
+			addlFilters)
+		throws EndpointCallErrorException {
+
+		for (final Map.Entry<String, FilterSpecBuilder<? extends Object>> entry
+				: addlFilters.entrySet()) {
+			try {
+				this.parseFilterParams(ctx, entry.getValue(), entry.getKey());
+			} catch (final InvalidSpecificationException e) {
+				if (this.log.isDebugEnabled())
+					this.log.debug("invalid additional filter \""
+							+ entry.getKey() + "\" specification request"
+							+ " parameters", e);
+				throw new EndpointCallErrorException(
+						HttpServletResponse.SC_BAD_REQUEST, null,
+						"Invalid additional filter specification request"
+						+ " parameters.");
+			}
+		}
+	}
+
+	/**
+	 * Parse properties fetch parameter value.
+	 *
+	 * @param ctx Call context.
+	 * @param propsFetch Properties fetch specification builder.
+	 * @param paramValue The parameter value.
+	 * @param addlFilters Map, to which to add aggregate property filters if
+	 * any.
+	 */
+	private void parsePropertiesFetchParam(
+			final EndpointCallContext ctx,
+			final PropertiesFetchSpecBuilder<R> propsFetch,
+			final String paramValue,
+			final Map<String, FilterSpecBuilder<? extends Object>>
+			addlFilters) {
+
+		// extract elements
+		int lastMatchEnd = -1;
+		for (final Matcher m = PROPS_FETCH_PARAM_PATTERN.matcher(paramValue);
+				m.find(); lastMatchEnd = m.end()) {
+			final String fullMatch = m.group(1);
+			final String propPath = m.group(2);
+			final String filterKey = m.group(3);
+			if (fullMatch.equals("*")) {
+				propsFetch.includeByDefault();
+			} else if (fullMatch.startsWith("-")) {
+				if (filterKey != null)
+					throw new InvalidSpecificationException(
+							"Exclusion rule for filtered aggregate property.");
+				if (fullMatch.endsWith(".*"))
+					propsFetch.excludeProperties(propPath);
+				else
+					propsFetch.exclude(propPath);
+			} else {
+				if (filterKey != null) {
+					FilterSpecBuilder<? extends Object> filter =
+						addlFilters.get(filterKey);
+					if (filter == null) {
+						final Class<?> aggRsrcClass;
+						try {
+							aggRsrcClass = (
+								(ResourceHandler<?>)
+								(
+									(AggregatePropertyHandler)
+									this.prsrcHandler
+										.getPersistentPropertyChain(propPath)
+										.getLast()
+								).getAggregatedCollectionHandler()
+							).getResourceClass();
+						} catch (final ClassCastException e) {
+							throw new InvalidSpecificationException(
+									"Invalid filtered aggregate property path.",
+									e);
+						}
+						addlFilters.put(filterKey,
+								filter = ctx.getFilterSpec(aggRsrcClass));
+					}
+					propsFetch.includeFilteredAggregate(propPath, filter);
+				} else if (fullMatch.endsWith(".*"))
+					propsFetch.fetch(propPath);
+				else
+					propsFetch.include(propPath);
+			}
+		}
+		if (lastMatchEnd != paramValue.length())
+			throw new InvalidSpecificationException(
+					"Specification parsing error.");
+	}
+
+	/**
+	 * Parse order parameter value.
+	 *
+	 * @param ctx Call context.
+	 * @param order Order specification builder.
+	 * @param paramValue The parameter value.
+	 * @param addlFilters Map, to which to add order segmentation filters if
+	 * any.
+	 */
+	private void parseOrderParam(
+			final EndpointCallContext ctx,
+			final OrderSpecBuilder<R> order,
+			final String paramValue,
+			final Map<String, FilterSpecBuilder<? extends Object>>
+			addlFilters) {
+
+		// extract elements
+		int lastMatchEnd = -1;
+		for (final Matcher m = ORDER_PARAM_PATTERN.matcher(paramValue);
+				m.find(); lastMatchEnd = m.end()) {
+
+			// get order direction
+			final SortDirection dir = ("desc".equals(
+						m.group(3 + VALUE_FUNC_RE_NUM_GROUPS)) ?
+					SortDirection.DESC : SortDirection.ASC);
+
+			// test if segmentation element
+			final String splitFilterKey = m.group(1);
+			if (splitFilterKey != null) {
+
+				// get segment split
+				FilterSpecBuilder<R> split;
+				try {
+					split = this.castFilter(addlFilters.get(splitFilterKey));
+				} catch (final ClassCastException e) {
+					throw new InvalidSpecificationException("The segment filter"
+							+ " is for a wrong persistent resource.", e);
+				}
+				if (split == null)
+					addlFilters.put(splitFilterKey,
+							split = ctx.getFilterSpec(this.prsrcClass));
+
+				// add segment
+				order.addSegment(dir, split);
+
+			} else { // property element
+
+				// get property path
+				final String propPath = m.group(2);
+
+				// parse value transformation function if any
+				final List<Object> funcParams = new ArrayList<>();
+				final PropertyValueFunction func =
+					this.parseValueFunction(m, 3, funcParams);
+
+				// add order element
+				order.add(dir, propPath, func,
+						(funcParams.isEmpty() ? null :
+							funcParams.toArray(new Object[funcParams.size()])));
+			}
+		}
+		if (lastMatchEnd != paramValue.length())
+			throw new InvalidSpecificationException(
+					"Specification parsing error.");
+	}
+
+	private void parseFilterParams(
+			final EndpointCallContext ctx,
+			final FilterSpecBuilder<? extends Object> filter,
+			final String filterKey) {
+
+		// get relevant parameters
+		final SortedMap<String, String[]> params =
+			ctx.getRequestParamsTree().subMap(filterKey + "$", filterKey + "/");
+
+		// find and process filter specification elements
+		for (final Map.Entry<String, String[]> entry : params.entrySet()) {
+			final String paramName = entry.getKey();
+		}
+
+		//...
+	}
+
+	/**
+	 * Parse property value transformation function specification.
+	 *
+	 * @param m Matcher containing the specification in its matched groups.
+	 * @param groupOffset First group offset.
+	 * @param funcParams List, to which to add function parameters if any.
+	 *
+	 * @return The function.
+	 */
+	private PropertyValueFunction parseValueFunction(
+			final Matcher m,
+			final int groupOffset,
+			final List<Object> funcParams) {
+
+		if (m.group(groupOffset) != null) {
+			return PropertyValueFunction.LENGTH;
+		}
+
+		if (m.group(groupOffset + 1) != null) {
+			return PropertyValueFunction.LOWERCASE;
+		}
+
+		if (m.group(groupOffset + 2) != null) {
+			funcParams.add(Integer.valueOf(m.group(groupOffset + 3)));
+			final String lenParam = m.group(groupOffset + 4);
+			funcParams.add(lenParam != null ?
+					Integer.valueOf(lenParam) : Integer.valueOf(0));
+			return PropertyValueFunction.SUBSTRING;
+		}
+
+		if (m.group(groupOffset + 5) != null) {
+			final Integer width = Integer.valueOf(m.group(groupOffset + 6));
+			if (width.intValue() > 255)
+				throw new InvalidSpecificationException(
+						"Padding width value is too large.");
+			funcParams.add(width);
+			final String paddingCharParam = m.group(groupOffset + 7);
+			funcParams.add(paddingCharParam != null ?
+					Character.valueOf(paddingCharParam.charAt(0)) :
+						Character.valueOf(' '));
+			return PropertyValueFunction.LPAD;
+		}
+
+		return PropertyValueFunction.PLAIN;
+	}
+
+	/**
+	 * Cast specified filter to filter for the handler's persistent resource.
+	 *
+	 * @param filter The filter to cast. May be {@code null}.
+	 *
+	 * @return The filter, or {@code null} if {@code null} was passed into the
+	 * method.
+	 *
+	 * @throws ClassCastException If the specified filter is for a different
+	 * resource.
+	 */
+	@SuppressWarnings("unchecked")
+	private FilterSpecBuilder<R> castFilter(
+			final FilterSpecBuilder<? extends Object> filter) {
+
+		if (filter == null)
+			return null;
+
+		if (!filter.getPersistentResourceClass().equals(this.prsrcClass))
+			throw new ClassCastException();
+
+		return (FilterSpecBuilder<R>) filter;
+	}
+
+	/**
+	 * Get properties fetch specification from the request parameters using
+	 * deprecated method.
+	 *
+	 * @param ctx Call context.
+	 *
+	 * @return Properties fetch specification, or {@code null} if none.
+	 *
+	 * @throws EndpointCallErrorException If request parameters are invalid.
+	 */
+	@Deprecated
+	private PropertiesFetchSpecBuilder<R> getDeprecatedPropertiesFetchSpec(
+			final EndpointCallContext ctx)
+		throws EndpointCallErrorException {
+
+		final String includePropsFetchParam = StringUtils.nullIfEmpty(
+				ctx.getRequestParam(INCLUDE_PROPS_FETCH_PARAM));
+		final String excludePropsFetchParam = StringUtils.nullIfEmpty(
+				ctx.getRequestParam(EXCLUDE_PROPS_FETCH_PARAM));
+		final String refsFetchParam = StringUtils.nullIfEmpty(
+				ctx.getRequestParam(REFS_FETCH_PARAM));
+
+		if ((includePropsFetchParam == null)
+				&& (excludePropsFetchParam == null)
+				&& (refsFetchParam == null))
+			return null;
+
+		final boolean includeWithPlus = ((includePropsFetchParam != null)
+				&& includePropsFetchParam.startsWith("+"));
+
+		if (includeWithPlus
+				&& (includePropsFetchParam != null) // redundant, for Eclipse
+				&& (includePropsFetchParam.length() <= 1))
+			throw new EndpointCallErrorException(
+					HttpServletResponse.SC_BAD_REQUEST, null,
+					"Invalid \"" + INCLUDE_PROPS_FETCH_PARAM
+					+ "\" request parameter.");
+
+		if ((includePropsFetchParam != null)
+				&& (excludePropsFetchParam != null) && !includeWithPlus)
+			throw new EndpointCallErrorException(
+					HttpServletResponse.SC_BAD_REQUEST, null,
+					"Conflicting \"" + INCLUDE_PROPS_FETCH_PARAM + "\" and  \""
+					+ EXCLUDE_PROPS_FETCH_PARAM + "\" request parameters.");
+
+		final PropertiesFetchSpecBuilder<R> propsFetch =
+			ctx.getPropertiesFetchSpec(this.prsrcClass);
+		try {
+			if ((includePropsFetchParam != null) && !includeWithPlus) {
+				for (final String propPath : includePropsFetchParam.split(","))
+					propsFetch.include(propPath);
+			} else {
+				propsFetch.includeByDefault();
+				if (includePropsFetchParam != null)
+					for (final String propPath :
+						includePropsFetchParam.substring(1).split(","))
+					propsFetch.include(propPath);
+				if (excludePropsFetchParam != null)
+					for (final String propPath :
+							excludePropsFetchParam.split(","))
+						propsFetch.exclude(propPath);
+			}
+		} catch (final InvalidSpecificationException e) {
+			if (this.log.isDebugEnabled())
+				this.log.debug("invalid parameter", e);
+			throw new EndpointCallErrorException(
+					HttpServletResponse.SC_BAD_REQUEST, null,
+					"Invalid properties fetch specification parameter.");
+		}
+
+		for (final String propPath : refsFetchParam.split(",")) {
+			try {
+				propsFetch.fetch(propPath);
+			} catch (final InvalidSpecificationException e) {
+				if (this.log.isDebugEnabled())
+					this.log.debug("invalid parameter", e);
+				throw new EndpointCallErrorException(
+						HttpServletResponse.SC_BAD_REQUEST, null,
+						"Invalid references fetch specification parameter.");
+			}
+		}
+
+		return propsFetch;
+	}
+
+	/**
+	 * Get filter specification from the request parameters using deprecated
+	 * method.
+	 *
+	 * @param ctx Call context.
+	 *
+	 * @return Filter specification, or {@code null} if none.
+	 *
+	 * @throws EndpointCallErrorException If request parameters are invalid.
+	 */
+	@Deprecated
+	private FilterSpecBuilder<R> getDeprecatedFilterSpec(
+			final EndpointCallContext ctx)
+		throws EndpointCallErrorException {
+
+		final Collection<String> filterParamNames =
+			ctx.getRequestParamNames(FILTER_PARAM_PATTERN);
+		if (filterParamNames.isEmpty())
+			return null;
+
+		final boolean useDisjunction =
+			"or".equalsIgnoreCase(ctx.getRequestParam(FILTER_COMB_PARAM));
+
+
+		final FilterSpecBuilder<R> filter = ctx.getFilterSpec(this.prsrcClass);
+
+		final Matcher m = FILTER_COND_PATTERN.matcher("");
+
+		if (filterParamNames.size() == 1) {
+			this.addFilterConditions(ctx,
+					(useDisjunction ? filter.addDisjunction() : filter),
+					filterParamNames.iterator().next(), m);
+		} else { // multiple groups
+			final FilterSpecBuilder<R> j =
+				(useDisjunction ? filter : filter.addDisjunction());
+			for (final String filterParamName : filterParamNames) {
+				this.addFilterConditions(ctx,
+						(useDisjunction ?
+								j.addDisjunction() : j.addConjunction()),
+						filterParamName, m);
+			}
+		}
+
+		return filter;
+	}
+
+	/**
+	 * Add filter conditions to the specified filter from the request parameters
+	 * for a single conditions group.
+	 *
+	 * @param ctx Call context.
+	 * @param filter Filter specification, to which to add the conditions.
+	 * @param filterParamName Request parameter name for the group.
+	 * @param m Matcher for filter condition pattern.
+	 *
+	 * @throws EndpointCallErrorException If request parameters are invalid.
+	 */
+	@Deprecated
+	private void addFilterConditions(final EndpointCallContext ctx,
+			final FilterSpecBuilder<R> filter, final String filterParamName,
+			final Matcher m)
+		throws EndpointCallErrorException {
+
+		for (final String condExpr : ctx.getRequestParamValues(filterParamName))
+			this.addFilterCondition(filter, filterParamName, condExpr, m);
+	}
+
+	/**
+	 * Add filter condition to the specified filter.
+	 *
+	 * @param filter The filter specification, to which to add the condition.
+	 * @param paramName Name of the request parameter that provides the
+	 * condition.
+	 * @param condExpr Condition expression (the parameter value).
+	 * @param m Matcher for filter condition pattern.
+	 *
+	 * @throws EndpointCallErrorException If condition expression is invalid.
+	 */
+	@Deprecated
+	private void addFilterCondition(final FilterSpecBuilder<R> filter,
+			final String paramName, final String condExpr, final Matcher m)
+		throws EndpointCallErrorException {
+
+		if (!m.reset(condExpr).matches())
+			throw new EndpointCallErrorException(
+					HttpServletResponse.SC_BAD_REQUEST, null,
+					"Invalid condition expression in parameter \"" + paramName
+						+ "\".");
+
+		final FilterConditionType condType;
+		final List<String> operandsList;
+		int g = 2;
+		if (m.group(++g) != null) {
+			condType = FilterConditionType.EQ;
+			operandsList = Collections.singletonList(m.group(g));
+		} else if (m.group(++g) != null) {
+			condType = FilterConditionType.LE;
+			operandsList = Collections.singletonList(m.group(g));
+		} else if (m.group(++g) != null) {
+			condType = FilterConditionType.GE;
+			operandsList = Collections.singletonList(m.group(g));
+		} else if (m.group(++g) != null) {
+			condType = FilterConditionType.MATCH;
+			operandsList = Collections.singletonList(m.group(g));
+		} else if (m.group(++g) != null) {
+			condType = FilterConditionType.SUBSTRING;
+			operandsList = Collections.singletonList(m.group(g));
+		} else if (m.group(++g) != null) {
+			condType = FilterConditionType.PREFIX;
+			operandsList = Collections.singletonList(m.group(g));
+		} else if (m.group(++g) != null) {
+			condType = FilterConditionType.EQ;
+			operandsList = Arrays.asList(m.group(g).split("\\|"));
+		} else {
+			condType = FilterConditionType.NOT_EMPTY;
+			operandsList = Collections.emptyList();
+		}
+
+		final Object[] operands =
+				operandsList.toArray(new Object[operandsList.size()]);
+		final boolean negated = (m.group(2) != null);
+		try {
+			final String[] propPaths = m.group(1).split(",");
+			if (propPaths.length > 1) {
+				final FilterSpecBuilder<R> junc = filter.addDisjunction();
+				for (final String propPath : propPaths)
+					junc.addCondition(propPath, PropertyValueFunction.PLAIN,
+							null, condType, negated, operands);
+			} else {
+				filter.addCondition(propPaths[0], PropertyValueFunction.PLAIN,
+						null, condType, negated, operands);
+			}
+		} catch (final InvalidSpecificationException e) {
+			if (this.log.isDebugEnabled())
+				this.log.debug("invalid parameter", e);
+			throw new EndpointCallErrorException(
+					HttpServletResponse.SC_BAD_REQUEST, null,
+					"Invalid condition expression in parameter \"" + paramName
+						+ "\": " + e.getMessage());
+		}
+	}
+
+	/**
+	 * Parse deprecated order segmentation parameter.
+	 *
+	 * @param ctx Call context.
+	 * @param order Order specification builder, to which to add parsed
+	 * segments.
+	 * @param paramValues Deprecated parameter values.
+	 *
+	 * @throws EndpointCallErrorException If request parameter values are
+	 * invalid.
+	 */
+	@Deprecated
+	private void parseDeprecatedSplitParam(
+			final EndpointCallContext ctx,
+			final OrderSpecBuilder<R> order,
+			final String[] paramValues)
+		throws EndpointCallErrorException {
+
+		final Matcher m = FILTER_COND_PATTERN.matcher("");
+		for (final String condExpr : paramValues) {
+			final FilterSpecBuilder<R> split =
+				ctx.getFilterSpec(this.prsrcClass);
+			this.addFilterCondition(split, SPLIT_PARAM, condExpr, m);
+			order.addSegment(SortDirection.ASC, split);
+		}
 	}
 
 	/**
@@ -577,109 +1185,6 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	}
 
 	/**
-	 * Parse properties fetch parameter value.
-	 *
-	 * @param ctx Call context.
-	 * @param propsFetch Properties fetch specification builder.
-	 * @param paramValue The parameter value.
-	 * @param addlFilters Map, to which to add aggregate property filters if
-	 * any.
-	 */
-	private void parsePropertiesFetchParam(
-			final EndpointCallContext ctx,
-			final PropertiesFetchSpecBuilder<R> propsFetch,
-			final String paramValue,
-			final Map<String, FilterSpecBuilder<? extends Object>>
-			addlFilters) {
-
-		int lastMatchEnd = -1;
-		for (final Matcher m = PROPS_FETCH_PARAM_PATTERN.matcher(paramValue);
-				m.find(); lastMatchEnd = m.end()) {
-			final String fullMatch = m.group(1);
-			final String propPath = m.group(2);
-			final String filterKey = m.group(3);
-			if (fullMatch.equals("*")) {
-				propsFetch.includeByDefault();
-			} else if (fullMatch.startsWith("-")) {
-				if (filterKey != null)
-					throw new InvalidSpecificationException(
-							"Exclusion rule for filtered aggregate property.");
-				if (fullMatch.endsWith(".*"))
-					propsFetch.excludeProperties(propPath);
-				else
-					propsFetch.exclude(propPath);
-			} else {
-				if (filterKey != null) {
-					FilterSpecBuilder<? extends Object> filter =
-						addlFilters.get(filterKey);
-					if (filter == null) {
-						final Class<?> aggRsrcClass;
-						try {
-							aggRsrcClass = (
-								(ResourceHandler<?>)
-								(
-									(AggregatePropertyHandler)
-									this.prsrcHandler
-										.getPersistentPropertyChain(propPath)
-										.getLast()
-								).getAggregatedCollectionHandler()
-							).getResourceClass();
-						} catch (final ClassCastException e) {
-							throw new InvalidSpecificationException(
-									"Invalid filtered aggregate property path.",
-									e);
-						}
-						addlFilters.put(filterKey,
-								filter = ctx.getFilterSpec(aggRsrcClass));
-					}
-					propsFetch.includeFilteredAggregate(propPath, filter);
-				} else if (fullMatch.endsWith(".*"))
-					propsFetch.fetch(propPath);
-				else
-					propsFetch.include(propPath);
-			}
-		}
-		if (lastMatchEnd != paramValue.length())
-			throw new InvalidSpecificationException(
-					"Specification parsing error.");
-	}
-
-	private void parseOrderParam(
-			final EndpointCallContext ctx,
-			final OrderSpecBuilder<R> order,
-			final String paramValue,
-			final Map<String, FilterSpecBuilder<? extends Object>>
-			addlFilters) {
-	}
-
-	/**
-	 * Parse all additional filters in the request.
-	 *
-	 * @param ctx Call context.
-	 * @param addlFilters Map with additional filter builders by filter keys.
-	 */
-	private void parseAdditionalFilters(
-			final EndpointCallContext ctx,
-			final Map<String, FilterSpecBuilder<? extends Object>>
-			addlFilters) {
-
-		for (final Map.Entry<String, FilterSpecBuilder<? extends Object>> entry
-				: addlFilters.entrySet())
-			this.parseFilterParams(ctx, entry.getValue(), entry.getKey());
-	}
-
-	private void parseFilterParams(
-			final EndpointCallContext ctx,
-			final FilterSpecBuilder<? extends Object> filter,
-			final String filterKey) {
-
-		final SortedMap<String, String[]> paramsTree =
-			ctx.getRequestParamsTree();
-
-		//...
-	}
-
-	/**
 	 * Add all dependent resource classes, fetched reference classes and their
 	 * dependent resource classes, other persistent resources that own requested
 	 * nested object properties and all resource classes used for calculation
@@ -757,369 +1262,5 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 					prsrcClasses.addAll(ph.getUsedPersistentResourceClasses());
 			}
 		}
-	}
-
-	/**
-	 * Get properties fetch specification from the request parameters using
-	 * deprecated method.
-	 *
-	 * @param ctx Call context.
-	 *
-	 * @return Properties fetch specification, or {@code null} if none.
-	 *
-	 * @throws EndpointCallErrorException If request parameters are invalid.
-	 */
-	@Deprecated
-	private PropertiesFetchSpecBuilder<R> getDeprecatedPropertiesFetchSpec(
-			final EndpointCallContext ctx)
-		throws EndpointCallErrorException {
-
-		final String includePropsFetchParam = StringUtils.nullIfEmpty(
-				ctx.getRequestParam(INCLUDE_PROPS_FETCH_PARAM));
-		final String excludePropsFetchParam = StringUtils.nullIfEmpty(
-				ctx.getRequestParam(EXCLUDE_PROPS_FETCH_PARAM));
-		final String refsFetchParam = StringUtils.nullIfEmpty(
-				ctx.getRequestParam(REFS_FETCH_PARAM));
-
-		if ((includePropsFetchParam == null)
-				&& (excludePropsFetchParam == null)
-				&& (refsFetchParam == null))
-			return null;
-
-		final boolean includeWithPlus = ((includePropsFetchParam != null)
-				&& includePropsFetchParam.startsWith("+"));
-
-		if (includeWithPlus
-				&& (includePropsFetchParam != null) // redundant, for Eclipse
-				&& (includePropsFetchParam.length() <= 1))
-			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_BAD_REQUEST, null,
-					"Invalid \"" + INCLUDE_PROPS_FETCH_PARAM
-					+ "\" request parameter.");
-
-		if ((includePropsFetchParam != null)
-				&& (excludePropsFetchParam != null) && !includeWithPlus)
-			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_BAD_REQUEST, null,
-					"Conflicting \"" + INCLUDE_PROPS_FETCH_PARAM + "\" and  \""
-					+ EXCLUDE_PROPS_FETCH_PARAM + "\" request parameters.");
-
-		final PropertiesFetchSpecBuilder<R> propsFetch =
-			ctx.getPropertiesFetchSpec(this.prsrcClass);
-		try {
-			if ((includePropsFetchParam != null) && !includeWithPlus) {
-				for (final String propPath : includePropsFetchParam.split(","))
-					propsFetch.include(propPath);
-			} else {
-				propsFetch.includeByDefault();
-				if (includePropsFetchParam != null)
-					for (final String propPath :
-						includePropsFetchParam.substring(1).split(","))
-					propsFetch.include(propPath);
-				if (excludePropsFetchParam != null)
-					for (final String propPath :
-							excludePropsFetchParam.split(","))
-						propsFetch.exclude(propPath);
-			}
-		} catch (final InvalidSpecificationException e) {
-			if (this.log.isDebugEnabled())
-				this.log.debug("invalid parameter", e);
-			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_BAD_REQUEST, null,
-					"Invalid properties fetch specification parameter.");
-		}
-
-		for (final String propPath : refsFetchParam.split(",")) {
-			try {
-				propsFetch.fetch(propPath);
-			} catch (final InvalidSpecificationException e) {
-				if (this.log.isDebugEnabled())
-					this.log.debug("invalid parameter", e);
-				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_BAD_REQUEST, null,
-						"Invalid references fetch specification parameter.");
-			}
-		}
-
-		return propsFetch;
-	}
-
-	/**
-	 * Get filter specification from the request parameters using deprecated
-	 * method.
-	 *
-	 * @param ctx Call context.
-	 *
-	 * @return Filter specification, or {@code null} if none.
-	 *
-	 * @throws EndpointCallErrorException If request parameters are invalid.
-	 */
-	private FilterSpecBuilder<R> getDeprecatedFilterSpec(
-			final EndpointCallContext ctx)
-		throws EndpointCallErrorException {
-
-		final Collection<String> filterParamNames =
-			ctx.getRequestParamNames(FILTER_PARAM_PATTERN);
-		if (filterParamNames.isEmpty())
-			return null;
-
-		final boolean useDisjunction =
-			"or".equalsIgnoreCase(ctx.getRequestParam(FILTER_COMB_PARAM));
-
-
-		final FilterSpecBuilder<R> filter = ctx.getFilterSpec(this.prsrcClass);
-
-		final Matcher m = FILTER_COND_PATTERN.matcher("");
-
-		if (filterParamNames.size() == 1) {
-			this.addFilterConditions(ctx,
-					(useDisjunction ? filter.addDisjunction() : filter),
-					filterParamNames.iterator().next(), m);
-		} else { // multiple groups
-			final FilterSpecBuilder<R> j =
-				(useDisjunction ? filter : filter.addDisjunction());
-			for (final String filterParamName : filterParamNames) {
-				this.addFilterConditions(ctx,
-						(useDisjunction ?
-								j.addDisjunction() : j.addConjunction()),
-						filterParamName, m);
-			}
-		}
-
-		return filter;
-	}
-
-	/**
-	 * Add filter conditions to the specified filter from the request parameters
-	 * for a single conditions group.
-	 *
-	 * @param ctx Call context.
-	 * @param filter Filter specification, to which to add the conditions.
-	 * @param filterParamName Request parameter name for the group.
-	 * @param m Matcher for filter condition pattern.
-	 *
-	 * @throws EndpointCallErrorException If request parameters are invalid.
-	 */
-	private void addFilterConditions(final EndpointCallContext ctx,
-			final FilterSpecBuilder<R> filter, final String filterParamName,
-			final Matcher m)
-		throws EndpointCallErrorException {
-
-		for (final String condExpr : ctx.getRequestParamValues(filterParamName))
-			this.addFilterCondition(filter, filterParamName, condExpr, m);
-	}
-
-	/**
-	 * Add filter condition to the specified filter.
-	 *
-	 * @param filter The filter specification, to which to add the condition.
-	 * @param paramName Name of the request parameter that provides the
-	 * condition.
-	 * @param condExpr Condition expression (the parameter value).
-	 * @param m Matcher for filter condition pattern.
-	 *
-	 * @throws EndpointCallErrorException If condition expression is invalid.
-	 */
-	private void addFilterCondition(final FilterSpecBuilder<R> filter,
-			final String paramName, final String condExpr, final Matcher m)
-		throws EndpointCallErrorException {
-
-		if (!m.reset(condExpr).matches())
-			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_BAD_REQUEST, null,
-					"Invalid condition expression in parameter \"" + paramName
-						+ "\".");
-
-		final FilterConditionType condType;
-		final List<String> operandsList;
-		int g = 2;
-		if (m.group(++g) != null) {
-			condType = FilterConditionType.EQ;
-			operandsList = Collections.singletonList(m.group(g));
-		} else if (m.group(++g) != null) {
-			condType = FilterConditionType.LE;
-			operandsList = Collections.singletonList(m.group(g));
-		} else if (m.group(++g) != null) {
-			condType = FilterConditionType.GE;
-			operandsList = Collections.singletonList(m.group(g));
-		} else if (m.group(++g) != null) {
-			condType = FilterConditionType.MATCH;
-			operandsList = Collections.singletonList(m.group(g));
-		} else if (m.group(++g) != null) {
-			condType = FilterConditionType.SUBSTRING;
-			operandsList = Collections.singletonList(m.group(g));
-		} else if (m.group(++g) != null) {
-			condType = FilterConditionType.PREFIX;
-			operandsList = Collections.singletonList(m.group(g));
-		} else if (m.group(++g) != null) {
-			condType = FilterConditionType.EQ;
-			operandsList = Arrays.asList(m.group(g).split("\\|"));
-		} else {
-			condType = FilterConditionType.NOT_EMPTY;
-			operandsList = Collections.emptyList();
-		}
-
-		final Object[] operands =
-				operandsList.toArray(new Object[operandsList.size()]);
-		final boolean negated = (m.group(2) != null);
-		try {
-			final String[] propPaths = m.group(1).split(",");
-			if (propPaths.length > 1) {
-				final FilterSpecBuilder<R> junc = filter.addDisjunction();
-				for (final String propPath : propPaths)
-					junc.addCondition(propPath, condType, negated,
-							operands);
-			} else {
-				filter.addCondition(propPaths[0], condType, negated,
-						operands);
-			}
-		} catch (final InvalidSpecificationException e) {
-			if (this.log.isDebugEnabled())
-				this.log.debug("invalid parameter", e);
-			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_BAD_REQUEST, null,
-					"Invalid condition expression in parameter \"" + paramName
-						+ "\": " + e.getMessage());
-		}
-	}
-
-	/**
-	 * Get order specification from the request parameters using deprecated
-	 * method.
-	 *
-	 * @param ctx Call context.
-	 *
-	 * @return Order specification, or {@code null} if none.
-	 *
-	 * @throws EndpointCallErrorException If request parameters are invalid.
-	 */
-	private OrderSpecBuilder<R> getDeprecatedOrderSpec(
-			final EndpointCallContext ctx)
-		throws EndpointCallErrorException {
-
-		OrderSpecBuilder<R> order = null;
-
-		final String[] segmentParams = ctx.getRequestParamValues(SPLIT_PARAM);
-		if ((segmentParams != null) && (segmentParams.length > 0)) {
-
-			order = ctx.getOrderSpec(this.prsrcClass);
-
-			final Matcher m = FILTER_COND_PATTERN.matcher("");
-
-			for (final String condExpr : segmentParams) {
-				final FilterSpecBuilder<R> split =
-					ctx.getFilterSpec(this.prsrcClass);
-				this.addFilterCondition(split, SPLIT_PARAM, condExpr, m);
-				order.addSegment(SortDirection.ASC, split);
-			}
-		}
-
-		final String orderParam = StringUtils.nullIfEmpty(
-				ctx.getRequestParam(ORDER_PARAM));
-		if (orderParam != null) {
-
-			if (order == null)
-				order = ctx.getOrderSpec(this.prsrcClass);
-
-			final Matcher m = ORDER_SPEC_PATTERN.matcher("");
-
-			for (final String orderElParam : orderParam.split(",")) {
-
-				if (!m.reset(orderElParam).matches())
-					throw new EndpointCallErrorException(
-							HttpServletResponse.SC_BAD_REQUEST, null,
-							"Invalid order specification parameter.");
-
-				final String propPath = m.group(1);
-
-				final PropertyValueFunction func;
-				final Object[] funcParams;
-				if (m.group(2) != null) {
-					func = PropertyValueFunction.LENGTH;
-					funcParams = null;
-				} else if (m.group(3) != null) {
-					func = PropertyValueFunction.SUBSTRING;
-					final int from = Integer.parseInt(m.group(4));
-					final int len =
-						(m.group(5) != null ? Integer.parseInt(m.group(5)) : 0);
-					funcParams = new Object[] {
-							Integer.valueOf(from),
-							Integer.valueOf(len)
-					};
-				} else if (m.group(6) != null) {
-					func = PropertyValueFunction.LPAD;
-					final int width = Integer.parseInt(m.group(7));
-					if (width > 255)
-						throw new EndpointCallErrorException(
-								HttpServletResponse.SC_BAD_REQUEST, null,
-								"Invalid order specification parameter:"
-										+ " padding is too large.");
-					final String paddingCharStr = m.group(8);
-					final char paddingChar =
-						(paddingCharStr != null ?
-								paddingCharStr.charAt(0) : ' ');
-					funcParams = new Object[] {
-							Integer.valueOf(width),
-							Character.valueOf(paddingChar)
-					};
-				} else {
-					func = PropertyValueFunction.PLAIN;
-					funcParams = null;
-				}
-
-				final SortDirection dir =
-					("desc".equalsIgnoreCase(m.group(9)) ? SortDirection.DESC :
-						SortDirection.ASC);
-
-				try {
-					order.add(dir, propPath, func, funcParams);
-				} catch (final InvalidSpecificationException e) {
-					if (this.log.isDebugEnabled())
-						this.log.debug("invalid parameter", e);
-					throw new EndpointCallErrorException(
-							HttpServletResponse.SC_BAD_REQUEST, null,
-							"Invalid order specification parameter: "
-									+ e.getMessage());
-				}
-			}
-		}
-
-		return order;
-	}
-
-	/**
-	 * Get range specification from the request parameters using deprecated
-	 * method.
-	 *
-	 * @param ctx Call context.
-	 *
-	 * @return Range specification, or {@code null} if none.
-	 *
-	 * @throws EndpointCallErrorException If request parameters are invalid.
-	 */
-	private RangeSpec getDeprecatedRangeSpec(final EndpointCallContext ctx)
-		throws EndpointCallErrorException {
-
-		final String rangeParam = StringUtils.nullIfEmpty(
-				ctx.getRequestParam(RANGE_PARAM));
-		if (rangeParam == null)
-			return null;
-
-		final RangeSpec range;
-		final int commaInd = rangeParam.indexOf(',');
-		try {
-			range = new RangeSpec(
-					Integer.parseInt(rangeParam.substring(0, commaInd)),
-					Integer.parseInt(rangeParam.substring(commaInd + 1)));
-		} catch (final InvalidSpecificationException | NumberFormatException
-				| IndexOutOfBoundsException e) {
-			if (this.log.isDebugEnabled())
-				this.log.debug("invalid parameter", e);
-			throw new EndpointCallErrorException(
-					HttpServletResponse.SC_BAD_REQUEST, null,
-					"Invalid range specification parameter.");
-		}
-
-		return range;
 	}
 }

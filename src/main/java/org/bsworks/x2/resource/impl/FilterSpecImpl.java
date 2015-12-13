@@ -11,6 +11,7 @@ import java.util.TreeSet;
 import org.bsworks.x2.resource.FilterConditionType;
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.FilterSpecBuilder;
+import org.bsworks.x2.resource.PropertyValueFunction;
 
 
 /**
@@ -195,13 +196,14 @@ class FilterSpecImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public FilterSpecImpl<R> addCondition(final String propPath,
+	public FilterSpecBuilder<R> addCondition(final String propPath,
+			final PropertyValueFunction func, final Object[] funcParams,
 			final FilterConditionType type, final boolean negate,
 			final Object... operands) {
 
 		final FilterConditionImpl c = new FilterConditionImpl(this.resources,
-				type, negate, this.prsrcHandler, propPath, operands,
-				this.prsrcClasses);
+				type, func, funcParams, negate, this.prsrcHandler, propPath,
+				operands, this.prsrcClasses);
 
 		this.conditions.add(c);
 
@@ -217,7 +219,8 @@ class FilterSpecImpl<R>
 	public FilterSpecBuilder<R> addTrueCondition(final String propPath,
 			final FilterConditionType type, final Object... operands) {
 
-		return this.addCondition(propPath, type, false, operands);
+		return this.addCondition(propPath, PropertyValueFunction.PLAIN, null,
+				type, false, operands);
 	}
 
 	/* (non-Javadoc)

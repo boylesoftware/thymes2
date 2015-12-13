@@ -25,6 +25,8 @@ public class RangeSpec {
 	 * @param firstRecord Index of the first record in the range, starting from
 	 * zero.
 	 * @param maxRecords Maximum number of records in the range.
+	 *
+	 * @throws InvalidSpecificationException If the specified range is invalid.
 	 */
 	public RangeSpec(final int firstRecord, final int maxRecords) {
 

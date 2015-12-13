@@ -698,7 +698,8 @@ class WhereClause {
 	}
 
 	/**
-	 * Append condition to the filter expression.
+	 * Append condition to the filter expression. The method also applies value
+	 * transformation function from the filter condition if any.
 	 *
 	 * @param buf Filter expression builder.
 	 * @param paramPrefix Query parameter names prefix to use.
@@ -708,8 +709,8 @@ class WhereClause {
 	 * @param disjunction {@code true} if the filter expression is a
 	 * disjunction.
 	 * @param cond The condition descriptor.
-	 * @param valueExpr Value expression that the condition tests.
-	 * @param valueType Value type.
+	 * @param rawValueExpr Value expression that the condition tests.
+	 * @param rawValueType Value type.
 	 * @param params Parameters collection, to which to add any query
 	 * parameters.
 	 *
@@ -720,8 +721,14 @@ class WhereClause {
 			final SQLDialect dialect,
 			final ParameterValuesFactoryImpl paramsFactory,
 			final boolean disjunction, final FilterCondition cond,
-			final String valueExpr, final PersistentValueType valueType,
+			final String rawValueExpr, final PersistentValueType rawValueType,
 			final Map<String, JDBCParameterValue> params) {
+
+		final String valueExpr = Utils.getTransformedValueExpression(dialect,
+				rawValueExpr, rawValueType, cond.getValueFunction(),
+				cond.getValueFunctionParams());
+		final PersistentValueType valueType = Utils.getTransformedValueType(
+				rawValueType, cond.getValueFunction());
 
 		if (buf.length() > 0)
 			buf.append(disjunction ? " OR " : " AND ");

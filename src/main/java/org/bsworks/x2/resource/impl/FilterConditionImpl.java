@@ -14,6 +14,7 @@ import org.bsworks.x2.resource.FilterConditionOperandType;
 import org.bsworks.x2.resource.FilterConditionType;
 import org.bsworks.x2.resource.InvalidResourceDataException;
 import org.bsworks.x2.resource.InvalidSpecificationException;
+import org.bsworks.x2.resource.PropertyValueFunction;
 import org.bsworks.x2.resource.RefPropertyHandler;
 import org.bsworks.x2.resource.ResourcePropertyHandler;
 import org.bsworks.x2.resource.ResourcePropertyValueHandler;
@@ -48,6 +49,16 @@ class FilterConditionImpl
 	private final FilterConditionOperandType propValueType;
 
 	/**
+	 * Property value transformation function.
+	 */
+	private final PropertyValueFunction valueFunc;
+
+	/**
+	 * Property value transformation function parameters.
+	 */
+	private final Object[] valueFuncParams;
+
+	/**
 	 * Property chain.
 	 */
 	private final Deque<? extends ResourcePropertyHandler> propChain;
@@ -63,6 +74,9 @@ class FilterConditionImpl
 	 *
 	 * @param resources Application resources manager.
 	 * @param type Condition type.
+	 * @param valueFunc Property value transformation function.
+	 * @param valueFuncParams Property value transformation function parameters.
+	 * May be {@code null} if the function takes no parameters.
 	 * @param negated {@code true} if negated.
 	 * @param prsrcHandler Root persistent resource handler.
 	 * @param propPath Property path.
@@ -75,12 +89,17 @@ class FilterConditionImpl
 	 * invalid.
 	 */
 	FilterConditionImpl(final ResourcesImpl resources,
-			final FilterConditionType type, final boolean negated,
+			final FilterConditionType type,
+			final PropertyValueFunction valueFunc,
+			final Object[] valueFuncParams, final boolean negated,
 			final PersistentResourceHandlerImpl<?> prsrcHandler,
 			final String propPath, final Object[] operands,
 			final Set<Class<?>> prsrcClasses) {
 
 		this.type = type;
+		this.valueFunc = valueFunc;
+		this.valueFuncParams = (valueFuncParams != null ?
+				valueFuncParams : new Object[0]);
 		this.negated = negated;
 
 		// get property path and tested value operand type
@@ -234,6 +253,24 @@ class FilterConditionImpl
 	public FilterConditionOperandType getPropertyValueType() {
 
 		return this.propValueType;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public PropertyValueFunction getValueFunction() {
+
+		return this.valueFunc;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public Object[] getValueFunctionParams() {
+
+		return this.valueFuncParams;
 	}
 
 	/* (non-Javadoc)
