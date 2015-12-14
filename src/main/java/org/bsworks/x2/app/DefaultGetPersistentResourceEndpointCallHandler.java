@@ -673,8 +673,22 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			ctx.getRequestParamsTree().subMap(filterKey + "$", filterKey + "/");
 
 		// find and process filter specification elements
+		final Matcher m = FILTER_PARAM_NAME_PATTERN.matcher("");
+		String curGroupKey = filterKey;
+		FilterSpecBuilder<? extends Object> curGroup = filter;
+		final StringBuilder buf = new StringBuilder();
 		for (final Map.Entry<String, String[]> entry : params.entrySet()) {
-			final String paramName = entry.getKey();
+			if (!m.reset(entry.getKey()).matches())
+				continue;
+			//final String groupKey = m.group(1);
+			buf.setLength(0);
+			buf.append(m.group(1));
+			while (!buf.toString().equals(curGroupKey)) {
+			}
+			while (!buf.toString().equals(curGroupKey)) {
+				
+			}
+			//...
 		}
 
 		//...
