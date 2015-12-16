@@ -51,8 +51,8 @@ import org.bsworks.x2.util.StringUtils;
  * requested record id, and records collection search call, identified by the
  * absence of the record id in the request URI.
  *
- * <p>The call is configured using optional request parameters. The following
- * parameters can be used:
+ * <p>The call is configured using optional request parameters. Below is a
+ * description of the deprecated way of configuring the call:
  *
  * <dl>
  * <dt>{@value #INCLUDE_PROPS_FETCH_PARAM}</dt><dd>Comma-separated list of
@@ -111,18 +111,18 @@ import org.bsworks.x2.util.StringUtils;
  * ":sub:<i>from</i>[:<i>len</i>]" for substring (from is zero-based), and
  * ":lpad:<i>width</i>[:<i>char</i>]" for left padding.</dd>
  * <dt>{@value #SPLIT_PARAM}</dt><dd>Defines result list segmentation (see
- * {@link OrderSpec#addSegment}). The syntax of the parameter value is the same
- * as for the filter condition parameter. Multiple {@value #SPLIT_PARAM}
- * parameters can be specified for a request to create sub-segmentation. Splits
- * are always added before any order specifications provided by the
- * {@link #ORDER_PARAM} parameter.</dd>
+ * {@link OrderSpecBuilder#addSegment}). The syntax of the parameter value is
+ * the same as for the filter condition parameter. Multiple
+ * {@value #SPLIT_PARAM} parameters can be specified for a request to create
+ * sub-segmentation. Splits are always added before any order specifications
+ * provided by the {@link #ORDER_PARAM} parameter.</dd>
  * <dt>{@value #RANGE_PARAM}</dt><dd>Collection fetch range specification (see
  * {@link RangeSpec}), which a pair of comma-separated integer numbers. The
  * first number is for the first record index, zero-based. The second number is
  * the maximum number of records to return.</dd>
  * <dt>{@value #REFS_FETCH_PARAM}</dt><dd>Comma-separated list of persistent
  * resource reference property paths to fetch along with the records (see
- * {@link RefsFetchSpec}).</dd>
+ * {@link PropertiesFetchSpecBuilder}).</dd>
  * </dl>
  *
  * <p>For a single record request, only {@value #INCLUDE_PROPS_FETCH_PARAM},
@@ -226,15 +226,15 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			"(" + FILTER_KEY_RE + "(?:\\.[a-z_0-9]+)*)\\$" // 1. group key
 			+ "(?:"
 				+ "(" + PROP_PATH_RE + "(?:/id|/key)?)"    // 2. property path
-				+ "(?: " + VALUE_FUNC_RE + ")"             // 3-10. value func
-				+ "("                                      // 11. test:
-					+ ":min"                               // minimum
-					+ "|:max"                              // maximum
-					+ "|:pat"                              // RE pattern match
-					+ "|:sub"                              // contains substring
-					+ "|:pre"                              // starts with
-					+ "|:alt"                              // one of
-				+ ")?"
+				+ "(?: " + VALUE_FUNC_RE + ")?"            // 3-10. value func
+				+ "(?::("                                  // 11. test:
+					+ "min"                                // minimum
+					+ "|max"                               // maximum
+					+ "|pat"                               // RE pattern match
+					+ "|sub"                               // contains substring
+					+ "|pre"                               // starts with
+					+ "|alt"                               // one of
+				+ "))?"
 				+ "(!)?"                                   // 12. negation
 			+ ")?");
 
@@ -395,6 +395,9 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			}
 		} else {
 			propsFetch = this.getDeprecatedPropertiesFetchSpec(ctx);
+			if (propsFetch != null)
+				this.log.warn(
+						"deprecated properties fetch specification is used");
 		}
 
 		// get requested record id
@@ -428,9 +431,11 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 						&& (deprecatedSplitParams.length > 0))) {
 			order = ctx.getOrderSpec(this.prsrcClass);
 			if ((deprecatedSplitParams != null)
-					&& (deprecatedSplitParams.length > 0))
+					&& (deprecatedSplitParams.length > 0)) {
 				this.parseDeprecatedSplitParam(ctx, order,
 						deprecatedSplitParams);
+				this.log.warn("deprecated result set split parameter is used");
+			}
 			if (orderParam != null) {
 				try {
 					this.parseOrderParam(ctx, order, orderParam, addlFilters);
@@ -467,8 +472,11 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 		}
 
 		// see if there is a deprecated filter specification
-		if (filter == null)
+		if (filter == null) {
 			filter = this.getDeprecatedFilterSpec(ctx);
+			if (filter != null)
+				this.log.warn("deprecated filter specification is used");
+		}
 
 		// get range specification
 		final String rangeParam = StringUtils.nullIfEmpty(
@@ -663,6 +671,13 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 					"Specification parsing error.");
 	}
 
+	/**
+	 * Parse parameters for a particular filter key and build the filter.
+	 *
+	 * @param ctx Call context.
+	 * @param filter Filter builder.
+	 * @param filterKey Filter key.
+	 */
 	private void parseFilterParams(
 			final EndpointCallContext ctx,
 			final FilterSpecBuilder<? extends Object> filter,
@@ -713,7 +728,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			final String[] entryValue = entry.getValue();
 			final String value = (
 					(entryValue != null) && (entryValue.length > 0) ?
-							entryValue[0] : null);
+							StringUtils.nullIfEmpty(entryValue[0]) : null);
 
 			// get property path from the parameter name
 			final String propPath = m.group(2);
@@ -725,10 +740,74 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 				continue;
 			}
 
-			//...
-		}
+			// build the condition:
 
-		//...
+			// parse value transformation function if any
+			final List<Object> funcParams = new ArrayList<>();
+			final PropertyValueFunction func =
+				this.parseValueFunction(m, 3, funcParams);
+
+			// condition type and operands
+			final FilterConditionType type;
+			final Object[] operands;
+			switch (StringUtils.defaultIfEmpty(m.group(11), "")) {
+			case "min":
+				if (value == null)
+					throw new InvalidSpecificationException(
+							"Minimum condition requires value.");
+				type = FilterConditionType.GE;
+				operands = new Object[] { value };
+				break;
+			case "max":
+				if (value == null)
+					throw new InvalidSpecificationException(
+							"Maximum condition requires value.");
+				type = FilterConditionType.LE;
+				operands = new Object[] { value };
+				break;
+			case "pat":
+				if (value == null)
+					throw new InvalidSpecificationException(
+							"Pattern condition requires value.");
+				type = FilterConditionType.MATCH;
+				operands = new Object[] { value };
+				break;
+			case "sub":
+				if (value == null)
+					throw new InvalidSpecificationException(
+							"Substring condition requires value.");
+				type = FilterConditionType.SUBSTRING;
+				operands = new Object[] { value };
+				break;
+			case "pre":
+				if (value == null)
+					throw new InvalidSpecificationException(
+							"Prefix condition requires value.");
+				type = FilterConditionType.PREFIX;
+				operands = new Object[] { value };
+				break;
+			case "alt":
+				if (value == null)
+					throw new InvalidSpecificationException(
+							"Alternatives condition requires value.");
+				type = FilterConditionType.EQ;
+				operands = value.split("\\|");
+				break;
+			default:
+				if (value != null) {
+					type = FilterConditionType.EQ;
+					operands = new Object[] { value };
+				} else {
+					type = FilterConditionType.NOT_EMPTY;
+					operands = new Object[] {};
+				}
+			}
+
+			// add condition to the current group
+			curGroup.addCondition(propPath,
+					func, funcParams.toArray(new Object[funcParams.size()]),
+					type, (m.group(12) != null), operands);
+		}
 	}
 
 	/**
@@ -891,15 +970,18 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 					"Invalid properties fetch specification parameter.");
 		}
 
-		for (final String propPath : refsFetchParam.split(",")) {
-			try {
-				propsFetch.fetch(propPath);
-			} catch (final InvalidSpecificationException e) {
-				if (this.log.isDebugEnabled())
-					this.log.debug("invalid parameter", e);
-				throw new EndpointCallErrorException(
-						HttpServletResponse.SC_BAD_REQUEST, null,
-						"Invalid references fetch specification parameter.");
+		if (refsFetchParam != null) {
+			for (final String propPath : refsFetchParam.split(",")) {
+				try {
+					propsFetch.fetch(propPath);
+				} catch (final InvalidSpecificationException e) {
+					if (this.log.isDebugEnabled())
+						this.log.debug("invalid parameter", e);
+					throw new EndpointCallErrorException(
+							HttpServletResponse.SC_BAD_REQUEST, null,
+							"Invalid references fetch specification"
+							+ " parameter.");
+				}
 			}
 		}
 

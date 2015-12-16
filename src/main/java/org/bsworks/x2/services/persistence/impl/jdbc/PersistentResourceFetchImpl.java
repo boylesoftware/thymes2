@@ -314,29 +314,34 @@ class PersistentResourceFetchImpl<R>
 
 		// build the query
 		final PropertiesFetchSpec<R> propsFetch = this.propsFetch;
-		final QueryBuilder qb = this.buildQuery(new PropertiesFetchSpec<R>() {
-			@Override
-			public Class<R> getPersistentResourceClass() {
-				return propsFetch.getPersistentResourceClass();
-			}
-			@Override
-			public boolean isIncluded(final String propPath) {
-				return propsFetch.isIncluded(propPath);
-			}
-			@Override
-			public boolean isFetchRequested(final String propPath) {
-				return false;
-			}
-			@Override
-			public SortedMap<String, Class<?>> getFetchedRefProperties() {
-				return Collections.emptySortedMap();
-			}
-			@Override
-			public FilterSpec<? extends Object> getAggregateFilter(
-					final String propPath) {
-				return propsFetch.getAggregateFilter(propPath);
-			}
-		});
+		final PropertiesFetchSpec<R> propsFetchToUse;
+		if (propsFetch == null)
+			propsFetchToUse = null;
+		else
+			propsFetchToUse = new PropertiesFetchSpec<R>() {
+				@Override
+				public Class<R> getPersistentResourceClass() {
+					return propsFetch.getPersistentResourceClass();
+				}
+				@Override
+				public boolean isIncluded(final String propPath) {
+					return propsFetch.isIncluded(propPath);
+				}
+				@Override
+				public boolean isFetchRequested(final String propPath) {
+					return false;
+				}
+				@Override
+				public SortedMap<String, Class<?>> getFetchedRefProperties() {
+					return Collections.emptySortedMap();
+				}
+				@Override
+				public FilterSpec<? extends Object> getAggregateFilter(
+						final String propPath) {
+					return propsFetch.getAggregateFilter(propPath);
+				}
+			};
+		final QueryBuilder qb = this.buildQuery(propsFetchToUse);
 
 		// get the main query
 		final MainQuery mainQuery = this.getMainQuery(qb, false);

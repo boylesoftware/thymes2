@@ -8,6 +8,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -361,6 +362,7 @@ class ResourcePropertiesContainerImpl<O>
 
 		// check if dynamic value
 		if ((valueJavaType instanceof WildcardType)
+				|| (valueJavaType instanceof TypeVariable)
 				|| valueJavaType.equals(Object.class))
 			return new DynamicResourcePropertyValueHandler(resources);
 

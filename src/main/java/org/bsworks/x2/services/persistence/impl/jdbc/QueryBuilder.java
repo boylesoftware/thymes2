@@ -1224,17 +1224,17 @@ class QueryBuilder {
 					continue;
 				final String propPath =
 					ctx.getPropertyPath(metaHandler.getName());
-				if (!ctx.isSelected(propPath, metaHandler))
-					continue;
 				final String metaValExpr = ctx.rootTableAlias + "."
 						+ metaHandler.getPersistence().getFieldName();
-				ctx.appendSelectList(
-						metaValExpr + " AS " + ctx.dialect.quoteColumnLabel(
-								colLabelPrefix + metaHandler.getName()), false);
 				ctx.singlePropExprs.put(propPath,
 						new SingleValuedQueryProperty(metaValExpr,
 								metaHandler.getValueHandler()
 									.getPersistentValueType()));
+				if (ctx.isSelected(propPath, metaHandler))
+					ctx.appendSelectList(
+							metaValExpr + " AS " + ctx.dialect.quoteColumnLabel(
+									colLabelPrefix + metaHandler.getName()),
+							false);
 			}
 		}
 
