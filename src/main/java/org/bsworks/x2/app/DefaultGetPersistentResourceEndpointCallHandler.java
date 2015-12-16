@@ -674,24 +674,81 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 
 		// find and process filter specification elements
 		final Matcher m = FILTER_PARAM_NAME_PATTERN.matcher("");
-		String curGroupKey = filterKey;
 		FilterSpecBuilder<? extends Object> curGroup = filter;
-		final StringBuilder buf = new StringBuilder();
+		String curGroupKey = filterKey;
+		final List<String> curGroupKeyParts = new ArrayList<>();
+		this.splitFilterGroupKey(curGroupKey, curGroupKeyParts);
+		final List<String> groupKeyParts = new ArrayList<>();
 		for (final Map.Entry<String, String[]> entry : params.entrySet()) {
+
+			// test if parameter name matches filter definition element pattern
 			if (!m.reset(entry.getKey()).matches())
 				continue;
-			//final String groupKey = m.group(1);
-			buf.setLength(0);
-			buf.append(m.group(1));
-			while (!buf.toString().equals(curGroupKey)) {
+
+			// get conditions group key
+			final String groupKey = m.group(1);
+
+			// if new group key, find/create the conditions group
+			if (!groupKey.equals(curGroupKey)) {
+				this.splitFilterGroupKey(groupKey, groupKeyParts);
+				final int curLen = curGroupKeyParts.size();
+				final int newLen = groupKeyParts.size();
+				final int minLen = (curLen < newLen ? curLen : newLen);
+				int i = 0;
+				while ((i < minLen)
+						&& curGroupKeyParts.get(i).equals(groupKeyParts.get(i)))
+					i++;
+				for (int j = curLen - 1; j >= i; j--) {
+					curGroupKeyParts.remove(j);
+					curGroup = curGroup.getParent();
+				}
+				for (int j = i; j < newLen; j++) {
+					curGroupKeyParts.add(groupKeyParts.get(j));
+					curGroup = curGroup.addConjunction();
+				}
+				curGroupKey = groupKey;
 			}
-			while (!buf.toString().equals(curGroupKey)) {
-				
+
+			// get parameter value
+			final String[] entryValue = entry.getValue();
+			final String value = (
+					(entryValue != null) && (entryValue.length > 0) ?
+							entryValue[0] : null);
+
+			// get property path from the parameter name
+			final String propPath = m.group(2);
+
+			// check if group options parameter
+			if (propPath == null) {
+				if ("or".equals(value))
+					curGroup.makeDisjunction();
+				continue;
 			}
+
 			//...
 		}
 
 		//...
+	}
+
+	/**
+	 * Split specified filter group key into its parts.
+	 *
+	 * @param groupKey The group key.
+	 * @param groupKeyParts List, to which to add the parts. The list is cleared
+	 * by this method before adding the parts.
+	 */
+	private void splitFilterGroupKey(final String groupKey,
+			final List<String> groupKeyParts) {
+
+		groupKeyParts.clear();
+
+		int dotInd, lastDotInd = -1;
+		while ((dotInd = groupKey.indexOf('.', lastDotInd + 1)) > 0) {
+			groupKeyParts.add(groupKey.substring(lastDotInd + 1, dotInd));
+			lastDotInd = dotInd;
+		}
+		groupKeyParts.add(groupKey.substring(lastDotInd + 1));
 	}
 
 	/**
