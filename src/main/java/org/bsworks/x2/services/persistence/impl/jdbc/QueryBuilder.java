@@ -19,6 +19,7 @@ import org.apache.commons.logging.LogFactory;
 import org.bsworks.x2.Actor;
 import org.bsworks.x2.resource.AggregatePropertyHandler;
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
+import org.bsworks.x2.resource.FilterCondition;
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.IdPropertyHandler;
 import org.bsworks.x2.resource.MetaPropertyHandler;
@@ -201,6 +202,11 @@ class QueryBuilder {
 		private String groupByList = "";
 
 		/**
+		 * Aggregation "WHERE" clause, if any.
+		 */
+		private WhereClause aggregationWhereClause = null;
+
+		/**
 		 * Order by list.
 		 */
 		private final StringBuilder orderByList = new StringBuilder(64);
@@ -293,6 +299,11 @@ class QueryBuilder {
 		 * Aggregation value expressions by property names.
 		 */
 		private final Map<String, String> aggregationValueExprs;
+
+		/**
+		 * Aggregation filter, if any.
+		 */
+		private FilterSpec<? extends Object> aggregationFilter;
 
 
 		/**
@@ -504,6 +515,32 @@ class QueryBuilder {
 		}
 
 		/**
+		 * Create aggregation "WHERE" clause.
+		 *
+		 * @return Aggregation "WHERE" clause, or {@code null} if no aggregation
+		 * filter.
+		 */
+		WhereClause createAggregationWhereClause() {
+
+			if (this.aggregationFilter == null)
+				return null;
+
+			;System.out.println(">>> BUILDING AGGREGATION WHERE CLAUSE:"
+					+ "\n - singlePropExprs: " + this.singlePropExprs
+					+ "\n - collectionProps: " + this.collectionProps
+					+ "\n - allSingleJoins: " + this.allSingleJoins
+					+ "\n - aggregationValueExprs: " + this.aggregationValueExprs);
+			/*final Map<String, JDBCParameterValue> params = new HashMap<>();
+			final WhereClause res = new WhereClause(this.resources,
+					this.dialect, this.paramsFactory,
+					this.aggregationFilter, "g", this.singlePropExprs,
+					this.collectionProps, this.allSingleJoins, params);
+			;System.out.println(">>> BUILT WHERE CLAUSE: " + res);*/
+
+			;return null;
+		}
+
+		/**
 		 * Set the group by list.
 		 *
 		 * @param groupByList Group by list to set.
@@ -511,6 +548,17 @@ class QueryBuilder {
 		void setGroupByList(final String groupByList) {
 
 			this.groupByList = groupByList;
+		}
+
+		/**
+		 * Set aggregation "WHERE" clause.
+		 *
+		 * @param aggregationWhereClause The clause to set.
+		 */
+		void setAggregationWhereClause(
+				final WhereClause aggregationWhereClause) {
+
+			this.aggregationWhereClause = aggregationWhereClause;
 		}
 
 		/**
@@ -565,13 +613,23 @@ class QueryBuilder {
 		}
 
 		/**
-		 * Build and return group by list of the query.
+		 * Get group by list of the query.
 		 *
 		 * @return The group by list, may be empty.
 		 */
 		String getGroupByList() {
 
-			return this.groupByList.toString();
+			return this.groupByList;
+		}
+
+		/**
+		 * Get aggregation "WHERE" clause for the query.
+		 *
+		 * @return The aggregation "WHERE" clause, or {@code null} if none.
+		 */
+		WhereClause getAggregationWhereClause() {
+
+			return this.aggregationWhereClause;
 		}
 
 		/**
@@ -724,10 +782,30 @@ class QueryBuilder {
 							this.aggregatedCollectionPropPath + "." + propPath);
 
 				// add intermediate references to the fetch
-				final String refPath = ph.getLastIntermediateRefPath();
+				// INCLUDED AUTOMATICALLY
+				/*final String refPath = ph.getLastIntermediateRefPath();
 				if (refPath != null)
-					this.aggregationPropsFetch.fetch(propPathsPrefix + refPath);
+					this.aggregationPropsFetch.fetch(propPathsPrefix + refPath);*/
 			}
+
+			// save aggregation filter and include all used properties
+			this.aggregationFilter = aggFilter;
+			if (this.aggregationFilter != null)
+				this.includeUsedFilterProps(
+						this.aggregationFilter,
+						this.aggregationPropsFetch,
+						this.aggregatedCollectionPropPath + ".");
+		}
+
+		private void includeUsedFilterProps(
+				final FilterSpec<? extends Object> filter,
+				final PropertiesFetchSpecBuilder<?> propsFetch,
+				final String propsPrefix) {
+
+			for (FilterCondition c : filter.getConditions())
+				propsFetch.include(propsPrefix + c.getPropertyPath());
+			for (FilterSpec<? extends Object> junc : filter.getJunctions())
+				this.includeUsedFilterProps(junc, propsFetch, propsPrefix);
 		}
 
 		/**
@@ -743,6 +821,8 @@ class QueryBuilder {
 			this.aggregationPropsFetch = null;
 
 			this.aggregationValueExprs.clear();
+
+			this.aggregationFilter = null;
 		}
 
 		/**
@@ -908,6 +988,11 @@ class QueryBuilder {
 	private final String groupByList;
 
 	/**
+	 * Aggregation "WHERE" clause, if any.
+	 */
+	private final WhereClause aggregationWhereClause;
+
+	/**
 	 * Body of the "ORDER BY" clause containing collection parent ids.
 	 */
 	private final String orderByList;
@@ -946,6 +1031,7 @@ class QueryBuilder {
 	 * @param collectionJoins Tail of the body of the "FROM" clause containing
 	 * the collection joins.
 	 * @param groupByList Body of the "GROUP BY" clause.
+	 * @param aggregationWhereClause Aggregation "WHERE" clause, if any.
 	 * @param orderByList Body of the "ORDER BY" clause containing collection
 	 * parent ids.
 	 * @param singlePropExprs Single-valued property SQL value expressions by
@@ -961,6 +1047,7 @@ class QueryBuilder {
 			final Set<String> selectSingleJoins,
 			final SortedMap<String, String> allSingleJoins,
 			final String collectionJoins, final String groupByList,
+			final WhereClause aggregationWhereClause,
 			final String orderByList,
 			final Map<String, SingleValuedQueryProperty> singlePropExprs,
 			final Map<String, CollectionQueryProperty> collectionProps,
@@ -979,6 +1066,7 @@ class QueryBuilder {
 		this.allSingleJoins = allSingleJoins;
 		this.collectionJoins = collectionJoins;
 		this.groupByList = groupByList;
+		this.aggregationWhereClause = aggregationWhereClause;
 		this.orderByList = orderByList;
 		this.singlePropExprs = singlePropExprs;
 		this.collectionProps = collectionProps;
@@ -1365,6 +1453,7 @@ class QueryBuilder {
 				ctx.allSingleJoins,
 				ctx.collectionJoins.toString(),
 				ctx.getGroupByList(),
+				ctx.getAggregationWhereClause(),
 				ctx.getOrderByList(),
 				ctx.singlePropExprs,
 				ctx.collectionProps,
@@ -1422,6 +1511,7 @@ class QueryBuilder {
 						CollectionUtils.<String, String>emptySortedMap(),
 						"",
 						"",
+						null,
 						"",
 						Collections.<String, SingleValuedQueryProperty>
 						emptyMap(),
@@ -2690,8 +2780,10 @@ class QueryBuilder {
 			if (ctx.mergedJoinAttachmentExprs.length() > 0)
 				groupByList.append(", ").append(ctx.mergedJoinAttachmentExprs);
 			ctx.setGroupByList(groupByList.toString());
+			ctx.setAggregationWhereClause(ctx.createAggregationWhereClause());
 		} else {
 			ctx.setGroupByList(branchQB.groupByList);
+			ctx.setAggregationWhereClause(branchQB.aggregationWhereClause);
 		}
 
 		// merge order by list
@@ -2796,8 +2888,12 @@ class QueryBuilder {
 					rebranchedSelectSingleJoins,
 					rebranchedAllSingleJoins,
 					rebranchedCollectionJoins.toString(),
-					(!ctx.isAggregationModeRoot() ? branchQB.groupByList :
+					(!ctx.isAggregationModeRoot() ?
+						branchQB.groupByList :
 						ctx.createGroupByList()),
+					(!ctx.isAggregationModeRoot() ?
+						branchQB.aggregationWhereClause :
+						ctx.createAggregationWhereClause()),
 					rebranchedOrderByList.toString(),
 					Collections.<String, SingleValuedQueryProperty>emptyMap(),
 					Collections.<String, CollectionQueryProperty>emptyMap(),
@@ -3022,8 +3118,10 @@ class QueryBuilder {
 			q.append(" WHERE ").append(whereClause.getBody());
 
 		// add "GROUP BY" clause
-		if (!this.groupByList.isEmpty())
+		if (!this.groupByList.isEmpty()) {
 			q.append(" GROUP BY ").append(this.groupByList);
+			;System.out.println(">>> APPENDING GROUP BY [" + this.groupByList + "], AGG WHERE: " + this.aggregationWhereClause);
+		}
 
 		// add the "ORDER BY" clause
 		if (orderByClause != null) {
@@ -3080,8 +3178,10 @@ class QueryBuilder {
 		q.append(this.collectionJoins);
 
 		// add "GROUP BY" clause
-		if (!this.groupByList.isEmpty())
+		if (!this.groupByList.isEmpty()) {
 			q.append(" GROUP BY ").append(this.groupByList);
+			;System.out.println(">>> APPENDING GROUP BY [" + this.groupByList + "], AGG WHERE: " + this.aggregationWhereClause);
+		}
 
 		// add the "ORDER BY" clause
 		if (orderByClause != null) {
