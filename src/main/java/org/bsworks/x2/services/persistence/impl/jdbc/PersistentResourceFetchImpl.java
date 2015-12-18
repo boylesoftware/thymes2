@@ -336,8 +336,7 @@ class PersistentResourceFetchImpl<R>
 					return Collections.emptySortedMap();
 				}
 				@Override
-				public FilterSpec<? extends Object> getAggregateFilter(
-						final String propPath) {
+				public FilterSpec<R> getAggregateFilter(final String propPath) {
 					return propsFetch.getAggregateFilter(propPath);
 				}
 			};
@@ -411,6 +410,9 @@ class PersistentResourceFetchImpl<R>
 		final String countQueryText;
 		final String dataQueryText;
 		final Map<String, JDBCParameterValue> params = new HashMap<>();
+
+		// get aggregation parameters from the query builder
+		params.putAll(qb.getAggregationParams());
 
 		// needed objects from the transaction
 		final SQLDialect dialect = this.tx.getSQLDialect();
@@ -558,7 +560,7 @@ class PersistentResourceFetchImpl<R>
 		}
 
 		// create the query
-		ResourcePersistenceQueryImpl<R> query =
+		final ResourcePersistenceQueryImpl<R> query =
 			new ResourcePersistenceQueryImpl<>(this.resources, this.tx,
 					dataQueryText, this.prsrcHandler.getResourceClass(),
 					params);

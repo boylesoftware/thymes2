@@ -12,7 +12,6 @@ import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.IdPropertyHandler;

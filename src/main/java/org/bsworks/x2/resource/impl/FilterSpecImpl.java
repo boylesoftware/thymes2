@@ -11,6 +11,7 @@ import java.util.TreeSet;
 import org.bsworks.x2.resource.FilterConditionType;
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.FilterSpecBuilder;
+import org.bsworks.x2.resource.InvalidSpecificationException;
 import org.bsworks.x2.resource.PropertyValueFunction;
 
 
@@ -45,6 +46,11 @@ class FilterSpecImpl<R>
 	private final FilterSpecImpl<R> parent;
 
 	/**
+	 * Base path.
+	 */
+	private String basePath;
+
+	/**
 	 * Nested junctions.
 	 */
 	private final Collection<FilterSpecImpl<R>> junctions = new ArrayList<>();
@@ -71,6 +77,12 @@ class FilterSpecImpl<R>
 	 * Used property paths.
 	 */
 	private final SortedSet<String> usedProps = new TreeSet<>();
+
+	/**
+	 * Read-only view of the used property paths.
+	 */
+	private final SortedSet<String> usedPropsRO =
+		Collections.unmodifiableSortedSet(this.usedProps);
 
 	/**
 	 * Participating persistent resource classes.
@@ -101,10 +113,12 @@ class FilterSpecImpl<R>
 		this.parent = parent;
 
 		if (parent == null) {
+			this.basePath = "";
 			this.prsrcClasses = new HashSet<>();
 			this.prsrcClassesRO =
 				Collections.unmodifiableSet(this.prsrcClasses);
 		} else {
+			this.basePath = parent.basePath;
 			this.prsrcClasses = parent.prsrcClasses;
 			this.prsrcClassesRO = parent.prsrcClassesRO;
 		}
@@ -122,6 +136,20 @@ class FilterSpecImpl<R>
 
 		if (this.parent != null)
 			this.parent.addUsedProperty(propPath);
+	}
+
+	/**
+	 * Update base path of this builder and recursively all of its nested con-
+	 * and disjunctions.
+	 *
+	 * @param basePath New base path.
+	 */
+	void updateBasePath(final String basePath) {
+
+		this.basePath = basePath;
+
+		for (final FilterSpecImpl<R> junc : this.junctions)
+			junc.updateBasePath(basePath);
 	}
 
 
@@ -152,6 +180,41 @@ class FilterSpecImpl<R>
 		this.disjunction = true;
 
 		return this;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public FilterSpecBuilder<R> setBasePath(final String propPath) {
+
+		// validate the path
+		this.prsrcHandler.getPersistentPropertyChain(propPath);
+
+		// make sure used properties are children of the new base path
+		final String basePath = propPath + ".";
+		for (final String usedPropPath : this.usedProps) {
+			if (!usedPropPath.startsWith(basePath))
+				throw new InvalidSpecificationException("Property "
+						+ usedPropPath + " used by the filter belongs to a"
+						+ " different base path.");
+		}
+
+		// update base path
+		this.updateBasePath(basePath);
+
+		// done
+		return this;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public String getBasePath() {
+
+		return (this.basePath.isEmpty() ? "" :
+			this.basePath.substring(0, this.basePath.length() - 1));
 	}
 
 	/* (non-Javadoc)
@@ -202,12 +265,12 @@ class FilterSpecImpl<R>
 			final Object... operands) {
 
 		final FilterConditionImpl c = new FilterConditionImpl(this.resources,
-				type, func, funcParams, negate, this.prsrcHandler, propPath,
-				operands, this.prsrcClasses);
+				type, func, funcParams, negate, this.prsrcHandler,
+				this.basePath + propPath, operands, this.prsrcClasses);
 
 		this.conditions.add(c);
 
-		this.addUsedProperty(propPath);
+		this.addUsedProperty(c.getPropertyPath());
 
 		return this;
 	}
@@ -239,6 +302,15 @@ class FilterSpecImpl<R>
 	public Collection<? extends FilterSpec<R>> getJunctions() {
 
 		return this.junctionsRO;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public SortedSet<String> getUsedProperties() {
+
+		return this.usedPropsRO;
 	}
 
 	/* (non-Javadoc)

@@ -15,7 +15,6 @@ import org.bsworks.x2.resource.InvalidSpecificationException;
 import org.bsworks.x2.resource.ObjectPropertyHandler;
 import org.bsworks.x2.resource.PropertiesFetchSpecBuilder;
 import org.bsworks.x2.resource.RefPropertyHandler;
-import org.bsworks.x2.resource.ResourceHandler;
 import org.bsworks.x2.resource.ResourcePropertyHandler;
 
 
@@ -98,8 +97,7 @@ class PropertiesFetchSpecImpl<R>
 	/**
 	 * Aggregate property filters by property paths.
 	 */
-	private final Map<String, FilterSpec<? extends Object>> aggergateFilters =
-		new HashMap<>();
+	private final Map<String, FilterSpec<R>> aggergateFilters = new HashMap<>();
 
 
 	/**
@@ -207,8 +205,7 @@ class PropertiesFetchSpecImpl<R>
 	 * See overridden method.
 	 */
 	@Override
-	public FilterSpec<? extends Object> getAggregateFilter(
-			final String propPath) {
+	public FilterSpec<R> getAggregateFilter(final String propPath) {
 
 		return this.aggergateFilters.get(propPath);
 	}
@@ -366,35 +363,26 @@ class PropertiesFetchSpecImpl<R>
 	 */
 	@Override
 	public PropertiesFetchSpecBuilder<R> includeFilteredAggregate(
-			final String propPath, final FilterSpec<? extends Object> filter) {
+			final String propPath, final FilterSpec<R> filter) {
 
 		// get property chain and validate property path
 		final Deque<? extends ResourcePropertyHandler> propChain =
 			this.prsrcHandler.getPersistentPropertyChain(propPath);
 
 		// last property must be an aggregate
-		final AggregatePropertyHandler propHandler;
-		try {
-			propHandler = (AggregatePropertyHandler) propChain.getLast();
-		} catch (final ClassCastException e) {
+		if (!(propChain.getLast() instanceof AggregatePropertyHandler))
 			throw new InvalidSpecificationException("Property " + propPath
 					+ " is not an aggregate.");
-		}
 
-		// validate the filter root class
-		final ResourceHandler<?> aggregatedResourceHandler;
-		try {
-			aggregatedResourceHandler = (ResourceHandler<?>) propHandler
-					.getAggregatedCollectionHandler();
-		} catch (final ClassCastException e) {
-			throw new InvalidSpecificationException("Aggregate property "
-					+ propPath + " does not refer to a resource references"
-							+ " collection and cannot be filtered.");
+		// validate the filter conditions
+		for (final String filterPropPath : filter.getUsedProperties()) {
+			if (!filterPropPath.startsWith(propPath)
+					|| (filterPropPath.length() == propPath.length()))
+				throw new InvalidSpecificationException("Filter associated with"
+						+ " aggregate property " + propPath
+						+ " uses properties that do not belong to the"
+						+ " aggregated collection.");
 		}
-		if (!filter.getPersistentResourceClass().equals(
-				aggregatedResourceHandler.getResourceClass()))
-			throw new InvalidSpecificationException("The specified filter is"
-					+ " not for the aggregated resource type.");
 
 		// include the property
 		this.include(propPath);

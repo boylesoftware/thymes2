@@ -55,13 +55,16 @@ public interface PropertiesFetchSpec<R> {
 	SortedMap<String, Class<?>> getFetchedRefProperties();
 
 	/**
-	 * Get filter to use to limit resource records participating in the
+	 * Get filter used to limit resource records participating in the
 	 * calculation of the specified aggregate property value.
 	 *
-	 * @param propPath Aggregate property path with nested properties separated
-	 * with dots.
+	 * <p>The returned filter specification is based at the persistent resource,
+	 * but all properties used in all filter conditions are nested properties in
+	 * the aggregated collection.
 	 *
-	 * @return Filter to use, or {@code null} if no filter.
+	 * @param propPath Aggregate property path.
+	 *
+	 * @return The filter, or {@code null} if no filter.
 	 */
-	FilterSpec<? extends Object> getAggregateFilter(String propPath);
+	FilterSpec<R> getAggregateFilter(String propPath);
 }

@@ -33,7 +33,6 @@ import org.bsworks.x2.resource.PropertiesFetchSpec;
 import org.bsworks.x2.resource.PropertiesFetchSpecBuilder;
 import org.bsworks.x2.resource.PropertyValueFunction;
 import org.bsworks.x2.resource.RangeSpec;
-import org.bsworks.x2.resource.ResourceHandler;
 import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.resource.SortDirection;
 import org.bsworks.x2.responses.NotModifiedResponse;
@@ -372,8 +371,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 		throws EndpointCallErrorException {
 
 		// create collector for additional filters
-		final Map<String, FilterSpecBuilder<? extends Object>> addlFilters =
-			new HashMap<>();
+		final Map<String, FilterSpecBuilder<R>> addlFilters = new HashMap<>();
 
 		// get properties fetch specification
 		final String propsFetchParam =
@@ -515,11 +513,10 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 */
 	private void parseAdditionalFilters(
 			final EndpointCallContext ctx,
-			final Map<String, FilterSpecBuilder<? extends Object>>
-			addlFilters)
+			final Map<String, FilterSpecBuilder<R>> addlFilters)
 		throws EndpointCallErrorException {
 
-		for (final Map.Entry<String, FilterSpecBuilder<? extends Object>> entry
+		for (final Map.Entry<String, FilterSpecBuilder<R>> entry
 				: addlFilters.entrySet()) {
 			try {
 				this.parseFilterParams(ctx, entry.getValue(), entry.getKey());
@@ -549,8 +546,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			final EndpointCallContext ctx,
 			final PropertiesFetchSpecBuilder<R> propsFetch,
 			final String paramValue,
-			final Map<String, FilterSpecBuilder<? extends Object>>
-			addlFilters) {
+			final Map<String, FilterSpecBuilder<R>> addlFilters) {
 
 		// extract elements
 		int lastMatchEnd = -1;
@@ -571,33 +567,34 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 					propsFetch.exclude(propPath);
 			} else {
 				if (filterKey != null) {
-					FilterSpecBuilder<? extends Object> filter =
-						addlFilters.get(filterKey);
-					if (filter == null) {
-						final Class<?> aggRsrcClass;
-						try {
-							aggRsrcClass = (
-								(ResourceHandler<?>)
-								(
-									(AggregatePropertyHandler)
-									this.prsrcHandler
-										.getPersistentPropertyChain(propPath)
-										.getLast()
-								).getAggregatedCollectionHandler()
-							).getResourceClass();
-						} catch (final ClassCastException e) {
-							throw new InvalidSpecificationException(
-									"Invalid filtered aggregate property path.",
-									e);
-						}
-						addlFilters.put(filterKey,
-								filter = ctx.getFilterSpec(aggRsrcClass));
+					final String aggCollectionPath;
+					try {
+						aggCollectionPath =
+							((AggregatePropertyHandler) this.prsrcHandler
+								.getPersistentPropertyChain(propPath).getLast())
+								.getAggregatedCollectionPropertyPath();
+					} catch (final ClassCastException e) {
+						throw new InvalidSpecificationException(
+								"Filtered property \"" + propPath
+								+ "\" is not an aggregate property.", e);
 					}
+					FilterSpecBuilder<R> filter = addlFilters.get(filterKey);
+					if (filter == null)
+						addlFilters.put(filterKey,
+								filter = ctx
+									.getFilterSpec(this.prsrcClass)
+									.setBasePath(aggCollectionPath));
+					else if (!filter.getBasePath().equals(aggCollectionPath))
+						throw new InvalidSpecificationException("Filter \""
+								+ filterKey + "\" is shared by aggregate"
+								+ " properties that aggregate different"
+								+ " collections.");
 					propsFetch.includeFilteredAggregate(propPath, filter);
-				} else if (fullMatch.endsWith(".*"))
+				} else if (fullMatch.endsWith(".*")) {
 					propsFetch.fetch(propPath);
-				else
+				} else {
 					propsFetch.include(propPath);
+				}
 			}
 		}
 		if (lastMatchEnd != paramValue.length())
@@ -618,8 +615,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			final EndpointCallContext ctx,
 			final OrderSpecBuilder<R> order,
 			final String paramValue,
-			final Map<String, FilterSpecBuilder<? extends Object>>
-			addlFilters) {
+			final Map<String, FilterSpecBuilder<R>> addlFilters) {
 
 		// extract elements
 		int lastMatchEnd = -1;
@@ -636,16 +632,14 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			if (splitFilterKey != null) {
 
 				// get segment split
-				FilterSpecBuilder<R> split;
-				try {
-					split = this.castFilter(addlFilters.get(splitFilterKey));
-				} catch (final ClassCastException e) {
-					throw new InvalidSpecificationException("The segment filter"
-							+ " is for a wrong persistent resource.", e);
-				}
+				FilterSpecBuilder<R> split = addlFilters.get(splitFilterKey);
 				if (split == null)
 					addlFilters.put(splitFilterKey,
 							split = ctx.getFilterSpec(this.prsrcClass));
+				else if (!split.getBasePath().isEmpty())
+					throw new InvalidSpecificationException(
+							"Result segmentation uses aggregate property"
+							+ " filter.");
 
 				// add segment
 				order.addSegment(dir, split);
@@ -680,7 +674,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 */
 	private void parseFilterParams(
 			final EndpointCallContext ctx,
-			final FilterSpecBuilder<? extends Object> filter,
+			final FilterSpecBuilder<R> filter,
 			final String filterKey) {
 
 		// get relevant parameters
@@ -689,7 +683,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 
 		// find and process filter specification elements
 		final Matcher m = FILTER_PARAM_NAME_PATTERN.matcher("");
-		FilterSpecBuilder<? extends Object> curGroup = filter;
+		FilterSpecBuilder<R> curGroup = filter;
 		String curGroupKey = filterKey;
 		final List<String> curGroupKeyParts = new ArrayList<>();
 		this.splitFilterGroupKey(curGroupKey, curGroupKeyParts);
@@ -874,30 +868,6 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 		}
 
 		return PropertyValueFunction.PLAIN;
-	}
-
-	/**
-	 * Cast specified filter to filter for the handler's persistent resource.
-	 *
-	 * @param filter The filter to cast. May be {@code null}.
-	 *
-	 * @return The filter, or {@code null} if {@code null} was passed into the
-	 * method.
-	 *
-	 * @throws ClassCastException If the specified filter is for a different
-	 * resource.
-	 */
-	@SuppressWarnings("unchecked")
-	private FilterSpecBuilder<R> castFilter(
-			final FilterSpecBuilder<? extends Object> filter) {
-
-		if (filter == null)
-			return null;
-
-		if (!filter.getPersistentResourceClass().equals(this.prsrcClass))
-			throw new ClassCastException();
-
-		return (FilterSpecBuilder<R>) filter;
 	}
 
 	/**

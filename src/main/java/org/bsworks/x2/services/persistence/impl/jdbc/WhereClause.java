@@ -1028,4 +1028,14 @@ class WhereClause {
 
 		return this.usedJoins;
 	}
+
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public String toString() {
+
+		return "[" + this.body + "], used joins: " + this.usedJoins;
+	}
 }

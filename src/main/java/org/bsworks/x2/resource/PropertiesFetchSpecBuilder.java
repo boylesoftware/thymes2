@@ -91,16 +91,20 @@ public interface PropertiesFetchSpecBuilder<R>
 
 	/**
 	 * Include an aggregate property and attach a filter for the aggregated
-	 * resource records that will participate in the aggregated property value
+	 * resource records that will participate in the aggregate property value
 	 * calculation.
 	 *
-	 * <p>The specified aggregate property must refer to a resource references
-	 * collection so that the aggregated records are resource records. An
-	 * aggregate property referring a nested objects collection cannot be
-	 * filtered. If attempted, an {@link InvalidSpecificationException} is
-	 * thrown.
+	 * <p>The specified filter is based at the persistent resource, but all
+	 * properties in all of its conditions must be nested properties in the
+	 * aggregated collection. An {@link InvalidSpecificationException} is thrown
+	 * if the filter uses any property that is not nested in the aggregated
+	 * collection. Note, that the specified filter is stored using its
+	 * reference, so if the filter specification is not immutable, care should
+	 * be taken not to modify it later on and add incompatible conditions.
 	 *
-	 * <p>In all other aspects, similar to the {@link #include(String)} method.
+	 * <p>In all other aspects, similar to the {@link #include(String)} method
+	 * adding the specification property path to the include rules and any
+	 * intermediate references to the fetch.
 	 *
 	 * @param propPath Aggregate property path with nested properties separated
 	 * with dots. The path starts at the class returned by
@@ -110,10 +114,11 @@ public interface PropertiesFetchSpecBuilder<R>
 	 * @return This object (for chaining).
 	 *
 	 * @throws InvalidSpecificationException If the specified property path is
-	 * invalid.
+	 * invalid or filter uses properties that are not nested in the aggregated
+	 * collection.
 	 */
 	PropertiesFetchSpecBuilder<R> includeFilteredAggregate(String propPath,
-			FilterSpec<? extends Object> filter);
+			FilterSpec<R> filter);
 
 	/**
 	 * Exclude specified property. Calling this method adds a rule to the

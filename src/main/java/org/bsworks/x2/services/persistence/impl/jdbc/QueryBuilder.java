@@ -19,7 +19,6 @@ import org.apache.commons.logging.LogFactory;
 import org.bsworks.x2.Actor;
 import org.bsworks.x2.resource.AggregatePropertyHandler;
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
-import org.bsworks.x2.resource.FilterCondition;
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.IdPropertyHandler;
 import org.bsworks.x2.resource.MetaPropertyHandler;
@@ -39,7 +38,9 @@ import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.resource.SimplePropertyHandler;
 import org.bsworks.x2.resource.TypePropertyHandler;
 import org.bsworks.x2.services.persistence.PersistenceException;
+import org.bsworks.x2.services.persistence.PersistentValueType;
 import org.bsworks.x2.util.CollectionUtils;
+import org.bsworks.x2.util.MutableInt;
 import org.bsworks.x2.util.sql.dialect.SQLDialect;
 
 
@@ -105,6 +106,16 @@ class QueryBuilder {
 		 * Order specification.
 		 */
 		final OrderSpec<?> order;
+
+		/**
+		 * Aggregation parameters collector.
+		 */
+		final Map<String, JDBCParameterValue> aggregationParams;
+
+		/**
+		 * Next aggregation parameter names discriminator.
+		 */
+		private final MutableInt nextAggregationParamsDisc;
 
 		/**
 		 * Parent property path (my be empty but not {@code null}).
@@ -189,7 +200,8 @@ class QueryBuilder {
 		/**
 		 * Join expressions for all single-valued properties.
 		 */
-		final SortedMap<String, String> allSingleJoins = new TreeMap<>();
+		private final SortedMap<String, String> allSingleJoins =
+			new TreeMap<>();
 
 		/**
 		 * Collection joins.
@@ -214,13 +226,13 @@ class QueryBuilder {
 		/**
 		 * Single-valued property descriptors by property paths.
 		 */
-		final Map<String, SingleValuedQueryProperty> singlePropExprs =
+		private final Map<String, SingleValuedQueryProperty> singlePropExprs =
 			new HashMap<>();
 
 		/**
 		 * Collection property stumps by property paths.
 		 */
-		final Map<String, CollectionQueryProperty> collectionProps =
+		private final Map<String, CollectionQueryProperty> collectionProps =
 			new HashMap<>();
 
 		/**
@@ -275,6 +287,17 @@ class QueryBuilder {
 		private int aggregationBranchLevel;
 
 		/**
+		 * Branch level of the aggregated collection.
+		 */
+		private int aggregatedCollectionBranchLevel;
+
+		/**
+		 * Reference in the top aggregation context to the aggregation context
+		 * of the aggregated collection.
+		 */
+		private QueryBuilderContext aggregatedCollectionBranchCtx;
+
+		/**
 		 * Aggregated collection property path.
 		 */
 		private String aggregatedCollectionPropPath;
@@ -303,7 +326,7 @@ class QueryBuilder {
 		/**
 		 * Aggregation filter, if any.
 		 */
-		private FilterSpec<? extends Object> aggregationFilter;
+		private FilterSpec<?> aggregationFilter;
 
 
 		/**
@@ -318,13 +341,15 @@ class QueryBuilder {
 		 * @param propsFetch Properties fetch specification, or {@code null}.
 		 * @param filter Filter specification, or {@code null}.
 		 * @param order Order specification, or {@code null}.
+		 * @param aggregationParams Aggregation parameters collector.
 		 */
 		QueryBuilderContext(final Resources resources, final SQLDialect dialect,
 				final ParameterValuesFactoryImpl paramsFactory,
 				final Actor actor,
 				final PersistentResourceHandler<?> prsrcHandler,
 				final PropertiesFetchSpec<?> propsFetch,
-				final FilterSpec<?> filter, final OrderSpec<?> order) {
+				final FilterSpec<?> filter, final OrderSpec<?> order,
+				final Map<String, JDBCParameterValue> aggregationParams) {
 
 			this.parentCtx = null;
 			this.prsrcHandler = prsrcHandler;
@@ -335,6 +360,8 @@ class QueryBuilder {
 			this.propsFetch = propsFetch;
 			this.filter = filter;
 			this.order = order;
+			this.aggregationParams = aggregationParams;
+			this.nextAggregationParamsDisc = new MutableInt('a');
 			this.parentPropPath = null;
 			this.parentPropChain =
 				Collections.<ResourcePropertyHandler>emptyList();
@@ -389,6 +416,9 @@ class QueryBuilder {
 			this.propsFetch = parentCtx.propsFetch;
 			this.filter = parentCtx.filter;
 			this.order = parentCtx.order;
+			this.aggregationParams = parentCtx.aggregationParams;
+			this.nextAggregationParamsDisc =
+				parentCtx.nextAggregationParamsDisc;
 			this.parentPropPath = parentPropPath;
 			this.parentPropChain = parentCtx.propChain;
 			this.rootTableName = rootTableName;
@@ -408,6 +438,15 @@ class QueryBuilder {
 			this.aggregationBranchLevel =
 				(parentCtx.aggregationBranchLevel < 0 ? -1 :
 					parentCtx.aggregationBranchLevel + 1);
+			this.aggregatedCollectionBranchLevel =
+				parentCtx.aggregatedCollectionBranchLevel;
+			if (this.aggregationBranchLevel
+					== this.aggregatedCollectionBranchLevel) {
+				QueryBuilderContext topCtx = this;
+				for (int i = this.aggregationBranchLevel; i > 0; i--)
+					topCtx = topCtx.parentCtx;
+				topCtx.aggregatedCollectionBranchCtx = this;
+			}
 			this.aggregatedCollectionPropPath =
 				parentCtx.aggregatedCollectionPropPath;
 			this.aggregationKeyPropName = parentCtx.aggregationKeyPropName;
@@ -486,6 +525,115 @@ class QueryBuilder {
 		}
 
 		/**
+		 * Register single valued property in the context.
+		 *
+		 * @param propPath Property path.
+		 * @param valExpr Property value expression.
+		 * @param valType Value type.
+		 */
+		void addSingleValuedProp(final String propPath, final String valExpr,
+				final PersistentValueType valType) {
+
+			this.singlePropExprs.put(propPath,
+					new SingleValuedQueryProperty(valExpr, valType));
+		}
+
+		/**
+		 * Register collection property in the context.
+		 *
+		 * @param propPath Property path.
+		 * @param propHandler Property handler.
+		 * @param collectionTableName Name of the table that represents the
+		 * collection.
+		 * @param collectionTableAlias Collection table alias.
+		 * @param collectionTableJoinCondition Condition expression used to join
+		 * the collection table to its parent.
+		 * @param keyExpr Expression for the key value, or {@code null} if not
+		 * available.
+		 * @param valueExpr Expression for the collection element value, which
+		 * is record id if the collection elements are nested objects or
+		 * references.
+		 */
+		void addCollectionProp(final String propPath,
+				final ResourcePropertyHandler propHandler,
+				final String collectionTableName,
+				final String collectionTableAlias,
+				final String collectionTableJoinCondition,
+				final String keyExpr, final String valueExpr) {
+
+			this.collectionProps.put(propPath, new CollectionQueryProperty(
+					propHandler, collectionTableName, collectionTableAlias,
+					collectionTableJoinCondition, keyExpr, valueExpr));
+		}
+
+		/**
+		 * Import single-valued and collection properties into the context.
+		 *
+		 * @param singlePropExprs Single-valued property descriptors.
+		 * @param collectionProps Collection property descriptors.
+		 */
+		void importProps(
+				final Map<String, SingleValuedQueryProperty> singlePropExprs,
+				final Map<String, CollectionQueryProperty> collectionProps) {
+
+			this.singlePropExprs.putAll(singlePropExprs);
+			this.collectionProps.putAll(collectionProps);
+		}
+
+		/**
+		 * Get single valued property descriptors.
+		 *
+		 * @return Single-valued property descriptors by property paths.
+		 */
+		Map<String, SingleValuedQueryProperty> getSingleValuedProps() {
+
+			return this.singlePropExprs;
+		}
+
+		/**
+		 * Get collection property descriptors.
+		 *
+		 * @return Collection property descriptors by property paths.
+		 */
+		Map<String, CollectionQueryProperty> getCollectionProps() {
+
+			return this.collectionProps;
+		}
+
+		/**
+		 * Add single-valued property join to the context.
+		 *
+		 * @param propPath Property path.
+		 * @param joinExpr Join expression.
+		 */
+		void addSingleValuedPropJoin(final String propPath,
+				final String joinExpr) {
+
+			this.allSingleJoins.put(propPath, joinExpr);
+		}
+
+		/**
+		 * Add all single-valued property joins from the specified map.
+		 *
+		 * @param joins The joins to import.
+		 */
+		void importSingleValuedPropJoins(
+				final SortedMap<String, String> joins) {
+
+			this.allSingleJoins.putAll(joins);
+		}
+
+		/**
+		 * Get join expressions for all single-valued properties in the context.
+		 *
+		 * @return Join expressions by property paths.
+		 */
+		SortedMap<String, String> getAllSingleJoins() {
+
+			return this.allSingleJoins;
+		}
+
+		/**
 		 * Create group by list.
 		 *
 		 * @return Group by list.
@@ -525,19 +673,16 @@ class QueryBuilder {
 			if (this.aggregationFilter == null)
 				return null;
 
-			;System.out.println(">>> BUILDING AGGREGATION WHERE CLAUSE:"
-					+ "\n - singlePropExprs: " + this.singlePropExprs
-					+ "\n - collectionProps: " + this.collectionProps
-					+ "\n - allSingleJoins: " + this.allSingleJoins
-					+ "\n - aggregationValueExprs: " + this.aggregationValueExprs);
-			/*final Map<String, JDBCParameterValue> params = new HashMap<>();
-			final WhereClause res = new WhereClause(this.resources,
-					this.dialect, this.paramsFactory,
-					this.aggregationFilter, "g", this.singlePropExprs,
-					this.collectionProps, this.allSingleJoins, params);
-			;System.out.println(">>> BUILT WHERE CLAUSE: " + res);*/
-
-			;return null;
+			return new WhereClause(
+					this.resources,
+					this.dialect,
+					this.paramsFactory,
+					this.aggregationFilter,
+					"g" + ((char) this.nextAggregationParamsDisc.increment()),
+					this.aggregatedCollectionBranchCtx.singlePropExprs,
+					this.aggregatedCollectionBranchCtx.collectionProps,
+					this.aggregatedCollectionBranchCtx.allSingleJoins,
+					this.aggregationParams);
 		}
 
 		/**
@@ -730,7 +875,7 @@ class QueryBuilder {
 		 *
 		 * @return The filter, or {@code null} if none.
 		 */
-		FilterSpec<? extends Object> getAggregateFilter(final String propPath) {
+		FilterSpec<?> getAggregateFilter(final String propPath) {
 
 			final PropertiesFetchSpec<?> propsFetch =
 				this.getPropertiesFetchSpec();
@@ -756,9 +901,14 @@ class QueryBuilder {
 				final String aggregatedCollectionPropPath,
 				final String aggregationKeyPropName,
 				final List<AggregatePropertyHandler> aggregatedPropHandlers,
-				final FilterSpec<? extends Object> aggFilter) {
+				final FilterSpec<?> aggFilter) {
 
 			this.aggregationBranchLevel = 0;
+
+			this.aggregatedCollectionBranchLevel = 1;
+			for (int i = aggregatedCollectionPropPath.indexOf('.'); i > 0;
+					i =  aggregatedCollectionPropPath.indexOf('.', i + 1))
+				this.aggregatedCollectionBranchLevel++;
 
 			this.aggregatedPropHandlers = aggregatedPropHandlers;
 			this.aggregationKeyPropName = aggregationKeyPropName;
@@ -783,7 +933,7 @@ class QueryBuilder {
 
 				// add intermediate references to the fetch
 				// INCLUDED AUTOMATICALLY
-				/*final String refPath = ph.getLastIntermediateRefPath();
+				;/*final String refPath = ph.getLastIntermediateRefPath();
 				if (refPath != null)
 					this.aggregationPropsFetch.fetch(propPathsPrefix + refPath);*/
 			}
@@ -791,21 +941,9 @@ class QueryBuilder {
 			// save aggregation filter and include all used properties
 			this.aggregationFilter = aggFilter;
 			if (this.aggregationFilter != null)
-				this.includeUsedFilterProps(
-						this.aggregationFilter,
-						this.aggregationPropsFetch,
-						this.aggregatedCollectionPropPath + ".");
-		}
-
-		private void includeUsedFilterProps(
-				final FilterSpec<? extends Object> filter,
-				final PropertiesFetchSpecBuilder<?> propsFetch,
-				final String propsPrefix) {
-
-			for (FilterCondition c : filter.getConditions())
-				propsFetch.include(propsPrefix + c.getPropertyPath());
-			for (FilterSpec<? extends Object> junc : filter.getJunctions())
-				this.includeUsedFilterProps(junc, propsFetch, propsPrefix);
+				for (final String propPath :
+						this.aggregationFilter.getUsedProperties())
+					this.aggregationPropsFetch.include(propPath);
 		}
 
 		/**
@@ -814,6 +952,9 @@ class QueryBuilder {
 		void clearAggregationMode() {
 
 			this.aggregationBranchLevel = -1;
+
+			this.aggregatedCollectionBranchLevel = -1;
+			this.aggregatedCollectionBranchCtx = null;
 
 			this.aggregatedCollectionPropPath = null;
 			this.aggregationKeyPropName = null;
@@ -993,6 +1134,11 @@ class QueryBuilder {
 	private final WhereClause aggregationWhereClause;
 
 	/**
+	 * Parameters for the aggregation "WHERE" clause.
+	 */
+	private final Map<String, JDBCParameterValue> aggregationParams;
+
+	/**
 	 * Body of the "ORDER BY" clause containing collection parent ids.
 	 */
 	private final String orderByList;
@@ -1032,6 +1178,7 @@ class QueryBuilder {
 	 * the collection joins.
 	 * @param groupByList Body of the "GROUP BY" clause.
 	 * @param aggregationWhereClause Aggregation "WHERE" clause, if any.
+	 * @param aggregationParams Parameters for the aggregation "WHERE" clause.
 	 * @param orderByList Body of the "ORDER BY" clause containing collection
 	 * parent ids.
 	 * @param singlePropExprs Single-valued property SQL value expressions by
@@ -1048,6 +1195,7 @@ class QueryBuilder {
 			final SortedMap<String, String> allSingleJoins,
 			final String collectionJoins, final String groupByList,
 			final WhereClause aggregationWhereClause,
+			final Map<String, JDBCParameterValue> aggregationParams,
 			final String orderByList,
 			final Map<String, SingleValuedQueryProperty> singlePropExprs,
 			final Map<String, CollectionQueryProperty> collectionProps,
@@ -1067,6 +1215,7 @@ class QueryBuilder {
 		this.collectionJoins = collectionJoins;
 		this.groupByList = groupByList;
 		this.aggregationWhereClause = aggregationWhereClause;
+		this.aggregationParams = aggregationParams;
 		this.orderByList = orderByList;
 		this.singlePropExprs = singlePropExprs;
 		this.collectionProps = collectionProps;
@@ -1104,7 +1253,8 @@ class QueryBuilder {
 						prsrcHandler,
 						propsFetch,
 						filter,
-						order),
+						order,
+						new HashMap<String, JDBCParameterValue>()),
 				"",
 				false,
 				null,
@@ -1289,13 +1439,11 @@ class QueryBuilder {
 		if ((idPropHandler != null) && !polymorphic) {
 			ctx.appendSelectList(idPropHandler.getName(), idColValExpr,
 					idColValExpr);
-			ctx.singlePropExprs.put(
+			ctx.addSingleValuedProp(
 					ctx.getPropertyPath(idPropHandler.getName()),
-					new SingleValuedQueryProperty(
-							ctx.rootTableAlias + "."
-								+ idPropHandler.getPersistence().getFieldName(),
-							idPropHandler.getValueHandler()
-								.getPersistentValueType()));
+					ctx.rootTableAlias + "."
+							+ idPropHandler.getPersistence().getFieldName(),
+					idPropHandler.getValueHandler().getPersistentValueType());
 		}
 
 		// see if persistent resource
@@ -1314,10 +1462,8 @@ class QueryBuilder {
 					ctx.getPropertyPath(metaHandler.getName());
 				final String metaValExpr = ctx.rootTableAlias + "."
 						+ metaHandler.getPersistence().getFieldName();
-				ctx.singlePropExprs.put(propPath,
-						new SingleValuedQueryProperty(metaValExpr,
-								metaHandler.getValueHandler()
-									.getPersistentValueType()));
+				ctx.addSingleValuedProp(propPath, metaValExpr,
+						metaHandler.getValueHandler().getPersistentValueType());
 				if (ctx.isSelected(propPath, metaHandler))
 					ctx.appendSelectList(
 							metaValExpr + " AS " + ctx.dialect.quoteColumnLabel(
@@ -1353,10 +1499,8 @@ class QueryBuilder {
 			final Map<String, List<AggregatePropertyHandler>>
 			aggregatePropHandlers = new HashMap<>();
 			int branchKeyDisc = 0;
-			final Map<FilterSpec<? extends Object>, Integer> aggFilterDiscs =
-				new HashMap<>();
-			final Map<String, FilterSpec<? extends Object>> aggFilters =
-				new HashMap<>();
+			final Map<FilterSpec<?>, Integer> aggFilterDiscs = new HashMap<>();
+			final Map<String, FilterSpec<?>> aggFilters = new HashMap<>();
 			for (final AggregatePropertyHandler propHandler :
 					prsrcHandler.getAggregateProperties()) {
 				final String propPath =
@@ -1364,7 +1508,7 @@ class QueryBuilder {
 				if (!ctx.isSelected(propPath, propHandler))
 					continue;
 				List<AggregatePropertyHandler> phList = null;
-				final FilterSpec<? extends Object> aggFilter =
+				final FilterSpec<?> aggFilter =
 					ctx.getAggregateFilter(propPath);
 				if (propHandler.getKeyPropertyName() != null) {
 					final String branchKey =
@@ -1425,6 +1569,7 @@ class QueryBuilder {
 				}
 				phList.add(propHandler);
 			}
+			;System.out.println(">>> AGG PROP HANDLERS: " + aggregatePropHandlers);
 
 			// add aggregate properties if any
 			for (final Map.Entry<String, List<AggregatePropertyHandler>> entry :
@@ -1450,13 +1595,14 @@ class QueryBuilder {
 				ctx.rootIdColName,
 				ctx.getSelectList(),
 				ctx.selectSingleJoins,
-				ctx.allSingleJoins,
+				ctx.getAllSingleJoins(),
 				ctx.collectionJoins.toString(),
 				ctx.getGroupByList(),
 				ctx.getAggregationWhereClause(),
+				ctx.aggregationParams,
 				ctx.getOrderByList(),
-				ctx.singlePropExprs,
-				ctx.collectionProps,
+				ctx.getSingleValuedProps(),
+				ctx.getCollectionProps(),
 				ctx.branches);
 		final QueryBranch resBranch = new QueryBranch(resQB,
 				ctx.parentAnchorColExpr, joinExpr, joinAttachmentExpr,
@@ -1512,6 +1658,7 @@ class QueryBuilder {
 						"",
 						"",
 						null,
+						ctx.aggregationParams,
 						"",
 						Collections.<String, SingleValuedQueryProperty>
 						emptyMap(),
@@ -1567,10 +1714,8 @@ class QueryBuilder {
 
 		// add property to the single properties
 		final String propPath = ctx.getPropertyPath(propHandler.getName());
-		ctx.singlePropExprs.put(propPath,
-				new SingleValuedQueryProperty(propValExpr,
-						propHandler.getValueHandler()
-							.getPersistentValueType()));
+		ctx.addSingleValuedProp(propPath, propValExpr,
+				propHandler.getValueHandler().getPersistentValueType());
 
 		// check if selected
 		if (!ctx.isSelected(propPath, propHandler))
@@ -1617,10 +1762,9 @@ class QueryBuilder {
 			ctx.propTableAlias + "." + propPersistence.getParentIdFieldName();
 		final String propJoinCondition = propAttachmentExpr
 				+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
-		ctx.collectionProps.put(propPath,
-				new CollectionQueryProperty(propHandler, propTableName,
-						ctx.propTableAlias, propJoinCondition, propKeyExpr,
-						propValueExpr));
+		ctx.addCollectionProp(propPath, propHandler, propTableName,
+				ctx.propTableAlias, propJoinCondition, propKeyExpr,
+				propValueExpr);
 
 		// create anchor column expression
 		final String propAnchorColExpr =
@@ -1700,13 +1844,14 @@ class QueryBuilder {
 				typeExpr = typeExprBuf.toString();
 
 				// add concrete type joins
-				ctx.allSingleJoins.put(propPath + "." + typeHandler.getName(),
+				ctx.addSingleValuedPropJoin(
+						propPath + "." + typeHandler.getName(),
 						ctx.valueTypeTestJoins.toString());
 			}
-			ctx.singlePropExprs.put(propPath + "." + typeHandler.getName(),
-					new SingleValuedQueryProperty(typeExpr,
-							typeHandler.getValueHandler()
-								.getPersistentValueType()));
+			ctx.addSingleValuedProp(
+					propPath + "." + typeHandler.getName(),
+					typeExpr,
+					typeHandler.getValueHandler().getPersistentValueType());
 		}
 	}
 
@@ -1882,10 +2027,9 @@ class QueryBuilder {
 		final String propJoinCondition =
 			ctx.propTableAlias + "." + propPersistence.getParentIdFieldName()
 			+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
-		ctx.collectionProps.put(propPath,
-				new CollectionQueryProperty(propHandler, propTableName,
-						ctx.propTableAlias, propJoinCondition, propKeyExpr,
-						propValueExpr));
+		ctx.addCollectionProp(propPath, propHandler, propTableName,
+				ctx.propTableAlias, propJoinCondition, propKeyExpr,
+				propValueExpr);
 
 		// create anchor column expression
 		final String propAnchorColExpr;
@@ -1990,10 +2134,8 @@ class QueryBuilder {
 			ctx.rootTableAlias + "." + propPersistence.getFieldName();
 
 		// add property to the single properties
-		ctx.singlePropExprs.put(propPath,
-				new SingleValuedQueryProperty(propValExpr,
-						propHandler.getValueHandler()
-							.getPersistentValueType()));
+		ctx.addSingleValuedProp(propPath, propValExpr,
+				propHandler.getValueHandler().getPersistentValueType());
 
 		// create column value expression
 		final String propColValExpr =
@@ -2064,10 +2206,9 @@ class QueryBuilder {
 		final String propJoinCondition =
 			propAttachmentExpr
 			+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
-		ctx.collectionProps.put(propPath,
-				new CollectionQueryProperty(propHandler, propTableName,
+		ctx.addCollectionProp(propPath, propHandler, propTableName,
 						ctx.propTableAlias, propJoinCondition, propKeyExpr,
-						propValueExpr));
+						propValueExpr);
 
 		// create anchor column expression
 		final String propAnchorColExpr =
@@ -2115,10 +2256,8 @@ class QueryBuilder {
 			ctx.rootTableAlias + "." + propPersistence.getFieldName();
 
 		// add property to the single properties
-		ctx.singlePropExprs.put(propPath,
-				new SingleValuedQueryProperty(propValExpr,
-						propHandler.getValueHandler()
-							.getPersistentValueType()));
+		ctx.addSingleValuedProp(propPath, propValExpr,
+				propHandler.getValueHandler().getPersistentValueType());
 
 		// create anchor column expression
 		final String propAnchorColExpr =
@@ -2185,10 +2324,9 @@ class QueryBuilder {
 		final String linkJoinCondition =
 			linkTableAlias + "." + propPersistence.getParentIdFieldName()
 			+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
-		ctx.collectionProps.put(propPath,
-				new CollectionQueryProperty(propHandler, linkTableName,
+		ctx.addCollectionProp(propPath, propHandler, linkTableName,
 						linkTableAlias, linkJoinCondition, propKeyExpr,
-						propValueExpr));
+						propValueExpr);
 
 		// create anchor column expression
 		final String propAnchorColExpr =
@@ -2290,10 +2428,8 @@ class QueryBuilder {
 		final String propValExpr = ctx.propTableAlias + "." + propIdColName;
 
 		// add property to the single properties
-		ctx.singlePropExprs.put(propPath,
-				new SingleValuedQueryProperty(propValExpr,
-						propHandler.getValueHandler()
-							.getPersistentValueType()));
+		ctx.addSingleValuedProp(propPath, propValExpr,
+				propHandler.getValueHandler().getPersistentValueType());
 
 		// create column value expression
 		final String propColValExpr =
@@ -2329,7 +2465,7 @@ class QueryBuilder {
 		if (!isUsed(ctx, propPath)) {
 
 			// save the join
-			ctx.allSingleJoins.put(propPath, branch.getJoinExpression());
+			ctx.addSingleValuedPropJoin(propPath, branch.getJoinExpression());
 
 			// no need for the branch
 			return;
@@ -2376,10 +2512,9 @@ class QueryBuilder {
 			ctx.propTableAlias + "." + propPersistence.getParentIdFieldName();
 		final String propJoinCondition = propAttachmentExpr
 				+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
-		ctx.collectionProps.put(propPath,
-				new CollectionQueryProperty(propHandler,
+		ctx.addCollectionProp(propPath, propHandler,
 						propTableName, ctx.propTableAlias,
-						propJoinCondition, null, propValueExpr));
+						propJoinCondition, null, propValueExpr);
 
 		// create anchor column expression
 		final String propAnchorColExpr =
@@ -2428,10 +2563,8 @@ class QueryBuilder {
 		final String propValExpr = ctx.propTableAlias + "." + propIdColName;
 
 		// add property to the single properties
-		ctx.singlePropExprs.put(propPath,
-				new SingleValuedQueryProperty(propValExpr,
-						propHandler.getValueHandler()
-							.getPersistentValueType()));
+		ctx.addSingleValuedProp(propPath, propValExpr,
+				propHandler.getValueHandler().getPersistentValueType());
 
 		// create anchor column expression
 		final String propAnchorColExpr =
@@ -2488,10 +2621,9 @@ class QueryBuilder {
 		final String propJoinCondition =
 			ctx.propTableAlias + "." + propPersistence.getParentIdFieldName()
 			+ " = " + ctx.rootTableAlias + "." + ctx.rootIdColName;
-		ctx.collectionProps.put(propPath,
-				new CollectionQueryProperty(propHandler, propTableName,
+		ctx.addCollectionProp(propPath, propHandler, propTableName,
 						ctx.propTableAlias, propJoinCondition, null,
-						propValueExpr));
+						propValueExpr);
 
 		// create anchor column expression
 		final String propAnchorColExpr =
@@ -2524,7 +2656,7 @@ class QueryBuilder {
 			final QueryBuilderContext ctx,
 			final PersistentResourceHandler<?> prsrcHandler,
 			final List<AggregatePropertyHandler> propHandlers,
-			final FilterSpec<? extends Object> aggFilter) {
+			final FilterSpec<?> aggFilter) {
 
 		// get collection property path
 		final String collectionPropPath =
@@ -2722,11 +2854,11 @@ class QueryBuilder {
 				final String branchJoinExpr = branch.getJoinExpression();
 				if (!branchJoinExpr.isEmpty()) {
 					ctx.selectSingleJoins.add(branch.getNodePropertyPath());
-					ctx.allSingleJoins.put(branch.getNodePropertyPath(),
+					ctx.addSingleValuedPropJoin(branch.getNodePropertyPath(),
 							branch.getJoinExpression());
 				}
 				ctx.selectSingleJoins.addAll(branchQB.selectSingleJoins);
-				ctx.allSingleJoins.putAll(branchQB.allSingleJoins);
+				ctx.importSingleValuedPropJoins(branchQB.allSingleJoins);
 				ctx.collectionJoins.append(branchQB.collectionJoins);
 			} else {
 				ctx.collectionJoins.append(branch.getJoinExpression());
@@ -2741,9 +2873,9 @@ class QueryBuilder {
 		} else { // not selected, but used
 
 			if (!collection) {
-				ctx.allSingleJoins.put(branch.getNodePropertyPath(),
+				ctx.addSingleValuedPropJoin(branch.getNodePropertyPath(),
 						branch.getJoinExpression());
-				ctx.allSingleJoins.putAll(branchQB.allSingleJoins);
+				ctx.importSingleValuedPropJoins(branchQB.allSingleJoins);
 			}
 		}
 
@@ -2768,10 +2900,8 @@ class QueryBuilder {
 		}
 
 		// merge properties
-		if (!collection) {
-			ctx.singlePropExprs.putAll(branchQB.singlePropExprs);
-			ctx.collectionProps.putAll(branchQB.collectionProps);
-		}
+		if (!collection)
+			ctx.importProps(branchQB.singlePropExprs, branchQB.collectionProps);
 
 		// merge or add group by list
 		if (ctx.isAggregationModeRoot()) {
@@ -2813,15 +2943,14 @@ class QueryBuilder {
 		// include branch's single joins
 		final String branchPropPath = branch.getNodePropertyPath();
 		if (!collection) {
-			ctx.allSingleJoins.put(branchPropPath, branch.getJoinExpression());
-			ctx.allSingleJoins.putAll(branchQB.allSingleJoins);
+			ctx.addSingleValuedPropJoin(branchPropPath,
+					branch.getJoinExpression());
+			ctx.importSingleValuedPropJoins(branchQB.allSingleJoins);
 		}
 
 		// make branch's properties available
-		if (!collection) {
-			ctx.singlePropExprs.putAll(branchQB.singlePropExprs);
-			ctx.collectionProps.putAll(branchQB.collectionProps);
-		}
+		if (!collection)
+			ctx.importProps(branchQB.singlePropExprs, branchQB.collectionProps);
 
 		// re-branch the branch and include in the context branches
 		if (selected) {
@@ -2894,6 +3023,7 @@ class QueryBuilder {
 					(!ctx.isAggregationModeRoot() ?
 						branchQB.aggregationWhereClause :
 						ctx.createAggregationWhereClause()),
+					ctx.aggregationParams,
 					rebranchedOrderByList.toString(),
 					Collections.<String, SingleValuedQueryProperty>emptyMap(),
 					Collections.<String, CollectionQueryProperty>emptyMap(),
@@ -3113,14 +3243,25 @@ class QueryBuilder {
 		// add collection joins
 		q.append(this.collectionJoins);
 
-		// add the "WHERE" clause
-		if (whereClause != null)
-			q.append(" WHERE ").append(whereClause.getBody());
-
-		// add "GROUP BY" clause
+		// add "WHERE" and "GROUP BY" clauses
 		if (!this.groupByList.isEmpty()) {
+			if (this.aggregationWhereClause != null) {
+				if (whereClause != null)
+					q.append(" WHERE (").append(whereClause.getBody())
+						.append(") AND (")
+						.append(this.aggregationWhereClause.getBody())
+						.append(")");
+				else
+					q.append(" WHERE ")
+					.append(this.aggregationWhereClause.getBody());
+			} else {
+				if (whereClause != null)
+					q.append(" WHERE ").append(whereClause.getBody());
+			}
 			q.append(" GROUP BY ").append(this.groupByList);
-			;System.out.println(">>> APPENDING GROUP BY [" + this.groupByList + "], AGG WHERE: " + this.aggregationWhereClause);
+		} else {
+			if (whereClause != null)
+				q.append(" WHERE ").append(whereClause.getBody());
 		}
 
 		// add the "ORDER BY" clause
@@ -3177,10 +3318,12 @@ class QueryBuilder {
 		// add collection joins
 		q.append(this.collectionJoins);
 
-		// add "GROUP BY" clause
+		// add aggregation "WHERE" clause and the "GROUP BY" clause
 		if (!this.groupByList.isEmpty()) {
+			if (this.aggregationWhereClause != null)
+				q.append(" WHERE ")
+				.append(this.aggregationWhereClause.getBody());
 			q.append(" GROUP BY ").append(this.groupByList);
-			;System.out.println(">>> APPENDING GROUP BY [" + this.groupByList + "], AGG WHERE: " + this.aggregationWhereClause);
 		}
 
 		// add the "ORDER BY" clause
@@ -3194,5 +3337,15 @@ class QueryBuilder {
 
 		// return the query
 		return q.toString();
+	}
+
+	/**
+	 * Get aggregation parameters.
+	 *
+	 * @return Aggregation parameters. Never {@code null}, but can be empty.
+	 */
+	Map<String, JDBCParameterValue> getAggregationParams() {
+
+		return this.aggregationParams;
 	}
 }

@@ -34,6 +34,28 @@ public interface FilterSpecBuilder<R>
 	FilterSpecBuilder<R> getParent();
 
 	/**
+	 * Set base property path for the filter's conditions. When the path is set,
+	 * all property paths passed to methods that add conditions are prefixed
+	 * with the base path (plus dot). If the filter is already not empty, the
+	 * method verifies that all used properties are nested properties of the
+	 * specified base path and if not, an {@link InvalidSpecificationException}
+	 * is thrown.
+	 *
+	 * @param propPath Base property path.
+	 *
+	 * @return This filter specification (for chaining).
+	 */
+	FilterSpecBuilder<R> setBasePath(String propPath);
+
+	/**
+	 * Get builder's current base property path.
+	 *
+	 * @return The base path set by the {@link #setBasePath(String)} method, or
+	 * empty string if none (never {@code null}).
+	 */
+	String getBasePath();
+
+	/**
 	 * Add nested logical conjunction ("AND") to the filter specification.
 	 *
 	 * @return Empty conjunction specification.

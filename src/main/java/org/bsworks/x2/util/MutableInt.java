@@ -47,9 +47,11 @@ public class MutableInt {
 
 	/**
 	 * Increment the value.
+	 *
+	 * @return Previous value (before the increment).
 	 */
-	public void increment() {
+	public int increment() {
 
-		this.value++;
+		return this.value++;
 	}
 }

@@ -2,6 +2,7 @@ package org.bsworks.x2.resource;
 
 import java.util.Collection;
 import java.util.Set;
+import java.util.SortedSet;
 
 
 /**
@@ -46,8 +47,19 @@ public interface FilterSpec<R> {
 	Collection <? extends FilterSpec<R>> getJunctions();
 
 	/**
+	 * Get paths of all properties <em>directly</em> used in all conditions of
+	 * the filter, recursively including nested con- and disjunctions. The set
+	 * does not include parent paths in of nested properties.
+	 *
+	 * @return Unmodifiable set of property paths. Never {@code null}, but may
+	 * be empty (in which case {@link #isEmpty()} also returns {@code true}).
+	 */
+	SortedSet<String> getUsedProperties();
+
+	/**
 	 * Tell if the filter specification is empty, that is no condition was ever
-	 * added to it or to any of its nested con- or disjunctions.
+	 * added to it or to any of its nested con- or disjunctions. This is
+	 * practically a shortcut for {@code getUsedProperties().isEmpty()}.
 	 *
 	 * @return {@code true} if empty.
 	 */
@@ -55,7 +67,9 @@ public interface FilterSpec<R> {
 
 	/**
 	 * Tell if the specified property is used by the filter, including by any of
-	 * its nested con- and disjunctions.
+	 * its nested con- and disjunctions. The method also returns {@code true}
+	 * for parent paths of any property directly used in a condition, which
+	 * makes it different from {@code getUsedProperties().contains(propPath)}.
 	 *
 	 * @param propPath Property path to check.
 	 *
