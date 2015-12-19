@@ -107,7 +107,13 @@ class OrderSpecImpl<R>
 	@Override
 	public boolean isUsed(final String propPath) {
 
-		if (this.usedProps.contains(propPath)
+		if (propPath.endsWith(".*")) {
+			if (!this.usedProps.subSet(
+					propPath,
+					propPath.substring(0, propPath.length() - 2) + "/")
+				.isEmpty())
+			return true;
+		} else if (this.usedProps.contains(propPath)
 				|| !this.usedProps.subSet(propPath + ".", propPath + "/")
 					.isEmpty())
 			return true;
@@ -146,11 +152,12 @@ class OrderSpecImpl<R>
 			final String propPath, final PropertyValueFunction func,
 			final Object... funcParams) {
 
-		this.elements.add(new PropertyOrderSpecElementImpl(dir,
-				this.prsrcHandler, propPath, func, funcParams,
-				this.prsrcClasses));
+		final PropertyOrderSpecElementImpl el =
+			new PropertyOrderSpecElementImpl(dir, this.prsrcHandler, propPath,
+					func, funcParams, this.prsrcClasses);
+		this.elements.add(el);
 
-		this.usedProps.add(propPath);
+		this.usedProps.add(el.getPropertyPath());
 
 		return this;
 	}

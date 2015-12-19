@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -1496,80 +1497,10 @@ class QueryBuilder {
 				addDependentRefProperty(ctx, propHandler);
 
 			// collect all requested aggregate properties and group them
-			final Map<String, List<AggregatePropertyHandler>>
-			aggregatePropHandlers = new HashMap<>();
-			int branchKeyDisc = 0;
-			final Map<FilterSpec<?>, Integer> aggFilterDiscs = new HashMap<>();
 			final Map<String, FilterSpec<?>> aggFilters = new HashMap<>();
-			for (final AggregatePropertyHandler propHandler :
-					prsrcHandler.getAggregateProperties()) {
-				final String propPath =
-					ctx.getPropertyPath(propHandler.getName());
-				if (!ctx.isSelected(propPath, propHandler))
-					continue;
-				List<AggregatePropertyHandler> phList = null;
-				final FilterSpec<?> aggFilter =
-					ctx.getAggregateFilter(propPath);
-				if (propHandler.getKeyPropertyName() != null) {
-					final String branchKey =
-						propHandler.getAggregatedCollectionPropertyPath()
-						+ "/M" + (branchKeyDisc++);
-					aggregatePropHandlers.put(branchKey,
-							phList = new ArrayList<>());
-				} else if (aggFilter != null) {
-					Integer disc = aggFilterDiscs.get(aggFilter);
-					if (disc == null)
-						aggFilterDiscs.put(aggFilter,
-								disc = Integer.valueOf(branchKeyDisc++));
-					final String branchKey =
-						propHandler.getAggregatedCollectionPropertyPath()
-						+ "/F" + disc;
-					aggFilters.put(branchKey, aggFilter);
-					phList = aggregatePropHandlers.get(branchKey);
-					if (phList == null) {
-						phList = new ArrayList<>();
-						aggregatePropHandlers.put(branchKey, phList);
-					}
-				} else {
-					final Deque<? extends ResourcePropertyHandler> propChain =
-						prsrcHandler.getPersistentPropertyChain(propHandler
-								.getDeepAggregatedResourcePropertyPath());
-					final StringBuilder subPath = new StringBuilder(
-						propHandler.getDeepAggregatedResourcePropertyPath());
-					for (final Iterator<? extends ResourcePropertyHandler> i =
-						propChain.descendingIterator(); i.hasNext();) {
-						final ResourcePropertyHandler ph = i.next();
-						phList = aggregatePropHandlers.get(subPath.toString());
-						if (phList != null)
-							break;
-						if (!ph.isSingleValued())
-							break;
-						if (i.hasNext())
-							subPath.setLength(subPath.length()
-									- ph.getName().length() - 1);
-					}
-					if (phList == null) {
-						phList = new ArrayList<>();
-						subPath.setLength(0);
-						subPath.append(propHandler
-								.getDeepAggregatedResourcePropertyPath());
-						for (final Iterator<? extends ResourcePropertyHandler>
-						i =
-							propChain.descendingIterator(); i.hasNext();) {
-							final ResourcePropertyHandler ph = i.next();
-							final String key = subPath.toString();
-							if (aggregatePropHandlers.containsKey(key))
-								break;
-							aggregatePropHandlers.put(key, phList);
-							if (i.hasNext())
-								subPath.setLength(subPath.length()
-										- ph.getName().length() - 1);
-						}
-					}
-				}
-				phList.add(propHandler);
-			}
-			;System.out.println(">>> AGG PROP HANDLERS: " + aggregatePropHandlers);
+			final Map<String, List<AggregatePropertyHandler>>
+			aggregatePropHandlers = groupAggregatePropHandlers(
+					ctx, prsrcHandler, aggFilters);
 
 			// add aggregate properties if any
 			for (final Map.Entry<String, List<AggregatePropertyHandler>> entry :
@@ -1611,6 +1542,118 @@ class QueryBuilder {
 
 		// return the resulting branch
 		return resBranch;
+	}
+
+	/**
+	 * Collect all requested in the specified context aggregate properties of
+	 * the specified persistent resource and group them for creating individual
+	 * branches.
+	 *
+	 * @param ctx The context.
+	 * @param prsrcHandler The persistent resource handler.
+	 * @param aggFilters Map, to which to add any filtered aggregate property
+	 * filters by branch key.
+	 *
+	 * @return Aggregate property handlers by branch keys.
+	 */
+	private static Map<String, List<AggregatePropertyHandler>>
+	groupAggregatePropHandlers(
+			final QueryBuilderContext ctx,
+			final PersistentResourceHandler<?> prsrcHandler,
+			final Map<String, FilterSpec<?>> aggFilters) {
+
+		// result collector
+		final Map<String, List<AggregatePropertyHandler>> res = new HashMap<>();
+
+		// go over each aggregate property of the persistent resource
+		int branchKeyDisc = 0;
+		final Map<FilterSpec<?>, Integer> aggFilterDiscs = new HashMap<>();
+		final SortedMap<String, List<AggregatePropertyHandler>> spread =
+			new TreeMap<>();
+		for (final AggregatePropertyHandler propHandler :
+				prsrcHandler.getAggregateProperties()) {
+
+			// get property path
+			final String propPath = ctx.getPropertyPath(propHandler.getName());
+
+			// check if selected
+			if (!ctx.isSelected(propPath, propHandler))
+				continue;
+
+			// get aggregate property filter, if in the fetch
+			final FilterSpec<?> aggFilter = ctx.getAggregateFilter(propPath);
+
+			if (propHandler.getKeyPropertyName() != null) { // map?
+				// each map aggregate property gets its own branch
+				final String branchKey =
+					"M" + String.valueOf((branchKeyDisc++)) + "/";
+				if (aggFilter != null)
+					aggFilters.put(branchKey, aggFilter);
+				final List<AggregatePropertyHandler> phList = new ArrayList<>();
+				spread.put(branchKey, phList);
+				phList.add(propHandler);
+			} else if (aggFilter != null) { // filtered?
+				// same branch for deep aggregated property and filter
+				Integer disc = aggFilterDiscs.get(aggFilter);
+				if (disc == null)
+					aggFilterDiscs.put(aggFilter,
+							disc = Integer.valueOf(branchKeyDisc++));
+				final String branchKey =
+					"F" + disc + "/"
+					+ propHandler.getDeepAggregatedResourcePropertyPath();
+				aggFilters.put(branchKey, aggFilter);
+				List<AggregatePropertyHandler> phList = spread.get(branchKey);
+				if (phList == null)
+					spread.put(branchKey, phList = new ArrayList<>());
+				phList.add(propHandler);
+			} else { // not map, not filtered
+				// same branch for deep aggregated property
+				final String branchKey =
+					propHandler.getDeepAggregatedResourcePropertyPath();
+				List<AggregatePropertyHandler> phList = spread.get(branchKey);
+				if (phList == null)
+					spread.put(branchKey, phList = new ArrayList<>());
+				phList.add(propHandler);
+			}
+		}
+
+		// merge branches
+		String lastBranchKey = "*";
+		List<AggregatePropertyHandler> lastPHList = null;
+		int lastPropChainLen = -1;
+		for (final Map.Entry<String, List<AggregatePropertyHandler>> entry :
+				spread.entrySet()) {
+			final String branchKey = entry.getKey();
+			final List<AggregatePropertyHandler> phList = entry.getValue();
+			final Deque<? extends ResourcePropertyHandler> propChain =
+				prsrcHandler.getPersistentPropertyChain(
+					phList.get(0).getDeepAggregatedResourcePropertyPath());
+			final int propChainLen = propChain.size();
+			boolean merge = false;
+			if (branchKey.startsWith(lastBranchKey + ".")) {
+				merge = true;
+				int n = propChainLen;
+				for (final Iterator<? extends ResourcePropertyHandler> i =
+						propChain.descendingIterator();
+					n > lastPropChainLen; n--) {
+					if (!i.next().isSingleValued()) {
+						merge = false;
+						break;
+					}
+				}
+			}
+			lastBranchKey = branchKey;
+			lastPropChainLen = propChainLen;
+			if (merge /* redundant: */ && (lastPHList != null)) {
+				lastPHList.addAll(phList);
+			} else {
+				lastPHList = phList;
+				res.put(branchKey, phList);
+			}
+		}
+
+		// return result
+		return res;
 	}
 
 	/**
@@ -2148,7 +2191,7 @@ class QueryBuilder {
 					propValExpr);
 
 		// check if used
-		if (!isUsed(ctx, propPath))
+		if (!isUsed(ctx, propPath + ".*"))
 			return;
 
 		// create join expression
@@ -2159,12 +2202,14 @@ class QueryBuilder {
 			+ " = " + ctx.rootTableAlias + "." + propPersistence.getFieldName();
 
 		// create property branch
-		addBranch(ctx, createBranch(ctx, propPath, propPersistence.isOptional(),
+		final QueryBranch branch = createBranch(ctx, propPath,
+				propPersistence.isOptional(),
 				propColValExpr + " AS " + ctx.dialect.quoteColumnLabel(
 						ctx.colLabelPrefix + propHandler.getName()),
 				propJoinCondition, null, null, null,
 				ctx.propColLabelPrefix, refTargetHandler, propTableName,
-				ctx.propTableAlias, propIdColName), false);
+				ctx.propTableAlias, propIdColName);
+		addBranch(ctx, branch, false);
 	}
 
 	/**
@@ -2762,6 +2807,15 @@ class QueryBuilder {
 	private static boolean isUsed(final QueryBuilderContext ctx,
 			final String propPath) {
 
+		;if (ctx.filter != null || ctx.order != null) {
+			boolean used = (((ctx.filter != null) && ctx.filter.isUsed(propPath))
+					|| ((ctx.order != null) && ctx.order.isUsed(propPath)));
+			if (used) {
+				;System.out.println(">>>> PROP [" + propPath + "] IS USED IN CTX:"
+						+ ctx.parentPropPath + ", agglvl=" + ctx.aggregationBranchLevel);
+			}
+		}
+
 		return (((ctx.filter != null) && ctx.filter.isUsed(propPath))
 				|| ((ctx.order != null) && ctx.order.isUsed(propPath)));
 	}
@@ -3221,7 +3275,9 @@ class QueryBuilder {
 
 		// create main query body
 		final StringBuilder q = new StringBuilder(512);
-		q.append("SELECT ").append(this.selectList).append(" FROM ")
+		q.append("SELECT ").append(this.selectList);
+		final int prefixLen = q.length();
+		q.append(" FROM ")
 			.append(this.rootTableName).append(" AS ")
 			.append(this.rootTableAlias);
 
@@ -3243,8 +3299,12 @@ class QueryBuilder {
 		// add collection joins
 		q.append(this.collectionJoins);
 
+		// get used table aliases and create filtered "GROUP BY" list
+		final String groupByListToUse = filterGroupByList(this.groupByList,
+				extractUsedTableAliases(q, prefixLen));
+
 		// add "WHERE" and "GROUP BY" clauses
-		if (!this.groupByList.isEmpty()) {
+		if (!groupByListToUse.isEmpty()) {
 			if (this.aggregationWhereClause != null) {
 				if (whereClause != null)
 					q.append(" WHERE (").append(whereClause.getBody())
@@ -3258,7 +3318,7 @@ class QueryBuilder {
 				if (whereClause != null)
 					q.append(" WHERE ").append(whereClause.getBody());
 			}
-			q.append(" GROUP BY ").append(this.groupByList);
+			q.append(" GROUP BY ").append(groupByListToUse);
 		} else {
 			if (whereClause != null)
 				q.append(" WHERE ").append(whereClause.getBody());
@@ -3295,7 +3355,9 @@ class QueryBuilder {
 
 		// create main query body
 		final StringBuilder q = new StringBuilder(512);
-		q.append("SELECT ").append(this.selectList).append(" FROM ")
+		q.append("SELECT ").append(this.selectList);
+		final int prefixLen = q.length();
+		q.append(" FROM ")
 			.append(anchorTableName).append(" AS a INNER JOIN ")
 			.append(this.rootTableName).append(" AS ")
 			.append(this.rootTableAlias).append(" ON ")
@@ -3318,12 +3380,16 @@ class QueryBuilder {
 		// add collection joins
 		q.append(this.collectionJoins);
 
+		// get used table aliases and create filtered "GROUP BY" list
+		final String groupByListToUse = filterGroupByList(this.groupByList,
+				extractUsedTableAliases(q, prefixLen));
+
 		// add aggregation "WHERE" clause and the "GROUP BY" clause
-		if (!this.groupByList.isEmpty()) {
+		if (!groupByListToUse.isEmpty()) {
 			if (this.aggregationWhereClause != null)
 				q.append(" WHERE ")
 				.append(this.aggregationWhereClause.getBody());
-			q.append(" GROUP BY ").append(this.groupByList);
+			q.append(" GROUP BY ").append(groupByListToUse);
 		}
 
 		// add the "ORDER BY" clause
@@ -3338,6 +3404,71 @@ class QueryBuilder {
 		// return the query
 		return q.toString();
 	}
+
+	////////////////////////////////////////////////////////////////////////////
+	// BEGIN KLUDGE
+	////////////////////////////////////////////////////////////////////////////
+
+	/**
+	 * Pattern used to extract table aliases from a SQL "FROM" clause.
+	 */
+	private static final Pattern TABLE_ALIAS_PATTERN = Pattern.compile(
+			" (?:FROM|JOIN) [^ ]+ AS ([^ ]+)");
+
+	/**
+	 * Extract table aliases from a SQL "FROM" clause.
+	 *
+	 * @param query The query.
+	 * @param fromInd Beginning of the "FROM" clause.
+	 *
+	 * @return Used table aliases.
+	 */
+	private static Set<String> extractUsedTableAliases(final CharSequence query,
+			final int fromInd) {
+
+		final Set<String> res = new HashSet<>();
+		final Matcher m = TABLE_ALIAS_PATTERN.matcher(
+				query.subSequence(fromInd, query.length()));
+		while (m.find())
+			res.add(m.group(1));
+
+		return res;
+	}
+
+	/**
+	 * Pattern used to extract elements from a SQL "GROUP BY" clause.
+	 */
+	private static final Pattern GROUP_BY_ELEMENT_PATTERN = Pattern.compile(
+			"(?:^|\\G, )([^ .]+)\\.([^ ,]+)");
+
+	/**
+	 * Rebuild a "GROUP BY" clause and include only specified tables.
+	 *
+	 * @param groupByList Original "GROUP BY" clause body.
+	 * @param usedTableAliases Used table aliases.
+	 *
+	 * @return New "GROUP BY" clause body (may be empty).
+	 */
+	private static String filterGroupByList(final String groupByList,
+			final Set<String> usedTableAliases) {
+
+		final StringBuilder res = new StringBuilder();
+		final Matcher m = GROUP_BY_ELEMENT_PATTERN.matcher(groupByList);
+		while (m.find()) {
+			final String tableAlias = m.group(1);
+			if (!usedTableAliases.contains(tableAlias))
+				continue;
+			if (res.length() > 0)
+				res.append(", ");
+			res.append(tableAlias).append('.').append(m.group(2));
+		}
+
+		return res.toString();
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+	// END KLUDGE
+	////////////////////////////////////////////////////////////////////////////
 
 	/**
 	 * Get aggregation parameters.

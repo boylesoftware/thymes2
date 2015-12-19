@@ -328,6 +328,12 @@ class FilterSpecImpl<R>
 	@Override
 	public boolean isUsed(final String propPath) {
 
+		if (propPath.endsWith(".*"))
+			return !this.usedProps.subSet(
+						propPath,
+						propPath.substring(0, propPath.length() - 2) + "/")
+					.isEmpty();
+
 		return (this.usedProps.contains(propPath)
 				|| !this.usedProps.subSet(propPath + ".", propPath + "/")
 					.isEmpty());

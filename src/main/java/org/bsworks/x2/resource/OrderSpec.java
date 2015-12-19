@@ -37,7 +37,13 @@ public interface OrderSpec<R> {
 	boolean isEmpty();
 
 	/**
-	 * Tell if the specified property is used by the order specification.
+	 * Tell if the specified property is used by the order specification. The
+	 * method also returned {@code true} for parent paths of properties used in
+	 * any order specification elements.
+	 *
+	 * <p>If the specified property path ends with ".*", it is considered a
+	 * template and the method checks if any of the specified path's nested
+	 * property is used by the filter, but not the property itself.
 	 *
 	 * @param propPath Property path to check.
 	 *

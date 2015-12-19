@@ -71,6 +71,10 @@ public interface FilterSpec<R> {
 	 * for parent paths of any property directly used in a condition, which
 	 * makes it different from {@code getUsedProperties().contains(propPath)}.
 	 *
+	 * <p>If the specified property path ends with ".*", it is considered a
+	 * template and the method checks if any of the specified path's nested
+	 * property is used by the filter, but not the property itself.
+	 *
 	 * @param propPath Property path to check.
 	 *
 	 * @return {@code true} if used.
