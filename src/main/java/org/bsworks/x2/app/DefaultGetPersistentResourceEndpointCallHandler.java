@@ -224,7 +224,10 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	private static final Pattern FILTER_PARAM_NAME_PATTERN = Pattern.compile(
 			"(" + FILTER_KEY_RE + "(?:\\.[a-z_0-9]+)*)\\$" // 1. group key
 			+ "(?:"
-				+ "(" + PROP_PATH_RE + "(?:/id|/key)?)"    // 2. property path
+				+ "("                                      // 2. property paths
+					+ PROP_PATH_RE + "(?:/id|/key)?"
+					+ "(?:," + PROP_PATH_RE + "(?:/id|/key)?)*"
+				+ ")"
 				+ "(?: " + VALUE_FUNC_RE + ")?"            // 3-10. value func
 				+ "(?::("                                  // 11. test:
 					+ "min"                                // minimum
@@ -724,11 +727,11 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 					(entryValue != null) && (entryValue.length > 0) ?
 							StringUtils.nullIfEmpty(entryValue[0]) : null);
 
-			// get property path from the parameter name
-			final String propPath = m.group(2);
+			// get property paths from the parameter name
+			final String propPathsString = m.group(2);
 
 			// check if group options parameter
-			if (propPath == null) {
+			if (propPathsString == null) {
 				if ("or".equals(value))
 					curGroup.makeDisjunction();
 				continue;
@@ -737,9 +740,11 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			// build the condition:
 
 			// parse value transformation function if any
-			final List<Object> funcParams = new ArrayList<>();
+			final List<Object> funcParamsList = new ArrayList<>();
 			final PropertyValueFunction func =
-				this.parseValueFunction(m, 3, funcParams);
+				this.parseValueFunction(m, 3, funcParamsList);
+			final Object[] funcParams =
+				funcParamsList.toArray(new Object[funcParamsList.size()]);
 
 			// condition type and operands
 			final FilterConditionType type;
@@ -797,10 +802,20 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 				}
 			}
 
-			// add condition to the current group
-			curGroup.addCondition(propPath,
-					func, funcParams.toArray(new Object[funcParams.size()]),
-					type, (m.group(12) != null), operands);
+			// negated condition?
+			final boolean negated = (m.group(12) != null);
+
+			// add condition to the current group for each property
+			final String[] propPaths = propPathsString.split(",");
+			if (propPaths.length > 1) {
+				final FilterSpecBuilder<R> g = curGroup.addDisjunction();
+				for (final String propPath : propPaths)
+					g.addCondition(propPath,
+							func, funcParams, type, negated, operands);
+			} else {
+				curGroup.addCondition(propPaths[0],
+						func, funcParams, type, negated, operands);
+			}
 		}
 	}
 
