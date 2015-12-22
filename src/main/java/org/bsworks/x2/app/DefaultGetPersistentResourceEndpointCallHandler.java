@@ -797,7 +797,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 					type = FilterConditionType.EQ;
 					operands = new Object[] { value };
 				} else {
-					type = FilterConditionType.NOT_EMPTY;
+					type = FilterConditionType.EMPTY;
 					operands = new Object[] {};
 				}
 			}
