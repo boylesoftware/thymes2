@@ -931,12 +931,6 @@ class QueryBuilder {
 				for (final String propPath : ph.getAggregatedPropertyPaths())
 					this.aggregationPropsFetch.include(
 							this.aggregatedCollectionPropPath + "." + propPath);
-
-				// add intermediate references to the fetch
-				// INCLUDED AUTOMATICALLY
-				;/*final String refPath = ph.getLastIntermediateRefPath();
-				if (refPath != null)
-					this.aggregationPropsFetch.fetch(propPathsPrefix + refPath);*/
 			}
 
 			// save aggregation filter and include all used properties
@@ -2806,15 +2800,6 @@ class QueryBuilder {
 	 */
 	private static boolean isUsed(final QueryBuilderContext ctx,
 			final String propPath) {
-
-		;if (ctx.filter != null || ctx.order != null) {
-			boolean used = (((ctx.filter != null) && ctx.filter.isUsed(propPath))
-					|| ((ctx.order != null) && ctx.order.isUsed(propPath)));
-			if (used) {
-				;System.out.println(">>>> PROP [" + propPath + "] IS USED IN CTX:"
-						+ ctx.parentPropPath + ", agglvl=" + ctx.aggregationBranchLevel);
-			}
-		}
 
 		return (((ctx.filter != null) && ctx.filter.isUsed(propPath))
 				|| ((ctx.order != null) && ctx.order.isUsed(propPath)));

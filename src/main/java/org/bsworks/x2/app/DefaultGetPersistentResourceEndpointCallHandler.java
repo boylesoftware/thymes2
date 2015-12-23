@@ -22,11 +22,9 @@ import org.bsworks.x2.EndpointCallResponse;
 import org.bsworks.x2.resource.AggregatePropertyHandler;
 import org.bsworks.x2.resource.DependentRefPropertyHandler;
 import org.bsworks.x2.resource.FilterConditionType;
-import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.FilterSpecBuilder;
 import org.bsworks.x2.resource.InvalidSpecificationException;
 import org.bsworks.x2.resource.ObjectPropertyHandler;
-import org.bsworks.x2.resource.OrderSpec;
 import org.bsworks.x2.resource.OrderSpecBuilder;
 import org.bsworks.x2.resource.PersistentResourceHandler;
 import org.bsworks.x2.resource.PropertiesFetchSpec;
@@ -45,98 +43,7 @@ import org.bsworks.x2.util.StringUtils;
 
 /**
  * Default implementation of a persistent resource endpoint call handler for
- * HTTP GET requests. The handler supports two types of calls: a get single
- * record call, identified by presence of the last URI parameter, which is the
- * requested record id, and records collection search call, identified by the
- * absence of the record id in the request URI.
- *
- * <p>The call is configured using optional request parameters. Below is a
- * description of the deprecated way of configuring the call:
- *
- * <dl>
- * <dt>{@value #INCLUDE_PROPS_FETCH_PARAM}</dt><dd>Comma-separated list of
- * persistent resource property paths to include in the result (see
- * {@link PropertiesFetchSpec}). If specified, only these properties are
- * fetched. If the list is prefixed with a plus sign ("+"), all properties that
- * are normally fetched by default are fetched plus whatever properties
- * mentioned in the list (makes sense to use to add properties that are not
- * fetched by default to the result). In this mode, the parameter may be
- * combined with {@value #EXCLUDE_PROPS_FETCH_PARAM} parameter.</dd>
- * <dt>{@value #EXCLUDE_PROPS_FETCH_PARAM}</dt><dd>Comma-separated list of
- * persistent resource property paths to exclude from the result (see
- * {@link PropertiesFetchSpec}). It is illegal to combine
- * {@value #EXCLUDE_PROPS_FETCH_PARAM} with {@value #INCLUDE_PROPS_FETCH_PARAM}
- * unless the latter's value is prefixed with "+" (see above).</dd>
- * <dt>{@value #FILTER_PARAM_RE}</dt><dd>Specifies a filter condition (see
- * {@link FilterSpec}). A condition is a sequence of three parts: the persistent
- * resource property path(s), the conditional operation and a value. The
- * following conditional operations are supported:
- * <dl>
- * <dt>:</dt><dd>Equals.</dd>
- * <dt>{@literal <}</dt><dd>Less than or equal.</dd>
- * <dt>{@literal >}</dt><dd>Greater than or equal.</dd>
- * <dt>~</dt><dd>Contains substring that matches case-insensitive regular
- * expression.</dd>
- * <dt>*</dt><dd>Contains case-insensitive substring.</dd>
- * <dt>^</dt><dd>Starts with case-insensitive prefix.</dd>
- * <dt>|</dt><dd>Equals to any of the values from the provided pipe-separated
- * list.</dd>
- * </dl>
- * Each conditional operation can be prefixed with "!" to negate it.
- * <p>A condition may consist of a property path (or paths), optionally followed
- * by a "!", and no conditional operation with values. In that case, the
- * {@link FilterConditionType#NOT_EMPTY} or {@link FilterConditionType#EMPTY} is
- * used to test the condition.
- * <p>Multiple property paths may be specified separated with commas. In that
- * case, the filter conditions are created for each of the property paths and
- * the resulting list of conditions is combined using logical disjunction
- * (Boolean "OR").
- * <p>Multiple parameters matching {@value #FILTER_PARAM_RE} may be specified
- * for the same request to define a filter with multiple conditions. Conditions
- * with the same parameter name are combined into groups. Conditions within a
- * group are combined using logical conjunction or disjunction based on the
- * value of the {@value #FILTER_COMB_PARAM} parameter. Then, if multiple groups
- * are present, the groups are combined using the logical operator complementary
- * to the {@value #FILTER_COMB_PARAM}.</dd>
- * <dt>{@value #FILTER_COMB_PARAM}</dt><dd>Logical operator used to combine
- * conditions in a single filter conditions group. May be "and", which is the
- * default, or "or" for a disjunction.</dd>
- * <dt>{@value #ORDER_PARAM}</dt><dd>Comma-separated list of persistent resource
- * property paths used to order the result (see {@link OrderSpec}). Each
- * property path in the list can be suffixed with ":asc" or ":desc" to specify
- * the order direction. If not specified, ":asc" is assumed. In between the
- * property name and the optional ":asc" or ":desc" a value transformation
- * function can be specified, including ":len" for the string value length,
- * ":sub:<i>from</i>[:<i>len</i>]" for substring (from is zero-based), and
- * ":lpad:<i>width</i>[:<i>char</i>]" for left padding.</dd>
- * <dt>{@value #SPLIT_PARAM}</dt><dd>Defines result list segmentation (see
- * {@link OrderSpecBuilder#addSegment}). The syntax of the parameter value is
- * the same as for the filter condition parameter. Multiple
- * {@value #SPLIT_PARAM} parameters can be specified for a request to create
- * sub-segmentation. Splits are always added before any order specifications
- * provided by the {@link #ORDER_PARAM} parameter.</dd>
- * <dt>{@value #RANGE_PARAM}</dt><dd>Collection fetch range specification (see
- * {@link RangeSpec}), which a pair of comma-separated integer numbers. The
- * first number is for the first record index, zero-based. The second number is
- * the maximum number of records to return.</dd>
- * <dt>{@value #REFS_FETCH_PARAM}</dt><dd>Comma-separated list of persistent
- * resource reference property paths to fetch along with the records (see
- * {@link PropertiesFetchSpecBuilder}).</dd>
- * </dl>
- *
- * <p>For a single record request, only {@value #INCLUDE_PROPS_FETCH_PARAM},
- * {@value #EXCLUDE_PROPS_FETCH_PARAM} and {@value #REFS_FETCH_PARAM} parameters
- * are used.
- *
- * <p>For a collection search call, the response is encapsulated in a
- * {@link PersistentResourceFetchResult} object. For a single record request,
- * the {@link PersistentResourceFetchResult} wrapper object is returned only if
- * the request has {@value #REFS_FETCH_PARAM} parameter. Otherwise, the fetched
- * record itself is returned.
- *
- * <p>Multiple persistent property paths can be included in a single condition
- * separated with pipes. That results in multiple conditions for each property
- * combined using logical disjunction (Boolean "OR").
+ * HTTP GET requests.
  *
  * <p>The handler implementation supports conditional HTTP requests and
  * generates "ETag" and "Last-Modified" HTTP response headers based on
@@ -144,6 +51,191 @@ import org.bsworks.x2.util.StringUtils;
  * meta-properties and uses application's
  * {@link PersistentResourceVersioningService} to incorporate participating
  * persistent resource collections in the generated values.
+ *
+ * <p>Depending on whether a resource record id is present as the last URI
+ * parameter, the handler performs one of the two distinct operations: get the
+ * specified by id resource record, or perform the resource records collection
+ * search and get matching records. In the first case, the response is the
+ * record (unless referred resource records fetch is requested, see below), or
+ * an HTTP 404 (Not Found) error response if no record with the specified id
+ * exists. In the collection search call case, the response is a special object
+ * represented by an instance of {@link PersistentResourceFetchResult}, that
+ * wraps the collection of the matched records (which may be empty if none
+ * matched) along with any requested referred resource records and the total
+ * number of the matched records for a ranged request (see below).
+ *
+ * <h3>Search Filter Specification</h3>
+ *
+ * <p>The filter for a collection search is specified using one or more HTTP
+ * request parameters. Each parameter represents a condition in the filter
+ * logical expression. Like a logical expression that may contain
+ * sub-expressions in parenthesis, filter conditions can be combined into
+ * groups. The groups and the conditions within them can form a logical
+ * conjunction ("AND") or a logical disjunction ("OR"). A group is identified by
+ * a prefix and its position in the expression hierarchy is encoded in the
+ * prefix format that uses dot-separated notation to express nesting level of
+ * the group.
+ *
+ * <p>The prefix for the root condition group of the main filter is
+ * {@value #MAIN_FILTER_KEY}. All conditions associated with this prefix belong
+ * to the top level of the filter logic expression. If another expression needs
+ * to be an element in the top level expression, its conditions must have prefix
+ * that is the parent prefix plus an arbitrary word appended to it after a dot
+ * (alphanumeric plus underscore). Nested expressions can be created by adding
+ * more elements to the prefix all separated by a dot.
+ *
+ * <p>The group prefix is the first part of every filter condition HTTP request
+ * parameter name and is separated from the rest of the condition definition
+ * with a dollar sign. By default, conditions in a give group are combined using
+ * logical "AND". To make it logical "OR", an HTTP request parameter consisting
+ * only of the group prefix plus the dollar sign and value "or" can be included.
+ *
+ * <p>So, for example, if we have an expression:
+ *
+ * <p>{@code A & B & (C | D) & (E & (F | G))}
+ *
+ * <p>the group prefixes in the HTTP request query string could be:
+ *
+ * <p>{@code f$A&f$B&f.a$=or&f.a$C&f.a$D&f.b$E&f.b.0$=or&f.b.0$F&f.b.0$G}
+ *
+ * <p>Each HTTP request parameter representing a condition is defined as
+ * follows:
+ *
+ * <p>{@literal <group prefix>$<property path>[,<property path>...][:<value function>][:<condition type>][!]=[<test value>]}
+ *
+ * <p>The group prefix has been already discussed above. Following the dollar
+ * sign after the group prefix is a comma-separated list of persistent resource
+ * paths (using dot notation). The values of the specified properties are tested
+ * by the condition. If multiple properties are specified, the results of
+ * testing each property are combined using logical "OR".
+ *
+ * <p>Optionally, after a colon, the property value transformation function and
+ * its parameters can be specified. The following functions are supported:
+ *
+ * <dl>
+ * <dt>len<dd>String value length.
+ * <dt>lc<dd>Lower-case string value.
+ * <dt>{@literal sub:<from>[:<len>]}<dd>String value's substring starting
+ * from the specified character (zero-based index) with the specified maximum
+ * length. If length is not specified, the rest of the string is used.
+ * <dt>{@literal lpad:<width>[:<char>]}<dd>String value padded on the left
+ * to the specified minimum length using the specified padding character. If
+ * character is not specified, space is used.
+ * </dl>
+ *
+ * <p>The condition type, that follows the property path(s) and the optional
+ * value transformation function in the condition HTTP parameter name, specifies
+ * what aspect of the property value is tested. It can be one of the following:
+ *
+ * <dl>
+ * <dt>min<dd>The parameter value is the minimum allowed value
+ * (see {@link FilterConditionType#GE}).
+ * <dt>max<dd>The parameter value is the maximum allowed value
+ * (see {@link FilterConditionType#LE}).
+ * <dt>pat<dd>The parameter value is a regular expression for a substring in the
+ * property value. The matching performed is case-insensitive
+ * (see {@link FilterConditionType#MATCH}).
+ * <dt>sub<dd>The parameter value is a case-insensitive substring in the
+ * property value (see {@link FilterConditionType#SUBSTRING}).
+ * <dt>pre<dd>The parameter value is a case-insensitive prefix of the property
+ * value (see {@link FilterConditionType#PREFIX}).
+ * <dt>alt<dd>The parameter value is a pipe-separated list of allowed property
+ * values (see {@link FilterConditionType#EQ}).
+ * </dl>
+ *
+ * <p>If no condition type is specified, the parameter value is the matching
+ * value for the property.
+ *
+ * <p>To inverse the condition, a exclamation mark is added at the end of the
+ * HTTP parameter name.
+ *
+ * <p>When no condition type is specified (the equality condition) and the HTTP
+ * parameter has no value (empty string value), the condition test if the
+ * property is not empty  (see {@link FilterConditionType#NOT_EMPTY}).
+ *
+ * <h3>Properties Fetch Specification</h3>
+ *
+ * <p>The collection search call may contain a {@link #PROPS_FETCH_PARAM} HTTP
+ * request parameter that specifies what properties of the persistent resource
+ * records are included in the result and what properties are excluded. It is
+ * also used to specify what referred resource records should be included in the
+ * result. If the resource contains properties that are references to records of
+ * another resource, the referred resource records fetch function allows
+ * receiving the referred record in the same response in a transactional way.
+ *
+ * <p>The HTTP request parameter value is a comma-separated list of elements.
+ * Each element can be:
+ *
+ * <ul>
+ * <li>Property path to include the property.
+ * <li>Property path prefixed with a dash (minus sign) to exclude the property.
+ * <li>Reference property path ending in ".*" to include the property and fetch
+ * the referred resource record.
+ * <li>Reference property path ending in ".*" and prefixed with a dash to
+ * exclude all properties of the referred resource record by default unless
+ * explicitly included.
+ * <li>An asterisk ("*") to include all properties by default (properties that
+ * are fetched by default according to the resource definition).
+ * <li>An aggregate property path followed by a slash and a filter prefix to
+ * include the aggregate property and use the specified filter in its value
+ * calculation.
+ * </ul>
+ *
+ * <p>When a nested property is included using a dot notation property path, all
+ * the parent properties are automatically included as well. If any of the
+ * parent properties are references, the referred resource records are also
+ * automatically fetched and included.
+ *
+ * <p>Unless an "*" is included in the properties list, if the HTTP request
+ * parameter is present, all properties are initially excluded. Absence of the
+ * HTTP request parameter is equivalent to having it with a single value of "*".
+ *
+ * <p>An aggregate property can be included with a filter. The filter is defined
+ * in the request the same way as the main filter, but instead of the
+ * {@value #MAIN_FILTER_KEY}, the specified after the slash filter key is used
+ * to identify the filter's root group.
+ *
+ * <p>Besides the resource collection search calls, the
+ * {@value #PROPS_FETCH_PARAM} HTTP request parameter can also be added to a
+ * single record request as well. In that case, it is used to specify what
+ * properties to include in the request. Note, that if the specification implies
+ * fetching any referred resource records, the response is no longer the simple
+ * resource record, but a {@link PersistentResourceFetchResult}, the same way as
+ * if it were a collection search call, with the single record in the records
+ * array.
+ *
+ * <h3>Result Order Specification</h3>
+ *
+ * <p>An {@value #ORDER_PARAM} HTTP request parameter is used to specify
+ * ordering of the records in the resource collection search request result. The
+ * value of the parameter is a comma-separated list of elements, each of which
+ * can be:
+ *
+ * <ul>
+ * <li>A property path to sort by the property value. The path can be followed
+ * by a colon and a value transformation function, the same way as in the filter
+ * condition definition described above.
+ * <li>A dollar sign an a filter key to split the result around the logical
+ * expression specified by the filter (result set segmentation). The filter is
+ * defined the same way as the main filter with the specified filter key instead
+ * of the {@value #MAIN_FILTER_KEY}. In ascending order, the records that <em>do
+ * not</em> match the filter go first followed by the records that do match it.
+ * </ul>
+ *
+ * <p>Each element can be optionally followed ":asc" or ":desc" to specify the
+ * ascending or descending order. If nothing is given, ":asc" is assumed.
+ *
+ * <h3>Range Specification</h3>
+ *
+ * <p>The resource collection search result can be paginated by specifying a
+ * range. The range is specified using an {@value #RANGE_PARAM} HTTP request
+ * parameter. The value is two numbers separated with a comma: the first number
+ * is the first matched record to return (starting with zero) and the second
+ * number is the maximum number of records to return (the page size).
+ *
+ * <p>If range is specified, the result include the total number of matched
+ * records. If range is not specified, the total number is not included (-1 in
+ * the result) because it is equal to the number of the returned records.
  *
  * @param <R> Handled persistent resource type.
  *
@@ -318,6 +410,12 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 
 
 	/**
+	 * Enable deprecated protocol.
+	 */
+	private final boolean ENABLE_DEPRECATED;
+
+
+	/**
 	 * Create new handler.
 	 *
 	 * @param endpointHandler Persistent resource endpoint handler.
@@ -325,6 +423,8 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	public DefaultGetPersistentResourceEndpointCallHandler(
 			final PersistentResourceEndpointHandler<R> endpointHandler) {
 		super(endpointHandler);
+
+		this.ENABLE_DEPRECATED = false;
 	}
 
 
@@ -394,11 +494,13 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 						"Invalid \"" + PROPS_FETCH_PARAM
 						+ "\" request parameter.");
 			}
-		} else {
+		} else if (this.ENABLE_DEPRECATED) {
 			propsFetch = this.getDeprecatedPropertiesFetchSpec(ctx);
 			if (propsFetch != null)
 				this.log.warn(
 						"deprecated properties fetch specification is used");
+		} else {
+			propsFetch = null;
 		}
 
 		// get requested record id
@@ -424,8 +526,8 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 		// get order specification
 		final String orderParam =
 			StringUtils.nullIfEmpty(ctx.getRequestParam(ORDER_PARAM));
-		final String[] deprecatedSplitParams =
-			ctx.getRequestParamValues(SPLIT_PARAM);
+		final String[] deprecatedSplitParams = (this.ENABLE_DEPRECATED ?
+				ctx.getRequestParamValues(SPLIT_PARAM) : null);
 		final OrderSpecBuilder<R> order;
 		if ((orderParam != null)
 				|| ((deprecatedSplitParams != null)
@@ -473,7 +575,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 		}
 
 		// see if there is a deprecated filter specification
-		if (filter == null) {
+		if (this.ENABLE_DEPRECATED && (filter == null)) {
 			filter = this.getDeprecatedFilterSpec(ctx);
 			if (filter != null)
 				this.log.warn("deprecated filter specification is used");
