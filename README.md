@@ -7,5 +7,3 @@ communicate with a range of other back-end services, and on the other end expose
 a REST API. The framework is an alternative to several Java EE technologies,
 primarily implementations of JAX-RS and JPA. It is modern, practical and
 lightweight.
-
-See more at https://www.boylesoftware.com/wiki/index.php/X2_Framework
