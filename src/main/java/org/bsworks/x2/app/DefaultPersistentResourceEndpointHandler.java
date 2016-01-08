@@ -14,6 +14,7 @@ import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.FilterSpecBuilder;
 import org.bsworks.x2.resource.IdPropertyHandler;
 import org.bsworks.x2.resource.OrderSpecBuilder;
+import org.bsworks.x2.resource.PersistentResourceFetchResult;
 import org.bsworks.x2.resource.PersistentResourceHandler;
 import org.bsworks.x2.resource.PropertiesFetchSpecBuilder;
 import org.bsworks.x2.resource.RangeSpec;
@@ -21,7 +22,6 @@ import org.bsworks.x2.resource.ResourcePropertyAccess;
 import org.bsworks.x2.services.persistence.LockType;
 import org.bsworks.x2.services.persistence.PersistenceTransaction;
 import org.bsworks.x2.services.persistence.PersistentResourceFetch;
-import org.bsworks.x2.services.persistence.PersistentResourceFetchResult;
 
 
 /**
@@ -172,7 +172,7 @@ public class DefaultPersistentResourceEndpointHandler<R>
 			final EndpointCallContext ctx,
 			final PropertiesFetchSpecBuilder<R> propsFetch,
 			final FilterSpecBuilder<R> filter, final OrderSpecBuilder<R> order,
-			final RangeSpec range, final boolean includeTotalCount)
+			final RangeSpec range)
 		throws EndpointCallErrorException {
 
 		final PersistentResourceFetch<R> fetch =
@@ -184,11 +184,8 @@ public class DefaultPersistentResourceEndpointHandler<R>
 			fetch.setFilter(filter);
 		if (order != null)
 			fetch.setOrder(order);
-		if (range != null) {
+		if (range != null)
 			fetch.setRange(range);
-			if (includeTotalCount)
-				fetch.includeTotalCount();
-		}
 
 		return fetch.getResult();
 	}

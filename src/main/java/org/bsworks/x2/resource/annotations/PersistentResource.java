@@ -6,6 +6,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import org.bsworks.x2.resource.PersistentResourceFetchResult;
+
 
 /**
  * Persistent resource. The annotated class must be public, concrete and have a
@@ -35,4 +37,13 @@ public @interface PersistentResource {
 	 * @return The persistent collection name.
 	 */
 	String persistentCollection() default "";
+
+	/**
+	 * Persistent resource fetch result class. If not specified, the basic
+	 * {@link PersistentResourceFetchResult} is used. If specified, must be an
+	 * extension of {@link PersistentResourceFetchResult}.
+	 *
+	 * @return The persistent resource fetch result class.
+	 */
+	Class<?> fetchResultClass() default PersistentResourceFetchResult.class;
 }

@@ -9,6 +9,7 @@ import java.util.SortedMap;
 
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.OrderSpec;
+import org.bsworks.x2.resource.PersistentResourceFetchResult;
 import org.bsworks.x2.resource.PersistentResourceHandler;
 import org.bsworks.x2.resource.PropertiesFetchSpec;
 import org.bsworks.x2.resource.RangeSpec;
@@ -16,7 +17,6 @@ import org.bsworks.x2.resource.ResourceReadSessionCache;
 import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.services.persistence.LockType;
 import org.bsworks.x2.services.persistence.PersistentResourceFetch;
-import org.bsworks.x2.services.persistence.PersistentResourceFetchResult;
 import org.bsworks.x2.util.sql.dialect.SQLDialect;
 
 
@@ -116,11 +116,6 @@ class PersistentResourceFetchImpl<R>
 	private RangeSpec range = null;
 
 	/**
-	 * Tell if total count needs to be included in the ranged fetch result.
-	 */
-	private boolean includeTotalCount = false;
-
-	/**
 	 Lock type for the result, or {@code null} if none requested.
 	 */
 	private LockType lockType = null;
@@ -196,17 +191,6 @@ class PersistentResourceFetchImpl<R>
 	}
 
 	/* (non-Javadoc)
-	 * @see org.bsworks.x2.services.persistence.PersistentResourceFetch#includeTotalCount()
-	 */
-	@Override
-	public PersistentResourceFetch<R> includeTotalCount() {
-
-		this.includeTotalCount = true;
-
-		return this;
-	}
-
-	/* (non-Javadoc)
 	 * See overridden method.
 	 */
 	@Override
@@ -262,7 +246,7 @@ class PersistentResourceFetchImpl<R>
 		// references fetch result map and the count
 		final Map<String, Object> refsFetchResultMap =
 			this.getRefsFetchResultMap();
-		long totalCount = -1;
+		Long totalCount = null;
 
 		// get the main query
 		final MainQuery mainQuery = this.getMainQuery(qb, false);
@@ -275,8 +259,7 @@ class PersistentResourceFetchImpl<R>
 
 			// get the records count if requested
 			if (mainQuery.countQuery != null)
-				totalCount =
-					mainQuery.countQuery.getFirstResult(null).longValue();
+				totalCount = mainQuery.countQuery.getFirstResult(null);
 
 			// execute the main query
 			final List<R> mainResult =
@@ -292,9 +275,14 @@ class PersistentResourceFetchImpl<R>
 				}
 			}
 
+			// build the result
+			final PersistentResourceFetchResult<R> res =
+				this.prsrcHandler.newFetchResult(mainResult,
+						refsFetchResultMap);
+			res.setTotalCount(totalCount);
+
 			// return the result
-			return new PersistentResourceFetchResult<>(mainResult, totalCount,
-					refsFetchResultMap);
+			return res;
 
 		} finally {
 
@@ -304,6 +292,16 @@ class PersistentResourceFetchImpl<R>
 						mainQuery.postStatements)
 					stmt.execute();
 		}
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public <C extends PersistentResourceFetchResult<R>> C getResult(
+			final Class<C> fetchResultClass) {
+
+		return fetchResultClass.cast(this.getResult());
 	}
 
 	/* (non-Javadoc)
@@ -338,6 +336,11 @@ class PersistentResourceFetchImpl<R>
 				@Override
 				public FilterSpec<R> getAggregateFilter(final String propPath) {
 					return propsFetch.getAggregateFilter(propPath);
+				}
+				@Override
+				public boolean isSuperAggregateIncluded(final String propName) {
+					// TODO Auto-generated method stub
+					;return false;
 				}
 			};
 		final QueryBuilder qb = this.buildQuery(propsFetchToUse);

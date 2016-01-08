@@ -26,6 +26,7 @@ import org.bsworks.x2.resource.FilterSpecBuilder;
 import org.bsworks.x2.resource.InvalidSpecificationException;
 import org.bsworks.x2.resource.ObjectPropertyHandler;
 import org.bsworks.x2.resource.OrderSpecBuilder;
+import org.bsworks.x2.resource.PersistentResourceFetchResult;
 import org.bsworks.x2.resource.PersistentResourceHandler;
 import org.bsworks.x2.resource.PropertiesFetchSpec;
 import org.bsworks.x2.resource.PropertiesFetchSpecBuilder;
@@ -35,7 +36,6 @@ import org.bsworks.x2.resource.Resources;
 import org.bsworks.x2.resource.SortDirection;
 import org.bsworks.x2.responses.NotModifiedResponse;
 import org.bsworks.x2.responses.OKResponse;
-import org.bsworks.x2.services.persistence.PersistentResourceFetchResult;
 import org.bsworks.x2.services.versioning.PersistentResourceVersionInfo;
 import org.bsworks.x2.services.versioning.PersistentResourceVersioningService;
 import org.bsworks.x2.util.StringUtils;
@@ -161,7 +161,17 @@ import org.bsworks.x2.util.StringUtils;
  * also used to specify what referred resource records should be included in the
  * result. If the resource contains properties that are references to records of
  * another resource, the referred resource records fetch function allows
- * receiving the referred record in the same response in a transactional way.
+ * receiving the referred records in the same response in a transactional way.
+ *
+ * <p>Finally, the properties fetch specification also allows requesting so
+ * called <em>persistent resource collection super-aggregate properties</em>, or
+ * <em>super-aggregates</em> for short, which are aggregated values that apply
+ * to the whole top-level persistent resource collection as opposed to some
+ * collection nested in the resource properties. An example of such
+ * super-aggregate is a number of records, matched the filter, if any. The value
+ * may be useful in ranged calls (see below) when only a portion of the matched
+ * records is returned in the result to give the caller an idea about the total
+ * number of matched records (e.g. for result pagination).
  *
  * <p>The HTTP request parameter value is a comma-separated list of elements.
  * Each element can be:
@@ -179,6 +189,9 @@ import org.bsworks.x2.util.StringUtils;
  * <li>An aggregate property path followed by a slash and a filter prefix to
  * include the aggregate property and use the specified filter in its value
  * calculation.
+ * <li>Name of a super-aggregate property prefixed with a dot to include the
+ * property in the result. May not have a filter, only the main call filter is
+ * applied.
  * </ul>
  *
  * <p>When a nested property is included using a dot notation property path, all
@@ -245,9 +258,15 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	extends AbstractPersistentResourceEndpointCallHandler<R, Void> {
 
 	/**
+	 * Property name regular expression.
+	 */
+	private static final String PROP_NAME_RE = "[a-z]\\w*";
+
+	/**
 	 * Property path regular expression.
 	 */
-	private static final String PROP_PATH_RE = "[a-z]\\w*(?:\\.[a-z]\\w*)*";
+	private static final String PROP_PATH_RE =
+		PROP_NAME_RE + "(?:\\." + PROP_NAME_RE + ")*";
 
 	/**
 	 * Additional filter key regular expression.
@@ -279,11 +298,14 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 	 */
 	private static final Pattern PROPS_FETCH_PARAM_PATTERN = Pattern.compile(
 			"(?:^|\\G(?<!^),)"
-			+ "(\\*|-?"                             // 1. full element
-				+ "(" + PROP_PATH_RE + ")"          // 2. property path
+			+ "(\\*|[-.]?"                              // 1. full element
+				+ "("                                   // 2. property path
+					+ PROP_NAME_RE
+					+ "((?:\\." + PROP_NAME_RE + ")+)?" // 3. rest of the path
+				+ ")"
 				+ "(?:"
 					+ "\\.\\*"
-					+ "|/(" + FILTER_KEY_RE + ")"   // 3. filter key
+					+ "|/(" + FILTER_KEY_RE + ")"       // 4. filter key
 				+ ")?"
 			+ ")");
 
@@ -659,7 +681,8 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 				m.find(); lastMatchEnd = m.end()) {
 			final String fullMatch = m.group(1);
 			final String propPath = m.group(2);
-			final String filterKey = m.group(3);
+			final boolean topProp = (m.group(3) == null);
+			final String filterKey = m.group(4);
 			if (fullMatch.equals("*")) {
 				propsFetch.includeByDefault();
 			} else if (fullMatch.startsWith("-")) {
@@ -670,6 +693,16 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 					propsFetch.excludeProperties(propPath);
 				else
 					propsFetch.exclude(propPath);
+			} else if (fullMatch.startsWith(".")) {
+				if (!topProp)
+					throw new InvalidSpecificationException(
+							"Unknown super-aggregate property \"" + propPath
+							+ "\".");
+				if (filterKey != null)
+					throw new InvalidSpecificationException(
+							"Super-aggregate property \"" + propPath
+							+ "\" may not be filtered.");
+				propsFetch.includeSuperAggregate(propPath);
 			} else {
 				if (filterKey != null) {
 					final String aggCollectionPath;
@@ -1363,7 +1396,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 		// get the record
 		final PersistentResourceFetchResult<R> res =
 			this.endpointHandler.search(ctx, propsFetch, recFilter, null,
-					new RangeSpec(0, 1), false);
+					new RangeSpec(0, 1));
 
 		// return the record in the response
 		return new OKResponse(res, eTag, lastModTS);
@@ -1417,8 +1450,7 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 
 		// get matching records
 		final PersistentResourceFetchResult<R> res =
-			this.endpointHandler.search(ctx, propsFetch, filter, order, range,
-					true);
+			this.endpointHandler.search(ctx, propsFetch, filter, order, range);
 
 		// return the records in the response
 		return new OKResponse(res, eTag, lastModTS);
@@ -1464,6 +1496,8 @@ public class DefaultGetPersistentResourceEndpointCallHandler<R>
 			if ((propsFetch != null) && propsFetch.isIncluded(ph.getName()))
 				prsrcClasses.addAll(ph.getUsedPersistentResourceClasses());
 		}
+
+		;// ? - super-aggregates?
 
 		// done if no references are requested to be fetched
 		if (propsFetch == null)

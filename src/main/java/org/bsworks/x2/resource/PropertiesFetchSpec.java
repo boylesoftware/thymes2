@@ -67,4 +67,15 @@ public interface PropertiesFetchSpec<R> {
 	 * @return The filter, or {@code null} if no filter.
 	 */
 	FilterSpec<R> getAggregateFilter(String propPath);
+
+	/**
+	 * Tell if the specified super-aggregate persistent resource collection
+	 * property is included in the fetch.
+	 *
+	 * @param propName Persistent resource collection super-aggregate property
+	 * name.
+	 *
+	 * @return {@code true} if included.
+	 */
+	boolean isSuperAggregateIncluded(String propName);
 }

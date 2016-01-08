@@ -1,6 +1,8 @@
 package org.bsworks.x2.resource;
 
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 
 import org.bsworks.x2.Actor;
 
@@ -22,6 +24,21 @@ public interface PersistentResourceHandler<R>
 	 * @return Persistent collection name.
 	 */
 	String getPersistentCollectionName();
+
+	/**
+	 * Get new instance of the transient resource used as the persistent
+	 * resource fetch result.
+	 *
+	 * @param records Fetched persistent resource records, or {@code null} if
+	 * records are not included in the fetch (super-aggregates only fetch).
+	 * @param refs Fetched referred persistent resource records by string
+	 * representations of their corresponding references, or {@code null} if no
+	 * referred resource records fetch was requested.
+	 *
+	 * @return New fetch result object.
+	 */
+	<C extends PersistentResourceFetchResult<R>> C newFetchResult(
+			List<R> records, Map<String, Object> refs);
 
 	/**
 	 * Tell if the specified actor has specified access to the persistent

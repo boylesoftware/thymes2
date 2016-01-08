@@ -2,6 +2,7 @@ package org.bsworks.x2.services.persistence;
 
 import org.bsworks.x2.resource.FilterSpec;
 import org.bsworks.x2.resource.OrderSpec;
+import org.bsworks.x2.resource.PersistentResourceFetchResult;
 import org.bsworks.x2.resource.PropertiesFetchSpec;
 import org.bsworks.x2.resource.RangeSpec;
 
@@ -59,16 +60,6 @@ public interface PersistentResourceFetch<R> {
 	PersistentResourceFetch<R> setRange(RangeSpec range);
 
 	/**
-	 * Tell the fetch to include the total count of matched records in the fetch
-	 * result. It makes sense only if range is specified using
-	 * {@link #setRange(RangeSpec)} method. Otherwise, the total count will
-	 * always be the number of fetched records in the fetch result.
-	 *
-	 * @return This fetch builder.
-	 */
-	PersistentResourceFetch<R> includeTotalCount();
-
-	/**
 	 * Tell the fetch to lock the fetched persistent resource records. The lock
 	 * is held until the end of the transaction.
 	 *
@@ -96,6 +87,19 @@ public interface PersistentResourceFetch<R> {
 	 * @return The fetch result.
 	 */
 	PersistentResourceFetchResult<R> getResult();
+
+	/**
+	 * Execute the fetch and get the resource specific result.
+	 *
+	 * @param fetchResultClass Resource specific fetch result class.
+	 *
+	 * @return The fetch result.
+	 *
+	 * @throws ClassCastException If the specified fetch result class does not
+	 * match the one specified for the persistent resource.
+	 */
+	<C extends PersistentResourceFetchResult<R>> C getResult(
+			Class<C> fetchResultClass);
 
 	/**
 	 * Execute the fetch and get the first fetched record.

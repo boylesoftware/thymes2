@@ -12,11 +12,11 @@ import org.bsworks.x2.EndpointCallHandler;
 import org.bsworks.x2.HttpMethod;
 import org.bsworks.x2.resource.FilterSpecBuilder;
 import org.bsworks.x2.resource.OrderSpecBuilder;
+import org.bsworks.x2.resource.PersistentResourceFetchResult;
 import org.bsworks.x2.resource.PersistentResourceHandler;
 import org.bsworks.x2.resource.PropertiesFetchSpecBuilder;
 import org.bsworks.x2.resource.RangeSpec;
 import org.bsworks.x2.resource.Resources;
-import org.bsworks.x2.services.persistence.PersistentResourceFetchResult;
 
 
 /**
@@ -83,8 +83,6 @@ public interface PersistentResourceEndpointHandler<R> {
 	 * particular order.
 	 * @param range Collection range specification, or {@code null} for all
 	 * records.
-	 * @param includeTotalCount {@code true} to include total count in the fetch
-	 * result. Taken into account only if "range" parameter is not {@code null}.
 	 *
 	 * @return The search result.
 	 *
@@ -94,7 +92,7 @@ public interface PersistentResourceEndpointHandler<R> {
 	PersistentResourceFetchResult<R> search(EndpointCallContext ctx,
 			PropertiesFetchSpecBuilder<R> propsFetch,
 			FilterSpecBuilder<R> filter, OrderSpecBuilder<R> order,
-			RangeSpec range, boolean includeTotalCount)
+			RangeSpec range)
 		throws EndpointCallErrorException;
 
 	/**

@@ -4,11 +4,14 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.bsworks.x2.Actor;
+import org.bsworks.x2.InitializationException;
 import org.bsworks.x2.resource.MetaPropertyType;
+import org.bsworks.x2.resource.PersistentResourceFetchResult;
 import org.bsworks.x2.resource.PersistentResourceHandler;
 import org.bsworks.x2.resource.ResourcePropertyAccess;
 import org.bsworks.x2.resource.annotations.PersistentResource;
@@ -31,6 +34,11 @@ class PersistentResourceHandlerImpl<R>
 	 * Persistent collection name.
 	 */
 	private final String persistentCollectionName;
+
+	/**
+	 * Fetch result class.
+	 */
+	private final Class<?> fetchResultClass;
 
 	/**
 	 * Resource access checker.
@@ -64,12 +72,13 @@ class PersistentResourceHandlerImpl<R>
 	 * @param prsrcClass Persistent resource class.
 	 * @param prsrcAnno The {@link PersistentResource} annotation.
 	 *
-	 * @throws IllegalArgumentException If something is wrong with the specified
+	 * @throws InitializationException If something is wrong with the specified
 	 * persistent resource class.
 	 */
 	PersistentResourceHandlerImpl(final ResourcesImpl resources,
 			final Set<Class<?>> prsrcClasses, final Class<R> prsrcClass,
-			final PersistentResource prsrcAnno) {
+			final PersistentResource prsrcAnno)
+		throws InitializationException {
 		super(new ResourcePropertiesContainerImpl<>(resources, prsrcClasses,
 						prsrcClass, prsrcClass, null, null,
 						StringUtils.defaultIfEmpty(
@@ -80,13 +89,23 @@ class PersistentResourceHandlerImpl<R>
 		// process annotation
 		this.persistentCollectionName =
 			this.props.getPersistentCollectionName();
+		try {
+			this.fetchResultClass = prsrcAnno.fetchResultClass().asSubclass(
+					PersistentResourceFetchResult.class);
+			this.fetchResultClass.newInstance();
+		} catch (final ClassCastException | InstantiationException |
+				IllegalAccessException e) {
+			throw new InitializationException("Persistent resource "
+					+ prsrcClass.getName() + " has invalid fetch result class.",
+					e);
+		}
 		this.accessChecker =
 			new AccessChecker(prsrcAnno.accessRestrictions(),
 					TargetType.PERSISTENT);
 
 		// check that we have record id property
 		if (this.getIdProperty() == null)
-			throw new IllegalArgumentException("Persistent resource "
+			throw new InitializationException("Persistent resource "
 					+ prsrcClass.getName()
 					+ " does not contain record id property.");
 
@@ -104,7 +123,7 @@ class PersistentResourceHandlerImpl<R>
 					(MetaPropertyHandlerImpl) propHandler;
 				if (this.metaPropertyHandlers.put(metaPropHandler.getType(),
 						metaPropHandler) != null)
-					throw new IllegalArgumentException("Persistent resource "
+					throw new InitializationException("Persistent resource "
 							+ prsrcClass.getName()
 							+ " contains more than one "
 							+ metaPropHandler.getType() + " meta-property.");
@@ -135,6 +154,28 @@ class PersistentResourceHandlerImpl<R>
 	public String getPersistentCollectionName() {
 
 		return this.persistentCollectionName;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@SuppressWarnings("unchecked")
+	@Override
+	public <C extends PersistentResourceFetchResult<R>> C newFetchResult(
+			final List<R> records, final Map<String, Object> refs) {
+
+		final C res;
+		try {
+			res = (C) this.fetchResultClass.newInstance();
+		} catch (final InstantiationException | IllegalAccessException e) {
+			throw new AssertionError("Error instatiating fetch result class.",
+					e);
+		}
+
+		res.setRecords(records);
+		res.setRefs(refs);
+
+		return res;
 	}
 
 	/* (non-Javadoc)

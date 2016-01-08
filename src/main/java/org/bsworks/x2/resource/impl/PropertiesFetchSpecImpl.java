@@ -214,6 +214,16 @@ class PropertiesFetchSpecImpl<R>
 	 * See overridden method.
 	 */
 	@Override
+	public boolean isSuperAggregateIncluded(final String propName) {
+
+		// TODO Auto-generated method stub
+		;return false;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
 	public PropertiesFetchSpecBuilder<R> includeByDefault() {
 
 		if (this.includeByDefault)
@@ -423,5 +433,16 @@ class PropertiesFetchSpecImpl<R>
 
 		// done
 		return this;
+	}
+
+	/* (non-Javadoc)
+	 * See overridden method.
+	 */
+	@Override
+	public PropertiesFetchSpecBuilder<R> includeSuperAggregate(
+			final String propName) {
+
+		// TODO Auto-generated method stub
+		;return this;
 	}
 }

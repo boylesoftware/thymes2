@@ -168,4 +168,18 @@ public interface PropertiesFetchSpecBuilder<R>
 	 * invalid.
 	 */
 	PropertiesFetchSpecBuilder<R> excludeProperties(String propPath);
+
+	/**
+	 * Include specified persistent resource collection super-aggregate property
+	 * in the fetch. By default, nothing is included.
+	 *
+	 * @param propName The persistent resource collection super-aggregate
+	 * property name.
+	 *
+	 * @return This object (for chaining).
+	 *
+	 * @throws InvalidSpecificationException If the specified property name is
+	 * invalid.
+	 */
+	PropertiesFetchSpecBuilder<R> includeSuperAggregate(String propName);
 }
