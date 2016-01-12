@@ -3,8 +3,10 @@ package org.bsworks.x2.resource.impl;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
@@ -98,6 +100,11 @@ class PropertiesFetchSpecImpl<R>
 	 * Aggregate property filters by property paths.
 	 */
 	private final Map<String, FilterSpec<R>> aggergateFilters = new HashMap<>();
+
+	/**
+	 * Included super-aggregate property names.
+	 */
+	private final Set<String> includedSuperAggregates = new HashSet<>();
 
 
 	/**
@@ -216,8 +223,7 @@ class PropertiesFetchSpecImpl<R>
 	@Override
 	public boolean isSuperAggregateIncluded(final String propName) {
 
-		// TODO Auto-generated method stub
-		;return false;
+		return this.includedSuperAggregates.contains(propName);
 	}
 
 	/* (non-Javadoc)
@@ -442,7 +448,12 @@ class PropertiesFetchSpecImpl<R>
 	public PropertiesFetchSpecBuilder<R> includeSuperAggregate(
 			final String propName) {
 
-		// TODO Auto-generated method stub
-		;return this;
+		;// TODO: validate the property (exists in the fetch result class and is
+		//       an aggregate.
+
+		// include the property
+		this.includedSuperAggregates.add(propName);
+
+		return this;
 	}
 }

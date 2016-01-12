@@ -32,8 +32,10 @@ class PersistentResourceFetchImpl<R>
 
 	/**
 	 * Main query with an optional count query.
+	 *
+	 * @param <R> Persistent resource type.
 	 */
-	private final class MainQuery {
+	private static final class MainQuery<R> {
 
 		/**
 		 * Statements to execute before the query.
@@ -207,13 +209,22 @@ class PersistentResourceFetchImpl<R>
 	@Override
 	public long getCount() {
 
+		// special properties fetch specification
+		final PropertiesFetchSpec<R> propsFetch = this.resources
+				.getPropertiesFetchSpec(this.prsrcHandler.getResourceClass())
+				.includeSuperAggregate(
+						PersistentResourceFetchResult.TOTAL_COUNT_PROP);
+
 		// build the query
-		final QueryBuilder qb = this.buildQuery(
-				this.resources.getPropertiesFetchSpec(
-						this.prsrcHandler.getResourceClass()));
+		final QueryBuilder qb = buildQuery(
+				this.resources, this.tx, this.prsrcHandler,
+				propsFetch, this.filter, null);
 
 		// get the main query
-		final MainQuery mainQuery = this.getMainQuery(qb, true);
+		final MainQuery<R> mainQuery = getMainQuery(
+				this.resources, this.tx, this.prsrcHandler,
+				qb, propsFetch, this.filter, null, null,
+				this.lockType, this.anchorTableName);
 
 		// execute pre-statements
 		if (mainQuery.preStatements != null)
@@ -241,7 +252,9 @@ class PersistentResourceFetchImpl<R>
 	public PersistentResourceFetchResult<R> getResult() {
 
 		// build the query
-		final QueryBuilder qb = this.buildQuery(this.propsFetch);
+		final QueryBuilder qb = buildQuery(
+				this.resources, this.tx, this.prsrcHandler,
+				this.propsFetch, this.filter, this.order);
 
 		// references fetch result map and the count
 		final Map<String, Object> refsFetchResultMap =
@@ -249,7 +262,10 @@ class PersistentResourceFetchImpl<R>
 		Long totalCount = null;
 
 		// get the main query
-		final MainQuery mainQuery = this.getMainQuery(qb, false);
+		final MainQuery<R> mainQuery = getMainQuery(
+				this.resources, this.tx, this.prsrcHandler,
+				qb, this.propsFetch, this.filter, this.order, this.range,
+				this.lockType, this.anchorTableName);
 
 		// execute pre-statements
 		if (mainQuery.preStatements != null)
@@ -310,7 +326,7 @@ class PersistentResourceFetchImpl<R>
 	@Override
 	public R getSingleResult() {
 
-		// build the query
+		// special properties fetch specification
 		final PropertiesFetchSpec<R> propsFetch = this.propsFetch;
 		final PropertiesFetchSpec<R> propsFetchToUse;
 		if (propsFetch == null)
@@ -339,14 +355,21 @@ class PersistentResourceFetchImpl<R>
 				}
 				@Override
 				public boolean isSuperAggregateIncluded(final String propName) {
-					// TODO Auto-generated method stub
-					;return false;
+					return false;
 				}
 			};
-		final QueryBuilder qb = this.buildQuery(propsFetchToUse);
+
+		// build the query
+		final QueryBuilder qb = buildQuery(
+				this.resources, this.tx, this.prsrcHandler,
+				propsFetchToUse, this.filter, this.order);
 
 		// get the main query
-		final MainQuery mainQuery = this.getMainQuery(qb, false);
+		final MainQuery<R> mainQuery = getMainQuery(
+				this.resources, this.tx, this.prsrcHandler,
+				qb, propsFetchToUse, this.filter, this.order,
+					new RangeSpec(0, 1),
+				this.lockType, this.anchorTableName);
 
 		// execute pre-statements
 		if (mainQuery.preStatements != null)
@@ -381,31 +404,71 @@ class PersistentResourceFetchImpl<R>
 	}
 
 	/**
+	 * Get map for the references fetch result.
+	 *
+	 * @return The references fetch result map, or {@code null} if not required.
+	 */
+	private Map<String, Object> getRefsFetchResultMap() {
+
+		if ((this.propsFetch == null)
+				|| this.propsFetch.getFetchedRefProperties().isEmpty())
+			return null;
+
+		return new HashMap<>();
+	}
+
+	/**
 	 * Build the query.
 	 *
-	 * @param propsFetch Properties fetch specification to use.
+	 * @param resources Resources.
+	 * @param tx Transaction.
+	 * @param prsrcHandler Persistent resource handler.
+	 * @param propsFetch Properties fetch specification.
+	 * @param filter Filter specification.
+	 * @param order Order specification.
 	 *
 	 * @return The top query builder.
 	 */
-	private QueryBuilder buildQuery(final PropertiesFetchSpec<R> propsFetch) {
+	private static <R> QueryBuilder buildQuery(
+			final Resources resources,
+			final JDBCPersistenceTransaction tx,
+			final PersistentResourceHandler<R> prsrcHandler,
+			final PropertiesFetchSpec<R> propsFetch,
+			final FilterSpec<R> filter,
+			final OrderSpec<R> order) {
 
-		return QueryBuilder.createQueryBuilder(this.resources,
-				this.tx.getSQLDialect(), this.tx.getParameterValuesFactory(),
-				this.tx.getActor(), this.prsrcHandler, propsFetch, this.filter,
-				this.order);
+		return QueryBuilder.createQueryBuilder(resources, tx.getSQLDialect(),
+				tx.getParameterValuesFactory(), tx.getActor(), prsrcHandler,
+				propsFetch, filter, order);
 	}
 
 	/**
 	 * Build, prepare and return the main query.
 	 *
+	 * @param resources Resources.
+	 * @param tx Transaction.
+	 * @param prsrcHandler Persistent resource handler.
 	 * @param qb Top query builder.
-	 * @param forceCount {@code true} to build records count query even if no
-	 * range set in the fetch.
+	 * @param propsFetch Properties fetch specification.
+	 * @param filter Filter specification.
+	 * @param order Order specification.
+	 * @param range Range specification.
+	 * @param lockType Lock type.
+	 * @param anchorTableName Anchor table name.
 	 *
 	 * @return The main query.
 	 */
-	private MainQuery getMainQuery(final QueryBuilder qb,
-			final boolean forceCount) {
+	private static <R> MainQuery<R> getMainQuery(
+			final Resources resources,
+			final JDBCPersistenceTransaction tx,
+			final PersistentResourceHandler<R> prsrcHandler,
+			final QueryBuilder qb,
+			final PropertiesFetchSpec<R> propsFetch,
+			final FilterSpec<R> filter,
+			final OrderSpec<R> order,
+			final RangeSpec range,
+			final LockType lockType,
+			final String anchorTableName) {
 
 		// the queries, the pre- and post- statements, the parameters
 		final List<String> preStmtTexts = new ArrayList<>();
@@ -418,29 +481,30 @@ class PersistentResourceFetchImpl<R>
 		params.putAll(qb.getAggregationParams());
 
 		// needed objects from the transaction
-		final SQLDialect dialect = this.tx.getSQLDialect();
+		final SQLDialect dialect = tx.getSQLDialect();
 		final ParameterValuesFactoryImpl paramsFactory =
-			this.tx.getParameterValuesFactory();
+			tx.getParameterValuesFactory();
 
 		// get "WHERE" and "ORDER BY" clauses
 		final WhereClause whereClause = (
-				(this.filter == null) || this.filter.isEmpty() ?
-						null : qb.buildWhereClause(params));
-		final OrderByClause orderByClause = (this.order == null ? null :
-			qb.buildOrderByClause(params));
+				(filter == null) || filter.isEmpty() ? null :
+					qb.buildWhereClause(params));
+		final OrderByClause orderByClause =
+				(order == null ? null :
+					qb.buildOrderByClause(params));
 
 		// check if no branches
 		if (qb.getBranches().isEmpty()) {
 
 			// check if no range
-			if (this.range == null) {
+			if (range == null) {
 
 				// direct select
 				final String q =
 					qb.buildDirectSelectQuery(whereClause, orderByClause);
-				if (this.lockType == null)
+				if (lockType == null)
 					dataQueryText = q;
-				else switch (this.lockType) {
+				else switch (lockType) {
 				case SHARED:
 					dataQueryText = dialect.makeSelectWithShareLock(
 							q, qb.getRootTableAlias());
@@ -462,10 +526,10 @@ class PersistentResourceFetchImpl<R>
 					final String q = dialect.makeRangedSelect(
 							qb.buildDirectSelectQuery(whereClause,
 									orderByClause),
-							this.range, paramsFactory, params);
-					if (this.lockType == null)
+							range, paramsFactory, params);
+					if (lockType == null)
 						dataQueryText = q;
-					else switch (this.lockType) {
+					else switch (lockType) {
 					case SHARED:
 						dataQueryText = dialect.makeSelectWithShareLock(
 								q, qb.getRootTableAlias());
@@ -484,11 +548,11 @@ class PersistentResourceFetchImpl<R>
 					// create anchor table
 					final String q = dialect.makeRangedSelect(
 							qb.buildIdsQuery(whereClause, orderByClause),
-							this.range, paramsFactory, params);
+							range, paramsFactory, params);
 					dialect.makeSelectIntoTempTable(
-							this.anchorTableName,
-							this.tx.addTempTable(this.anchorTableName),
-							(this.lockType == LockType.EXCLUSIVE
+							anchorTableName,
+							tx.addTempTable(anchorTableName),
+							(lockType == LockType.EXCLUSIVE
 									? dialect.makeSelectWithExclusiveLock(
 											q, qb.getRootTableAlias())
 									: dialect.makeSelectWithShareLock(
@@ -497,7 +561,7 @@ class PersistentResourceFetchImpl<R>
 
 					// anchored select
 					dataQueryText =
-						qb.buildAnchoredSelectQuery(this.anchorTableName,
+						qb.buildAnchoredSelectQuery(anchorTableName,
 								orderByClause);
 				}
 			}
@@ -505,14 +569,14 @@ class PersistentResourceFetchImpl<R>
 		} else { // branched query
 
 			// check if no range
-			if (this.range == null) {
+			if (range == null) {
 
 				// create anchor table
 				final String q = qb.buildIdsQuery(whereClause, null);
 				dialect.makeSelectIntoTempTable(
-						this.anchorTableName,
-						this.tx.addTempTable(this.anchorTableName),
-						(this.lockType == LockType.EXCLUSIVE
+						anchorTableName,
+						tx.addTempTable(anchorTableName),
+						(lockType == LockType.EXCLUSIVE
 								? dialect.makeSelectWithExclusiveLock(
 										q, qb.getRootTableAlias())
 								: dialect.makeSelectWithShareLock(
@@ -524,11 +588,11 @@ class PersistentResourceFetchImpl<R>
 				// create anchor table
 				final String q = dialect.makeRangedSelect(
 						qb.buildIdsQuery(whereClause, orderByClause),
-						this.range, paramsFactory, params);
+						range, paramsFactory, params);
 				dialect.makeSelectIntoTempTable(
-						this.anchorTableName,
-						this.tx.addTempTable(this.anchorTableName),
-						(this.lockType == LockType.EXCLUSIVE
+						anchorTableName,
+						tx.addTempTable(anchorTableName),
+						(lockType == LockType.EXCLUSIVE
 								? dialect.makeSelectWithExclusiveLock(
 										q, qb.getRootTableAlias())
 								: dialect.makeSelectWithShareLock(
@@ -538,8 +602,7 @@ class PersistentResourceFetchImpl<R>
 
 			// anchored select
 			dataQueryText =
-				qb.buildAnchoredSelectQuery(this.anchorTableName,
-						orderByClause);
+				qb.buildAnchoredSelectQuery(anchorTableName, orderByClause);
 		}
 
 		// prepare pre- and post- statements
@@ -547,7 +610,7 @@ class PersistentResourceFetchImpl<R>
 		if (!preStmtTexts.isEmpty()) {
 			preStmts = new ArrayList<>(preStmtTexts.size());
 			for (final String stmtText : preStmtTexts)
-				preStmts.add(new PersistenceUpdateImpl(this.resources, this.tx,
+				preStmts.add(new PersistenceUpdateImpl(resources, tx,
 						stmtText, params));
 		} else {
 			preStmts = null;
@@ -556,7 +619,7 @@ class PersistentResourceFetchImpl<R>
 		if (!postStmtTexts.isEmpty()) {
 			postStmts = new ArrayList<>(postStmtTexts.size());
 			for (final String stmtText : postStmtTexts)
-				postStmts.add(new PersistenceUpdateImpl(this.resources, this.tx,
+				postStmts.add(new PersistenceUpdateImpl(resources, tx,
 						stmtText, params));
 		} else {
 			postStmts = null;
@@ -564,36 +627,23 @@ class PersistentResourceFetchImpl<R>
 
 		// create the query
 		final ResourcePersistenceQueryImpl<R> query =
-			new ResourcePersistenceQueryImpl<>(this.resources, this.tx,
-					dataQueryText, this.prsrcHandler.getResourceClass(),
+			new ResourcePersistenceQueryImpl<>(resources, tx,
+					dataQueryText, prsrcHandler.getResourceClass(),
 					params);
 		query.setSessionCache(new ResourceReadSessionCache());
 
 		// create records count query
-		if (this.includeTotalCount || forceCount)
+		if ((propsFetch != null) && propsFetch.isSuperAggregateIncluded(
+				PersistentResourceFetchResult.TOTAL_COUNT_PROP))
 			countQueryText = qb.buildCountQuery(whereClause);
 		else
 			countQueryText = null;
 
 		// create and return the main query object
-		return new MainQuery(preStmts, postStmts, query,
+		return new MainQuery<>(preStmts, postStmts, query,
 				(countQueryText == null ? null :
-					new SimpleValuePersistenceQueryImpl<>(this.resources,
-							this.tx, countQueryText,
+					new SimpleValuePersistenceQueryImpl<>(resources,
+							tx, countQueryText,
 							ResultSetValueReader.LONG_VALUE_READER, params)));
-	}
-
-	/**
-	 * Get map for the references fetch result.
-	 *
-	 * @return The references fetch result map, or {@code null} if not required.
-	 */
-	private Map<String, Object> getRefsFetchResultMap() {
-
-		if ((this.propsFetch == null)
-				|| this.propsFetch.getFetchedRefProperties().isEmpty())
-			return null;
-
-		return new HashMap<>();
 	}
 }
