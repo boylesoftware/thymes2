@@ -29,6 +29,7 @@ public interface PersistentResourceHandler<R>
 	 * Get new instance of the transient resource used as the persistent
 	 * resource fetch result.
 	 *
+	 * @param <C> Fetch result type.
 	 * @param records Fetched persistent resource records, or {@code null} if
 	 * records are not included in the fetch (super-aggregates only fetch).
 	 * @param refs Fetched referred persistent resource records by string

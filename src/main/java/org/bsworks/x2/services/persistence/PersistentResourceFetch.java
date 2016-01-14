@@ -91,6 +91,7 @@ public interface PersistentResourceFetch<R> {
 	/**
 	 * Execute the fetch and get the resource specific result.
 	 *
+	 * @param <C> Fetch result type.
 	 * @param fetchResultClass Resource specific fetch result class.
 	 *
 	 * @return The fetch result.
