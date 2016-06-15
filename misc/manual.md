@@ -2116,29 +2116,123 @@ This concludes a demonstration of the most basic features of the framework. A fu
 
 These are web-application context parameters utilized by the framework and allowing to customize it for the application and/or its runtime environment:
 
-| Parameter &amp; Default Value | Description |
-| --- | --- |
-| x2.app.manifest<br/>*Default:* /META-INF/MANIFEST.MF | Application manifest file path, relative to the web-application context. In live mode, the manifest file is used to get the application version ("Implementation-Version" manifest attribute). The application version is used, for example, in forming resource "ETag" values, so that resources cached by clients from different application releases do not mix up. |
-| x2.threads.EndpointCallProcessors<br/>*Default:* 2 | Number of threads used to process regular endpoint requests. |
-| x2.threads.JobRunners<br/>*Default:* 1 | Number of threads used for long-running background jobs and "long job" endpoint requests. |
-| x2.threads.SideTaskProcessors<br/>*Default:* 1 | Number of threads used to execute asynchronous side tasks. |
-| x2.maxRequestSize<br/>*Default:* 2048 | Maximum allowed HTTP request entity size in bytes. |
-| x2.regularCallTimeout<br/>*Default:*10000 | Timeout in milliseconds for processing regular endpoint calls. Value of zero or less indicates no such timeout. |
-| x2.longJobCallTimeout<br/>*Default:* 60000 | Timeout in milliseconds for processing "long job" endpoint calls. Value of zero or less indicates no such timeout. |
-| x2.allowedOriginsPattern<br/>*Default:* \* | Regular expression for allowed CORS request origins. Special value of \* is used for the CORS wildcard. |
-| x2.auth.tokenTTL<br/>*Default:* 1800000 | Number of milliseconds a newly issued authentication token is valid. |
-| x2.auth.cache.discardAfter<br/>*Default:* 60000 | Number of milliseconds after which to expire results of actor lookup in the actor authentication service. If 0, caching of actor lookup results is disabled. |
-| x2.auth.cache.refreshAfter<br/>*Default:* 5000 | Number of milliseconds after which to request refresh of cached actor lookup results. As opposed to the discard timeout, refreshing is performed asynchronously in the background, which the currently cached result is still returned. |
-| x2.auth.cache.maxSize<br/>*Default:* 256 | Maximum size of the actor lookup results cache. |
-| x2.service.serialization.provider<br/>*Default:* org.bsworks.x2.services.serialization.impl.json.JsonResourceSerializationServiceProvider | Class name of the resource serialization service provider used by the application. |
-| x2.service.versioning.provider<br/>*Default:* org.bsworks.x2.services.versioning.impl.memory.MemoryPersistentResourceVersioningServiceProvider | Class name of the persistent resource versioning service provider used by the application. |
-| x2.service.persistence.provider<br/>*Default:* org.bsworks.x2.services.persistence.impl.dummy.DummyPersistenceServiceProvider | Class name of the persistence service provider used by the application. |
-| x2.service.auth.provider<br/>*Default:* org.bsworks.x2.services.auth.impl.dummy.DummyActorAuthenticationServiceProvider | Class name of the actor authentication service provider used by the application. |
-| x2.service.monitor.provider<br/>*Default:* org.bsworks.x2.services.monitor.impl.dummy.DummyMonitorServiceProvider | Class name of the application internal monitor service provider used by the application. |
-| x2.app.serviceProviders | Whitespace-separated list of additional application service providers each with an optional service instance id following a colon after the provider class name. |
-| x2.app.persistentResources.packages | Whitespace-separated list of Java packages that contain application persistent resources. |
-| x2.app.persistentResources.jarsPattern | Regular expression pattern for JAR file names to scan for persistent application resources. If empty, only classes in /WEB-INF/classes are scanned. |
-| x2.app.endpoints | Service endpoint definitions. |
+* *x2.app.manifest*
+
+  Default: /META-INF/MANIFEST.MF
+
+  Application manifest file path, relative to the web-application context. In live mode, the manifest file is used to get the application version ("Implementation-Version" manifest attribute). The application version is used, for example, in forming resource "ETag" values, so that resources cached by clients from different application releases do not mix up.
+
+* *x2.threads.EndpointCallProcessors*
+
+  Default: 2
+
+  Number of threads used to process regular endpoint requests.
+
+* *x2.threads.JobRunners*
+
+  Default: 1
+
+  Number of threads used for long-running background jobs and "long job" endpoint requests.
+
+* *x2.threads.SideTaskProcessors*
+
+  Default: 1
+
+  Number of threads used to execute asynchronous side tasks.
+
+* *x2.maxRequestSize*
+
+  Default: 2048
+
+  Maximum allowed HTTP request entity size in bytes.
+
+* *x2.regularCallTimeout*
+
+  Default: 10000
+
+  Timeout in milliseconds for processing regular endpoint calls. Value of zero or less indicates no such timeout.
+
+* *x2.longJobCallTimeout*
+
+  Default: 60000
+
+  Timeout in milliseconds for processing "long job" endpoint calls. Value of zero or less indicates no such timeout.
+
+* *x2.allowedOriginsPattern*
+
+  Default: \*
+
+  Regular expression for allowed CORS request origins. Special value of \* is used for the CORS wildcard.
+
+* *x2.auth.tokenTTL*
+
+  Default: 1800000
+
+  Number of milliseconds a newly issued authentication token is valid.
+
+* *x2.auth.cache.discardAfter*
+
+  Default: 60000
+
+  Number of milliseconds after which to expire results of actor lookup in the actor authentication service. If 0, caching of actor lookup results is disabled.
+
+* *x2.auth.cache.refreshAfter*
+
+  Default: 5000
+
+  Number of milliseconds after which to request refresh of cached actor lookup results. As opposed to the discard timeout, refreshing is performed asynchronously in the background, which the currently cached result is still returned.
+
+* *x2.auth.cache.maxSize*
+
+  Default: 256
+
+  Maximum size of the actor lookup results cache.
+
+* *x2.service.serialization.provider*
+
+  Default: org.bsworks.x2.services.serialization.impl.json.JsonResourceSerializationServiceProvider
+
+  Class name of the resource serialization service provider used by the application.
+
+* *x2.service.versioning.provider*
+
+  Default: org.bsworks.x2.services.versioning.impl.memory.MemoryPersistentResourceVersioningServiceProvider
+
+  Class name of the persistent resource versioning service provider used by the application.
+
+* *x2.service.persistence.provider*
+
+  Default: org.bsworks.x2.services.persistence.impl.dummy.DummyPersistenceServiceProvider
+
+  Class name of the persistence service provider used by the application.
+
+* *x2.service.auth.provider*
+
+  Default: org.bsworks.x2.services.auth.impl.dummy.DummyActorAuthenticationServiceProvider
+
+  Class name of the actor authentication service provider used by the application.
+
+* *x2.service.monitor.provider*
+
+  Default: org.bsworks.x2.services.monitor.impl.dummy.DummyMonitorServiceProvider
+
+  Class name of the application internal monitor service provider used by the application.
+
+* *x2.app.serviceProviders*
+
+  Whitespace-separated list of additional application service providers each with an optional service instance id following a colon after the provider class name.
+
+* *x2.app.persistentResources.packages*
+
+  Whitespace-separated list of Java packages that contain application persistent resources.
+
+* *x2.app.persistentResources.jarsPattern*
+
+  Regular expression pattern for JAR file names to scan for persistent application resources. If empty, only classes in /WEB-INF/classes are scanned.
+
+* *x2.app.endpoints*
+
+  Service endpoint definitions.
 
 ## Additional Information
 
