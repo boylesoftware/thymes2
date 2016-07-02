@@ -426,7 +426,7 @@ class EndpointCallExecutor<E>
 
 			error = e;
 
-		} catch (final Exception e) {
+		} catch (final Throwable e) {
 			this.log.error("internal server error: " + e.getMessage(), e);
 
 			this.runtimeCtx.getMonitorService().logApplicationError(e,
@@ -455,7 +455,7 @@ class EndpointCallExecutor<E>
 										this.omitResponseEntity);
 						} catch (final IOException e) {
 							throw e;
-						} catch (final Exception e) {
+						} catch (final Throwable e) {
 							this.log.error("error sending response", e);
 							httpResponse.sendError(
 								HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
